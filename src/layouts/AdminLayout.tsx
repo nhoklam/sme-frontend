@@ -4,7 +4,7 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import {
     Box, AppBar, Toolbar, Typography, IconButton,
     Drawer, Avatar, Menu, MenuItem, Divider,
-    Badge, Tooltip, useTheme, useMediaQuery,
+    Badge, Tooltip, useTheme, useMediaQuery, Button
 } from '@mui/material';
 import {
     Menu as MenuIcon,
@@ -12,7 +12,39 @@ import {
     Notifications, ChevronLeft,
 } from '@mui/icons-material';
 import Sidebar from '../components/layout/Sidebar';
+import BranchSelector from '../components/common/BranchSelector';
 import authService from '../services/authService';
+import { notificationService, Notification } from '../services/notificationService';
+import warehouseService from '../services/warehouseService';
+import { useWebSocket, WsPayload } from '../store/hooks/useWebSocket';
+import { formatDistanceToNow } from 'date-fns';
+import { vi } from 'date-fns/locale';
+import AIChatWidget from '../components/common/AIChatWidget';
+
+/**
+ * Render message thân thiện từ payload:
+ * - Ưu tiên payload.warehouseName (records mới)
+ * - Nếu không có, tra cứu warehouseMap theo warehouseId (records cũ)
+ */
+const renderNotifMessage = (notif: Notification, warehouseMap: Map<string, string>): string => {
+    if (notif.type === 'LOW_STOCK' && notif.payload?.productName) {
+        const product = notif.payload.productName;
+        let warehousePart = '';
+        if (notif.payload.warehouseName) {
+            warehousePart = ` tại kho '${notif.payload.warehouseName}'`;
+        } else if (notif.payload.warehouseId) {
+            const wid = String(notif.payload.warehouseId);
+            const name = warehouseMap.get(wid);
+            warehousePart = name
+                ? ` tại kho '${name}'`
+                : ` tại kho (${wid.slice(0, 8)}...)`;
+        }
+        const qty = notif.payload.quantity;
+        const qtyText = qty != null ? ` — còn lại ${qty} sản phẩm` : '';
+        return `Sản phẩm '${product}'${warehousePart} sắp hết hàng${qtyText}`;
+    }
+    return notif.message;
+};
 
 const DRAWER_WIDTH = 256;
 const DRAWER_MINI = 0;
@@ -29,12 +61,80 @@ const AdminLayout = () => {
     const role = currentUser?.role || '';
     const roleLabel = role === 'ROLE_ADMIN' ? 'Admin' : role === 'ROLE_MANAGER' ? 'Quản lý' : 'Thu ngân';
 
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [unreadCount, setUnreadCount] = useState(0);
+    const [notifAnchorEl, setNotifAnchorEl] = useState<null | HTMLElement>(null);
+    const [warehouseMap, setWarehouseMap] = useState<Map<string, string>>(new Map());
+
+    // Fetch danh sách kho một lần — để resolve warehouseId cũ thành tên kho
+    React.useEffect(() => {
+        warehouseService.getAll()
+            .then(warehouses => {
+                const map = new Map<string, string>();
+                warehouses.forEach(w => { if (w.id) map.set(w.id, w.name); });
+                setWarehouseMap(map);
+            })
+            .catch(() => { /* Fallback an toàn */ });
+    }, []);
+
+    const loadNotifications = async () => {
+        try {
+            // Lấy 10 thông báo mới nhất (cả đã đọc và chưa đọc)
+            const res = await notificationService.getAll({ page: 0, size: 10 });
+            setNotifications(res.data?.data?.content || []);
+            
+            // Vẫn đếm số lượng chưa đọc để hiện ở Badge chuông
+            const countRes = await notificationService.countUnread();
+            setUnreadCount(countRes.data?.data || 0);
+        } catch { }
+    };
+
+    React.useEffect(() => {
+        if (currentUser) {
+            loadNotifications();
+        }
+    }, [currentUser]);
+
+    useWebSocket({
+        warehouseId: currentUser?.warehouseId,
+        onMessage: (payload: WsPayload) => {
+            // Nhận thông báo mới từ socket
+            setUnreadCount(prev => prev + 1);
+            loadNotifications(); // Reload danh sách
+        },
+        enabled: !!currentUser,
+    });
+
+    const handleMarkAsRead = async (notif: Notification) => {
+        try {
+            if (!notif.isRead) {
+                await notificationService.markAsRead(notif.id);
+                loadNotifications();
+            }
+            
+            setNotifAnchorEl(null);
+
+            // Điều hướng dựa trên loại thông báo
+            if (notif.type === 'LOW_STOCK') {
+                navigate('/admin/inventory/import');
+            } else if (notif.type === 'TRANSFER_ARRIVED') {
+                navigate('/admin/inventory/transfer');
+            }
+        } catch {}
+    };
+
+    const handleMarkAllAsRead = async () => {
+        try {
+            await notificationService.markAllAsRead();
+            loadNotifications();
+            setNotifAnchorEl(null);
+        } catch {}
+    };
+
     const handleLogout = () => {
         authService.logout();
         navigate('/login', { replace: true });
     };
-
-    const drawerWidth = open ? DRAWER_WIDTH : DRAWER_MINI;
 
     return (
         <Box sx={{ display: 'flex' }}>
@@ -70,13 +170,77 @@ const AdminLayout = () => {
 
                     {/* Right actions */}
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <BranchSelector />
+                        
                         <Tooltip title="Thông báo">
-                            <IconButton size="small" sx={{ color: '#666' }}>
-                                <Badge badgeContent={3} color="error" max={9}>
+                            <IconButton size="small" sx={{ color: '#666' }} onClick={e => setNotifAnchorEl(e.currentTarget)}>
+                                <Badge badgeContent={unreadCount} color="error" max={99}>
                                     <Notifications sx={{ fontSize: 22 }} />
                                 </Badge>
                             </IconButton>
                         </Tooltip>
+
+                        {/* Notifications Dropdown */}
+                        <Menu
+                            anchorEl={notifAnchorEl} open={Boolean(notifAnchorEl)} onClose={() => setNotifAnchorEl(null)}
+                            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+                            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+                            PaperProps={{ sx: { width: 360, maxHeight: 500, borderRadius: 2, boxShadow: '0 8px 32px rgba(0,0,0,0.1)', mt: 1, p: 0 } }}
+                        >
+                            <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f0f0f0', bgcolor: '#f8fafc' }}>
+                                <Typography fontWeight={700} fontSize={15} color="#0f172a">Thông báo mới</Typography>
+                                {unreadCount > 0 && (
+                                    <Typography variant="caption" sx={{ cursor: 'pointer', color: '#3b82f6', fontWeight: 600, '&:hover': { textDecoration: 'underline' } }} onClick={handleMarkAllAsRead}>
+                                        Đánh dấu tất cả đã đọc
+                                    </Typography>
+                                )}
+                            </Box>
+                            <Box sx={{ maxHeight: 380, overflowY: 'auto' }}>
+                                {notifications.length === 0 ? (
+                                    <Box sx={{ p: 4, textAlign: 'center' }}>
+                                        <Notifications sx={{ fontSize: 40, color: '#e2e8f0', mb: 1 }} />
+                                        <Typography variant="body2" color="#64748b">Bạn không có thông báo mới</Typography>
+                                    </Box>
+                                ) : (
+                                    notifications.map(notif => (
+                                        <Box 
+                                            key={notif.id} 
+                                            onClick={() => handleMarkAsRead(notif)} 
+                                            sx={{ 
+                                                p: 2, 
+                                                borderBottom: '1px solid #f1f5f9', 
+                                                cursor: 'pointer', 
+                                                bgcolor: notif.isRead ? '#fff' : '#f0f7ff',
+                                                '&:hover': { bgcolor: notif.isRead ? '#f8fafc' : '#e6f0ff' }, 
+                                                transition: 'all 0.2s' 
+                                            }}
+                                        >
+                                            <Box sx={{ display: 'flex', gap: 1.5 }}>
+                                                {!notif.isRead && (
+                                                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#3b82f6', mt: 0.75, flexShrink: 0 }} />
+                                                )}
+                                                <Box sx={{ ml: notif.isRead ? 3 : 0 }}>
+                                                    <Typography variant="body2" fontWeight={notif.isRead ? 500 : 700} color="#1e293b" mb={0.5}>
+                                                        {notif.title}
+                                                    </Typography>
+                                                    <Typography variant="caption" color="#475569" display="block" mb={0.75} sx={{ lineHeight: 1.4 }}>
+                                                        {renderNotifMessage(notif, warehouseMap)}
+                                                    </Typography>
+                                                    <Typography variant="caption" color="#94a3b8" fontSize={11}>
+                                                        {formatDistanceToNow(new Date(notif.createdAt), { addSuffix: true, locale: vi })}
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+                                        </Box>
+                                    ))
+                                )}
+                            </Box>
+                            <Box sx={{ p: 1.5, borderTop: '1px solid #f0f0f0', textAlign: 'center', bgcolor: '#f8fafc' }}>
+                                <Button size="small" onClick={() => { setNotifAnchorEl(null); navigate('/admin/notifications'); }} sx={{ textTransform: 'none', fontWeight: 600, color: '#3b82f6' }}>
+                                    Xem tất cả thông báo
+                                </Button>
+                            </Box>
+                        </Menu>
 
                         <Box
                             onClick={e => setAnchorEl(e.currentTarget)}
@@ -169,9 +333,6 @@ const AdminLayout = () => {
                             <Typography variant="subtitle2" fontWeight={800} color="#1976d2" lineHeight={1.1}>
                                 SME ERP & POS
                             </Typography>
-                            <Typography variant="caption" color="text.secondary" fontSize={10}>
-                                Tất cả chi nhánh
-                            </Typography>
                         </Box>
                     )}
                 </Box>
@@ -204,6 +365,7 @@ const AdminLayout = () => {
                 <Toolbar sx={{ minHeight: '56px !important' }} />
                 <Outlet />
             </Box>
+            {role !== 'ROLE_CASHIER' && <AIChatWidget />}
         </Box>
     );
 };

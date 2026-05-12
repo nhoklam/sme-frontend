@@ -1,4 +1,4 @@
-import { useReducer, useCallback } from 'react';
+import { useReducer, useCallback, useEffect } from 'react';
 
 // ── Reducer ────────────────────────────────────────────────────
 const cartReducer = (state, action) => {
@@ -33,14 +33,20 @@ const cartReducer = (state, action) => {
                 ),
             };
         case 'CLEAR':
-            return { ...state, items: [] };
+            return { ...state, items: [], appliedPromotion: null };
+
+        case 'SET_PROMOTION':
+            return { ...state, appliedPromotion: action.promotion };
 
         default:
             return state;
     }
 };
 
-const initialState = { items: [] };
+const initialState = { 
+    items: JSON.parse(localStorage.getItem('cart_items') || '[]'),
+    appliedPromotion: JSON.parse(localStorage.getItem('cart_promo') || 'null')
+};
 
 // ── Hook ───────────────────────────────────────────────────────
 export const useCart = () => {
@@ -49,13 +55,39 @@ export const useCart = () => {
     const addToCart = useCallback((product) => dispatch({ type: 'ADD', product }), []);
     const removeItem = useCallback((id) => dispatch({ type: 'REMOVE', id }), []);
     const updateQty = useCallback((id, qty) => dispatch({ type: 'UPDATE_QTY', id, qty }), []);
-    const clearCart = useCallback(() => dispatch({ type: 'CLEAR' }), []);
+    
+    const clearCart = useCallback(() => {
+        dispatch({ type: 'CLEAR' });
+        localStorage.removeItem('cart_items');
+        localStorage.removeItem('cart_promo');
+    }, []);
+
+    const setAppliedPromotion = useCallback((promotion) => {
+        dispatch({ type: 'SET_PROMOTION', promotion });
+        localStorage.setItem('cart_promo', JSON.stringify(promotion));
+    }, []);
+
+    // Sync items to localStorage
+    useEffect(() => {
+        localStorage.setItem('cart_items', JSON.stringify(state.items));
+    }, [state.items]);
 
     const totalItems = state.items.reduce((s, i) => s + i.qty, 0);
     const totalPrice = state.items.reduce((s, i) => s + i.price * i.qty, 0);
-    const totalSaved = state.items.reduce((s, i) => s + (i.oldPrice - i.price) * i.qty, 0);
+    const totalSaved = state.items.reduce((s, i) => s + ((i.oldPrice || i.price) - i.price) * i.qty, 0);
 
-    return { items: state.items, addToCart, removeItem, updateQty, clearCart, totalItems, totalPrice, totalSaved };
+    return { 
+        items: state.items, 
+        appliedPromotion: state.appliedPromotion,
+        addToCart, 
+        removeItem, 
+        updateQty, 
+        clearCart, 
+        setAppliedPromotion,
+        totalItems, 
+        totalPrice, 
+        totalSaved 
+    };
 };
 
 export default useCart;

@@ -5,7 +5,8 @@ import {
     Divider, Alert, Skeleton, Stepper, Step, StepLabel,
     Table, TableBody, TableCell, TableHead, TableRow,
     Dialog, DialogTitle, DialogContent, DialogActions,
-    TextField, Snackbar,
+    TextField, Snackbar, CircularProgress, FormControl,
+    InputLabel, Select, MenuItem,
 } from '@mui/material';
 import {
     ArrowBack, Edit, LocalShipping, Person, LocationOn,
@@ -13,7 +14,8 @@ import {
     AccessTime, Refresh, Close,
 } from '@mui/icons-material';
 import orderService from '../../../../services/orderService';
-import { OrderResponse, OrderStatus, PaymentStatus } from '../../../../types';
+import warehouseService from '../../../../services/warehouseService';
+import { OrderResponse, OrderStatus, PaymentStatus, Warehouse } from '../../../../types';
 
 // ── Helpers ─────────────────────────────────────────────────
 const fmt = (n?: number) => {
@@ -62,6 +64,72 @@ const FieldRow = ({ label, value, color }: { label: string; value: React.ReactNo
         <Typography variant="caption" fontWeight={600} color={color || '#333'}>{value}</Typography>
     </Box>
 );
+
+// ── Assign Warehouse Dialog ───────────────────────────────────
+const AssignWarehouseDialog: React.FC<{
+    open: boolean;
+    onClose: () => void;
+    onConfirm: (whId: string) => void;
+    loading: boolean;
+}> = ({ open, onClose, onConfirm, loading }) => {
+    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+    const [selected, setSelected] = useState('');
+    const [fetching, setFetching] = useState(false);
+
+    useEffect(() => {
+        if (open) {
+            setFetching(true);
+            warehouseService.getAll().then(setWarehouses).finally(() => setFetching(false));
+        }
+    }, [open]);
+
+    return (
+        <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 2.5 } }}>
+            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography fontWeight={800}>Chỉ định kho xử lý</Typography>
+                <IconButton size="small" onClick={onClose}><Close sx={{ fontSize: 18 }} /></IconButton>
+            </DialogTitle>
+            <Divider />
+            <DialogContent sx={{ py: 3 }}>
+                <Typography variant="body2" color="text.secondary" mb={2}>
+                    Chọn chi nhánh/kho sẽ chịu trách nhiệm đóng gói và giao đơn hàng này.
+                </Typography>
+                {fetching ? (
+                    <Box sx={{ textAlign: 'center', py: 2 }}><CircularProgress size={24} /></Box>
+                ) : (
+                    <FormControl fullWidth size="small">
+                        <InputLabel>Chọn kho</InputLabel>
+                        <Select
+                            value={selected}
+                            onChange={(e) => setSelected(e.target.value as string)}
+                            label="Chọn kho"
+                        >
+                            {warehouses.map(w => (
+                                <MenuItem key={w.id} value={w.id}>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                                        <Typography variant="body2" fontWeight={600}>{w.name}</Typography>
+                                        <Typography variant="caption" color="text.secondary">{w.provinceCode}</Typography>
+                                    </Box>
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                )}
+            </DialogContent>
+            <DialogActions sx={{ px: 3, pb: 2.5 }}>
+                <Button onClick={onClose} variant="outlined" sx={{ textTransform: 'none', borderRadius: 1.5 }}>Hủy</Button>
+                <Button
+                    variant="contained"
+                    disabled={loading || !selected || fetching}
+                    onClick={() => onConfirm(selected)}
+                    sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, bgcolor: '#1976d2' }}
+                >
+                    {loading ? 'Đang gán...' : 'Gán đơn hàng'}
+                </Button>
+            </DialogActions>
+        </Dialog>
+    );
+};
 
 // ── Update Status Dialog ──────────────────────────────────────
 const UpdateStatusDialog: React.FC<{
@@ -155,7 +223,9 @@ const OrderDetailPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
+    const [assignDialogOpen, setAssignDialogOpen] = useState(false);
     const [updating, setUpdating] = useState(false);
+    const [assigning, setAssigning] = useState(false);
     const [snack, setSnack] = useState<{ message: string; severity: 'success' | 'error' } | null>(null);
 
     const loadOrder = useCallback(async () => {
@@ -186,6 +256,21 @@ const OrderDetailPage: React.FC = () => {
             setSnack({ message: e.response?.data?.message || 'Cập nhật thất bại', severity: 'error' });
         } finally {
             setUpdating(false);
+        }
+    };
+
+    const handleAssignWarehouse = async (warehouseId: string) => {
+        if (!order) return;
+        setAssigning(true);
+        try {
+            const updated = await orderService.assignWarehouse(order.id, warehouseId);
+            setOrder(updated);
+            setAssignDialogOpen(false);
+            setSnack({ message: 'Đã gán kho xử lý thành công', severity: 'success' });
+        } catch (e: any) {
+            setSnack({ message: e.response?.data?.message || 'Gán kho thất bại', severity: 'error' });
+        } finally {
+            setAssigning(false);
         }
     };
 
@@ -371,13 +456,26 @@ const OrderDetailPage: React.FC = () => {
                 {/* Vận chuyển */}
                 <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                     <InfoSection icon={<LocalShipping sx={{ fontSize: 16 }} />} title="VẬN CHUYỂN">
-                        <FieldRow label="Kho đóng gói" value={order.assignedWarehouseName || 'Chưa gán'} />
-                        <FieldRow label="Mã vận đơn" value={order.trackingCode || '—'} />
-                        <FieldRow label="Đơn vị VC" value={order.shippingProvider || '—'} />
-                        {order.packedAt && (
-                            <FieldRow label="Đóng gói lúc"
-                                value={new Date(order.packedAt).toLocaleDateString('vi-VN')} />
-                        )}
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                            <Typography variant="caption" color="text.secondary">Kho đóng gói</Typography>
+                            {!isCancelled && order.status === 'PENDING' && (
+                                <IconButton size="small" onClick={() => setAssignDialogOpen(true)}
+                                    sx={{ p: 0.25, color: '#1976d2', bgcolor: '#e3f2fd', '&:hover': { bgcolor: '#bbdefb' } }}>
+                                    <Edit sx={{ fontSize: 14 }} />
+                                </IconButton>
+                            )}
+                        </Box>
+                        <Typography variant="body2" fontWeight={700} color={order.assignedWarehouseId ? '#333' : '#d32f2f'}>
+                            {order.assignedWarehouseName || 'Chưa gán'}
+                        </Typography>
+                        <Box sx={{ mt: 1 }}>
+                            <FieldRow label="Mã vận đơn" value={order.trackingCode || '—'} />
+                            <FieldRow label="Đơn vị VC" value={order.shippingProvider || '—'} />
+                            {order.packedAt && (
+                                <FieldRow label="Đóng gói lúc"
+                                    value={new Date(order.packedAt).toLocaleDateString('vi-VN')} />
+                            )}
+                        </Box>
                     </InfoSection>
                 </Grid>
             </Grid>
@@ -475,6 +573,14 @@ const OrderDetailPage: React.FC = () => {
                     </Box>
                 </Paper>
             )}
+
+            {/* ── Assign Warehouse Dialog ── */}
+            <AssignWarehouseDialog
+                open={assignDialogOpen}
+                onClose={() => setAssignDialogOpen(false)}
+                onConfirm={handleAssignWarehouse}
+                loading={assigning}
+            />
 
             {/* ── Update Status Dialog ── */}
             <UpdateStatusDialog

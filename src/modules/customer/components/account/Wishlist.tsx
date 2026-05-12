@@ -1,40 +1,74 @@
 import React from 'react';
-import { Box, Typography, Grid, Button, Paper } from '@mui/material';
-import { Favorite } from '@mui/icons-material';
+import { Box, Typography, Grid, Button, Paper, IconButton, Tooltip } from '@mui/material';
+import { Favorite, Delete, DeleteSweep } from '@mui/icons-material';
 import ProductCard from '../products/ProductCard';
+import { useWishlist } from '../../hooks/useWishlist';
 
-const mockWishlist = [
-    {
-        id: 1,
-        name: 'Tuyển Tập Truyện Cổ Tích Việt Nam',
-        author: 'Nhiều tác giả',
-        price: 100000,
-        originalPrice: 125000,
-        image: 'https://via.placeholder.com/200x250?text=Book+1',
-        rating: 4.5,
-        sold: 1250,
-    },
-];
+const Wishlist: React.FC = () => {
+    const { items, removeFromWishlist, clearWishlist } = useWishlist();
 
-const Wishlist = () => {
-    if (mockWishlist.length === 0) {
+    if (items.length === 0) {
         return (
-            <Paper sx={{ p: 4, textAlign: 'center' }}>
-                <Favorite sx={{ fontSize: 48, color: '#e2e8f0', mb: 2 }} />
-                <Typography color="text.secondary">Chưa có sản phẩm yêu thích</Typography>
+            <Paper sx={{ p: 5, textAlign: 'center', borderRadius: 3 }}>
+                <Favorite sx={{ fontSize: 56, color: '#e0e0e0', mb: 1.5 }} />
+                <Typography fontWeight={600} mb={0.5}>Chưa có sản phẩm yêu thích</Typography>
+                <Typography variant="body2" color="text.secondary">
+                    Hãy thêm sản phẩm vào danh sách yêu thích để xem lại sau
+                </Typography>
             </Paper>
         );
     }
 
     return (
-        <Grid container spacing={3}>
-            {mockWishlist.map((product) => (
-                <Grid item xs={12} sm={6} md={4} key={product.id}>
-                    <ProductCard product={product} />
-                </Grid>
-            ))}
-        </Grid>
+        <Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6" fontWeight={700}>
+                    Sản phẩm yêu thích ({items.length})
+                </Typography>
+                <Button
+                    size="small" color="error" startIcon={<DeleteSweep />}
+                    onClick={clearWishlist}
+                    sx={{ textTransform: 'none', fontWeight: 600 }}
+                >
+                    Xóa tất cả
+                </Button>
+            </Box>
+            <Grid container spacing={2}>
+                {items.map(item => (
+                    <Grid size={{ xs: 6, sm: 4, md: 3 }} key={item.id}>
+                        <Box sx={{ position: 'relative' }}>
+                            <ProductCard product={{
+                                id: item.id,
+                                name: item.name,
+                                price: item.price,
+                                originalPrice: item.originalPrice,
+                                imageUrl: item.imageUrl,
+                                author: item.author,
+                                rating: item.rating,
+                                sold: item.sold,
+                            }} />
+                            <Tooltip title="Xóa khỏi yêu thích">
+                                <IconButton
+                                    size="small"
+                                    onClick={() => removeFromWishlist(item.id)}
+                                    sx={{
+                                        position: 'absolute', top: 6, right: 6,
+                                        bgcolor: 'rgba(255,255,255,0.9)',
+                                        color: '#d32f2f',
+                                        '&:hover': { bgcolor: '#ffebee' },
+                                        boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
+                                        width: 28, height: 28,
+                                    }}
+                                >
+                                    <Delete sx={{ fontSize: 15 }} />
+                                </IconButton>
+                            </Tooltip>
+                        </Box>
+                    </Grid>
+                ))}
+            </Grid>
+        </Box>
     );
 };
 
-export default Wishlist;
+export default Wishlist;

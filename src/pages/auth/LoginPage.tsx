@@ -1,4 +1,4 @@
-// src/pages/auth/LoginPage.jsx
+// src/pages/auth/LoginPage.tsx - CẬP NHẬT redirect cho cashier
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Container, Box, Paper, Typography } from '@mui/material';
@@ -7,14 +7,15 @@ import LoginForm from '../../components/auth/LoginForm';
 const LoginPage = () => {
     const navigate = useNavigate();
 
-    const handleLoginSuccess = (user) => {
+    const handleLoginSuccess = (user: any) => {
         switch (user?.role) {
             case 'ROLE_ADMIN':
             case 'ROLE_MANAGER':
                 navigate('/admin/dashboard', { replace: true });
                 break;
             case 'ROLE_CASHIER':
-                navigate('/employee/pos', { replace: true });
+                // Cashier vào thẳng POS
+                navigate('/admin/pos', { replace: true });
                 break;
             default:
                 navigate('/', { replace: true });
@@ -40,7 +41,7 @@ const LoginPage = () => {
                         Đăng nhập vào hệ thống quản lý
                     </Typography>
                 </Box>
-                <LoginForm onSuccess={handleLoginSuccess} />
+                <LoginForm onSuccess={handleLoginSuccess} onError={undefined} />
             </Paper>
         </Container>
     );

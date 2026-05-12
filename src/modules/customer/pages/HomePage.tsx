@@ -1,6 +1,5 @@
-// src/modules/customer/pages/HomePage.jsx
 import React from 'react';
-import { Container } from '@mui/material';
+import { Box, Container } from '@mui/material';
 
 import HeroBanner from '../components/home/HeroBanner';
 import ServicesBar from '../components/home/ServicesBar';
@@ -9,13 +8,36 @@ import FeaturedProducts from '../components/home/FeaturedProducts';
 import PromotionBanner from '../components/home/PromotionBanner';
 
 const HomePage = () => (
-    <Container maxWidth="lg" sx={{ py: 2 }}>
-        <HeroBanner />
-        <ServicesBar />
-        <CategorySlider />
-        <FeaturedProducts />
-        <PromotionBanner />
-    </Container>
+    <Box sx={{ bgcolor: '#f4f4f4', minHeight: '100vh' }}>
+        <Container maxWidth="lg" sx={{ py: 2 }}>
+
+            {/* Hero Banner */}
+            <HeroBanner />
+
+            {/* Services strip */}
+            <ServicesBar />
+
+            {/* Category chips */}
+            <Box sx={{
+                bgcolor: '#fff',
+                borderRadius: 1.5,
+                border: '1px solid #ececec',
+                px: 2,
+                py: 1.75,
+                mb: 2,
+                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            }}>
+                <CategorySlider />
+            </Box>
+
+            {/* Products sections */}
+            <FeaturedProducts />
+
+            {/* Promotion */}
+            <PromotionBanner />
+
+        </Container>
+    </Box>
 );
 
 export default HomePage;

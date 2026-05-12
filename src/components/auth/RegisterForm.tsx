@@ -19,6 +19,7 @@ import {
     Phone,
     HowToReg,
 } from '@mui/icons-material';
+import { AxiosError } from 'axios';
 import axiosInstance from '../../services/axiosConfig';
 
 const IC = '#d32f2f';
@@ -31,36 +32,60 @@ const fieldSx = {
     '& .MuiInputLabel-root.Mui-focused': { color: IC },
 };
 
-const RegisterForm = ({ onSuccess, onError }) => {
+interface FormData {
+    username: string;
+    fullName: string;
+    email: string;
+    phone: string;
+    password: string;
+    confirmPassword: string;
+}
+
+interface RegisterFormProps {
+    onSuccess?: (formData: FormData) => void;
+    onError?: (message: string) => void;
+}
+
+const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess, onError }) => {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
-    const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState<FormData>({
         username: '', fullName: '', email: '', phone: '', password: '', confirmPassword: '',
     });
 
-    const handleChange = (e) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (error) setError('');
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    const validate = () => {
-        if (!formData.username.trim() || formData.username.trim().length < 3)
-            return setError('Tên đăng nhập phải có ít nhất 3 ký tự'), false;
-        if (!formData.fullName.trim())
-            return setError('Vui lòng nhập họ và tên'), false;
-        if (!formData.phone.trim())
-            return setError('Vui lòng nhập số điện thoại'), false;
-        if (!formData.password || formData.password.length < 6)
-            return setError('Mật khẩu phải có ít nhất 6 ký tự'), false;
-        if (formData.password !== formData.confirmPassword)
-            return setError('Mật khẩu xác nhận không khớp'), false;
+    const validate = (): boolean => {
+        if (!formData.username.trim() || formData.username.trim().length < 3) {
+            setError('Tên đăng nhập phải có ít nhất 3 ký tự');
+            return false;
+        }
+        if (!formData.fullName.trim()) {
+            setError('Vui lòng nhập họ và tên');
+            return false;
+        }
+        if (!formData.phone.trim()) {
+            setError('Vui lòng nhập số điện thoại');
+            return false;
+        }
+        if (!formData.password || formData.password.length < 6) {
+            setError('Mật khẩu phải có ít nhất 6 ký tự');
+            return false;
+        }
+        if (formData.password !== formData.confirmPassword) {
+            setError('Mật khẩu xác nhận không khớp');
+            return false;
+        }
         return true;
     };
 
-    const handleSubmit = async (e) => {
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!validate()) return;
         setLoading(true);
@@ -77,7 +102,8 @@ const RegisterForm = ({ onSuccess, onError }) => {
             if (onSuccess) onSuccess(formData);
             setTimeout(() => { window.location.href = '/login'; }, 2000);
         } catch (err) {
-            const msg = err.response?.data?.message || 'Đăng ký thất bại. Vui lòng thử lại sau.';
+            const axiosErr = err as AxiosError<{ message?: string }>;
+            const msg = axiosErr.response?.data?.message || 'Đăng ký thất bại. Vui lòng thử lại sau.';
             setError(msg);
             if (onError) onError(msg);
         } finally {
@@ -87,13 +113,13 @@ const RegisterForm = ({ onSuccess, onError }) => {
 
     const commonProps = {
         fullWidth: true,
-        size: 'small',
-        margin: 'normal',
+        size: 'small' as const,
+        margin: 'normal' as const,
         onChange: handleChange,
         sx: fieldSx,
     };
 
-    const iconAdornment = (Icon) => ({
+    const iconAdornment = (Icon: React.ElementType) => ({
         startAdornment: (
             <InputAdornment position="start">
                 <Icon sx={{ color: IC, fontSize: 18 }} />
@@ -101,7 +127,7 @@ const RegisterForm = ({ onSuccess, onError }) => {
         ),
     });
 
-    const pwAdornment = (show, toggle) => ({
+    const pwAdornment = (show: boolean, toggle: () => void) => ({
         startAdornment: (
             <InputAdornment position="start">
                 <Lock sx={{ color: IC, fontSize: 18 }} />

@@ -44,6 +44,7 @@ export interface UserResponse {
   isActive: boolean;
   createdAt: string;
   lastLoginAt?: string;
+  posSettings?: string;
 }
 
 export type UserRole = 'ROLE_ADMIN' | 'ROLE_MANAGER' | 'ROLE_CASHIER';
@@ -56,6 +57,7 @@ export interface CreateUserRequest {
   phone?: string;
   role: string;
   warehouseId?: string;
+  posSettings?: string;
 }
 
 export interface ChangePasswordRequest {
@@ -153,6 +155,7 @@ export interface ProductResponse {
   wholesalePrice?: number;
   macPrice: number;
   imageUrl?: string;
+  imageUrls?: string[];
   unit: string;
   weight?: number;
   isActive: boolean;
@@ -170,6 +173,7 @@ export interface CreateProductRequest {
   retailPrice: number;
   wholesalePrice?: number;
   imageUrl?: string;
+  imageUrls?: string[];
   unit?: string;
   weight?: number;
 }
@@ -183,6 +187,7 @@ export interface UpdateProductRequest {
   retailPrice?: number;
   wholesalePrice?: number;
   imageUrl?: string;
+  imageUrls?: string[];
   unit?: string;
   weight?: number;
   isActive?: boolean;
@@ -212,6 +217,7 @@ export interface Inventory {
   minQuantity: number;
   lowStock: boolean;
   availableQuantity: number;
+  location?: string;
   version: number;
 }
 
@@ -226,6 +232,8 @@ export interface InventoryTransaction {
   note?: string;
   createdBy?: string;
   createdAt: string;
+  batchNumber?: string;
+  expiryDate?: string;
 }
 
 export interface AdjustInventoryRequest {
@@ -258,21 +266,43 @@ export interface PurchaseOrder {
 }
 
 export type PurchaseStatus = 'DRAFT' | 'PENDING' | 'COMPLETED' | 'CANCELLED';
+// ─────────────────────────────────────────────────────────────
+// BATCH / LOT NUMBER (thêm vào types/index.ts)
+// Paste các interface này vào cuối file types/index.ts
+// ─────────────────────────────────────────────────────────────
 
+// Thêm vào PurchaseItem (extend interface hiện tại)
+// Thay thế interface PurchaseItem cũ bằng cái này:
 export interface PurchaseItem {
   id: string;
   productId: string;
   quantity: number;
   receivedQty: number;
   importPrice: number;
+  // ── Batch / Lot fields (mới) ──
+  batchNumber?: string;     // Số lô sản xuất
+  lotNumber?: string;       // Mã lô nhập
+  expiryDate?: string;      // Ngày hết hạn (ISO date string: "2025-12-31")
+  manufacturingDate?: string; // Ngày sản xuất
 }
 
+// Thêm vào CreatePurchaseOrderRequest:
 export interface CreatePurchaseOrderRequest {
   supplierId: string;
   warehouseId: string;
-  items: Array<{ productId: string; quantity: number; importPrice: number }>;
+  items: Array<{
+    productId: string;
+    quantity: number;
+    importPrice: number;
+    // ── Batch / Lot fields (mới) ──
+    batchNumber?: string;
+    lotNumber?: string;
+    expiryDate?: string;
+    manufacturingDate?: string;
+  }>;
   note?: string;
 }
+
 
 // ─────────────────────────────────────────────────────────────
 // INTERNAL TRANSFER
@@ -419,6 +449,7 @@ export interface OrderResponse {
   shippingProvider?: string;
   cancelledReason?: string;
   packedBy?: string;
+  packedByName?: string;
   packedAt?: string;
   codReconciled: boolean;
   note?: string;
@@ -445,6 +476,7 @@ export interface OrderStatusHistoryResponse {
   newStatus: string;
   note?: string;
   changedBy?: string;
+  changedByName?: string;
   createdAt: string;
 }
 
@@ -459,6 +491,8 @@ export interface CreateOrderRequest {
   type?: string;
   note?: string;
   assignedWarehouseId?: string;
+  couponCode?: string;
+  discountAmount?: number;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -627,6 +661,7 @@ export interface InventoryWithMeta {
   imageUrl?: string;
   retailPrice?: number;
   macPrice?: number;
+  location?: string;
 }
 
 // ── Inventory filters ────────────────────────────────────────
@@ -650,6 +685,11 @@ export interface PurchaseCartItem {
   subtotal: number;
   imageUrl?: string;
   currentStock?: number;
+  batchNumber?: string;
+  lotNumber?: string;
+  expiryDate?: string;
+  manufacturingDate?: string;
+  showBatchFields?: boolean;
 }
 
 // ── Transfer cart item (UI-only) ─────────────────────────────
@@ -749,6 +789,7 @@ export interface RevenueReportParams {
   to: string;   // ISO string
   period?: ReportPeriod;
   warehouseId?: string;
+  paymentMethod?: string;
 }
 
 export interface TopProductParams {
@@ -756,6 +797,7 @@ export interface TopProductParams {
   to: string;
   limit?: number;
   warehouseId?: string;
+  paymentMethod?: string;
 }
 
 
@@ -773,3 +815,33 @@ export interface RevenueTrendPoint {
   revenue: number;
   orders: number;
 }
+
+// ─────────────────────────────────────────────────────────────
+// PROMOTIONS
+// ─────────────────────────────────────────────────────────────
+export interface Promotion {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  discountType: PromotionType;
+  discountValue: number;
+  minOrderValue?: number;
+  maxDiscountAmount?: number;
+  maxUsage?: number;
+  usedCount: number;
+  applicableProductId?: string;
+  applicableCategoryId?: string;
+  buyQuantity?: number;
+  getQuantity?: number;
+  startDate: string;
+  endDate: string;
+  isActive: boolean;
+  valid: boolean;
+  createdAt: string;
+  // Aliases for backward compat in PromotionDialog
+  type?: PromotionType;
+  minOrderAmount?: number;
+}
+
+export type PromotionType = 'PERCENTAGE' | 'FIXED_AMOUNT' | 'BUY_X_GET_Y';

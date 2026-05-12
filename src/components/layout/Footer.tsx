@@ -23,7 +23,7 @@ const Footer = () => (
         <Container maxWidth="lg">
             <Grid container spacing={4} sx={{ mb: 4 }}>
                 {/* Brand */}
-                <Grid item xs={12} md={3}>
+                <Grid size={{ xs: 12, md: 4 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                         <Box sx={{
                             width: 36, height: 36, bgcolor: '#d32f2f', borderRadius: 1,
@@ -51,7 +51,7 @@ const Footer = () => (
 
                 {/* Columns */}
                 {FOOTER_COLS.map((col) => (
-                    <Grid item xs={6} md={3} ml={15} key={col.title} sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    <Grid size={{ xs: 12, md: 2 }} ml={15} key={col.title} sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                         <Typography fontWeight={700} sx={{ mb: 2 }}>{col.title}</Typography>
                         {col.links.map((link) => (
                             <Typography key={link} variant="body2" color="#aaa" sx={{

@@ -21,11 +21,88 @@ import {
 import orderService from '../../../../services/orderService';
 import customerService from '../../../../services/customerService';
 import warehouseService from '../../../../services/warehouseService';
+import axiosInstance from '../../../../services/axiosConfig';
 import {
     OrderResponse, OrderStatus, PaymentStatus,
-    CreateOrderRequest, Customer, Warehouse, ProductResponse,
+    CreateOrderRequest, Customer, Warehouse, ProductResponse
 } from '../../../../types';
 import productService from '../../../../services/productService';
+
+// ── Memoized OrderRow ──────────────────────────────────────────
+const OrderRow = React.memo(({
+    order, idx, page, PAGE_SIZE, onClick, onAction
+}: {
+    order: OrderResponse, idx: number, page: number, PAGE_SIZE: number,
+    onClick: (order: OrderResponse) => void, onAction: (action: string, order: OrderResponse) => void
+}) => {
+    const status = STATUS_MAP[order.status as OrderStatus] || { label: order.status, color: '#666', bg: '#f3f4f6', step: 0 };
+    const payStatus = PAYMENT_STATUS_MAP[order.paymentStatus as PaymentStatus] || { label: order.paymentStatus, color: '#888' };
+    const typeInfo = TYPE_MAP[order.type || ''] || { label: order.type, color: '#555', bg: '#f5f5f5' };
+    const provinceName = PROVINCES.find(p => p.code === order.provinceCode)?.name || order.provinceCode || '—';
+    const isCancelled = order.status === 'CANCELLED';
+
+    return (
+        <TableRow hover
+            sx={{ bgcolor: isCancelled ? '#fafafa' : idx % 2 === 0 ? '#fff' : '#fafafa', '&:hover': { bgcolor: '#f5f9ff' }, opacity: isCancelled ? 0.7 : 1, cursor: 'pointer' }}
+            onClick={() => onClick(order)}>
+            <TableCell sx={{ py: 1.5 }}>
+                <Typography variant="caption" color="#bbb" fontWeight={600}>{page * PAGE_SIZE + idx + 1}</Typography>
+            </TableCell>
+            <TableCell sx={{ py: 1.5 }}>
+                <Typography variant="caption" fontFamily="monospace" fontWeight={700} color="#1976d2" display="block">{order.code}</Typography>
+                {order.type && (
+                    <Chip label={typeInfo.label} size="small"
+                        sx={{ height: 18, fontSize: 10, fontWeight: 700, bgcolor: typeInfo.bg, color: typeInfo.color, mt: 0.25 }} />
+                )}
+            </TableCell>
+            <TableCell sx={{ py: 1.5 }}>
+                <Typography variant="body2" fontWeight={700} fontSize={13}>
+                    {order.customerName || order.shippingName || 'Khách lẻ'}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" display="block">
+                    {order.customerPhone || order.shippingPhone || '—'}
+                </Typography>
+            </TableCell>
+            <TableCell sx={{ py: 1.5 }}>
+                <Typography variant="caption" color="#555" fontSize={12}>{provinceName}</Typography>
+            </TableCell>
+            <TableCell sx={{ py: 1.5 }}>
+                {order.assignedWarehouseName ? (
+                    <Typography variant="caption" color="#555" fontSize={12}>{order.assignedWarehouseName}</Typography>
+                ) : (
+                    <Chip label="Chờ gán kho" size="small"
+                        sx={{ height: 18, fontSize: 10, bgcolor: '#fff8e1', color: '#f57c00', fontWeight: 600 }} />
+                )}
+            </TableCell>
+            <TableCell sx={{ py: 1.5 }}>
+                <Typography variant="body2" fontSize={12} color="#555">
+                    {order.createdAt ? new Date(order.createdAt).toLocaleDateString('vi-VN') : '—'}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                    {order.createdAt ? new Date(order.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : ''}
+                </Typography>
+            </TableCell>
+            <TableCell align="right" sx={{ py: 1.5 }}>
+                <Typography variant="body2" fontWeight={700} fontSize={13} color={isCancelled ? '#bbb' : '#1a1a2e'}>
+                    {fmt(order.finalAmount)}
+                </Typography>
+                {order.paymentMethod && (
+                    <Typography variant="caption" color="text.secondary">{order.paymentMethod}</Typography>
+                )}
+            </TableCell>
+            <TableCell align="center" sx={{ py: 1.5 }}>
+                <Typography variant="caption" fontWeight={700} color={payStatus.color}>{payStatus.label}</Typography>
+            </TableCell>
+            <TableCell align="center" sx={{ py: 1.5 }}>
+                <Chip label={status.label} size="small"
+                    sx={{ height: 22, fontSize: 11, fontWeight: 700, bgcolor: status.bg, color: status.color }} />
+            </TableCell>
+            <TableCell align="center" sx={{ py: 1.5 }} onClick={e => e.stopPropagation()}>
+                <RowMenu order={order} onAction={onAction} />
+            </TableCell>
+        </TableRow>
+    );
+});
 
 // ── Helpers ────────────────────────────────────────────────
 const fmt = (n?: number) => {
@@ -51,6 +128,8 @@ const PAYMENT_STATUS_MAP: Record<PaymentStatus, { label: string; color: string }
 const TYPE_MAP: Record<string, { label: string; color: string; bg: string }> = {
     DELIVERY: { label: 'Giao hàng', color: '#0277bd', bg: '#e1f5fe' },
     BOPIS: { label: 'Tại quầy', color: '#558b2f', bg: '#f1f8e9' },
+    POS: { label: 'Bán tại quầy', color: '#6a1b9a', bg: '#f3e5f5' },
+    RETURN: { label: 'Trả hàng', color: '#d32f2f', bg: '#ffebee' },
 };
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
@@ -114,9 +193,9 @@ const RowMenu: React.FC<{
                 PaperProps={{ sx: { minWidth: 160, borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.1)', py: 0.5 } }}>
                 {[
                     { label: 'Xem chi tiết', action: 'view' },
-                    { label: 'Xác nhận đóng gói', action: 'packing', show: status === 'PENDING' },
-                    { label: 'Xác nhận giao hàng', action: 'shipping', show: status === 'PACKING' },
-                    { label: 'Đã giao', action: 'delivered', show: status === 'SHIPPING' },
+                    { label: 'Xác nhận đóng gói', action: 'packing', show: status === 'PENDING' && order.type !== 'BOPIS' },
+                    { label: 'Xác nhận giao hàng', action: 'shipping', show: status === 'PACKING' && order.type !== 'BOPIS' },
+                    { label: order.type === 'BOPIS' ? 'Khách đã lấy hàng' : 'Đã giao', action: 'delivered', show: status === 'SHIPPING' || (status === 'PENDING' && order.type === 'BOPIS') },
                     {
                         label: 'Hủy đơn', action: 'cancel', color: '#d32f2f',
                         show: status !== 'CANCELLED' && status !== 'DELIVERED' && status !== 'RETURNED'
@@ -146,12 +225,19 @@ const OrderDetailDialog: React.FC<{
     const STEPS = ['Chờ xử lý', 'Đóng gói', 'Đang giao', 'Hoàn thành'];
     const isCancelled = order.status === 'CANCELLED' || order.status === 'RETURNED';
 
+    const isOffline = (order as any)._source === 'OFFLINE';
     const nextActions: { label: string; action: string; color: string }[] = [];
-    if (order.status === 'PENDING') nextActions.push({ label: 'Xác nhận đóng gói', action: 'PACKING', color: '#1976d2' });
-    if (order.status === 'PACKING') nextActions.push({ label: 'Xác nhận giao hàng', action: 'SHIPPING', color: '#6a1b9a' });
-    if (order.status === 'SHIPPING') nextActions.push({ label: 'Xác nhận đã giao', action: 'DELIVERED', color: '#2e7d32' });
-    if (!isCancelled && order.status !== 'DELIVERED') {
-        nextActions.push({ label: 'Hủy đơn', action: 'CANCELLED', color: '#d32f2f' });
+    if (!isOffline) {
+        if (order.type === 'BOPIS') {
+            if (order.status === 'PENDING') nextActions.push({ label: 'Khách đã lấy hàng', action: 'DELIVERED', color: '#2e7d32' });
+        } else {
+            if (order.status === 'PENDING') nextActions.push({ label: 'Xác nhận đóng gói', action: 'PACKING', color: '#1976d2' });
+            if (order.status === 'PACKING') nextActions.push({ label: 'Xác nhận giao hàng', action: 'SHIPPING', color: '#6a1b9a' });
+            if (order.status === 'SHIPPING') nextActions.push({ label: 'Xác nhận đã giao', action: 'DELIVERED', color: '#2e7d32' });
+        }
+        if (!isCancelled && order.status !== 'DELIVERED') {
+            nextActions.push({ label: 'Hủy đơn', action: 'CANCELLED', color: '#d32f2f' });
+        }
     }
 
     return (
@@ -179,7 +265,7 @@ const OrderDetailDialog: React.FC<{
 
             <DialogContent sx={{ px: 3, py: 2 }}>
                 {/* Timeline trạng thái */}
-                {!isCancelled && (
+                {!isCancelled && !isOffline && (
                     <Box sx={{ mb: 3 }}>
                         <Stepper activeStep={status.step} alternativeLabel>
                             {STEPS.map(s => (
@@ -190,7 +276,7 @@ const OrderDetailDialog: React.FC<{
                         </Stepper>
                     </Box>
                 )}
-                {isCancelled && (
+                {isCancelled && !isOffline && (
                     <Box sx={{ mb: 2, p: 1.5, bgcolor: '#ffebee', borderRadius: 2, border: '1px solid #ffcdd2', display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Cancel sx={{ color: '#d32f2f', fontSize: 18 }} />
                         <Typography variant="body2" fontWeight={700} color="#d32f2f">
@@ -214,17 +300,19 @@ const OrderDetailDialog: React.FC<{
                     </Grid>
 
                     {/* Địa chỉ giao hàng */}
-                    <Grid size={{ xs: 12, md: 6 }}>
-                        <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #f0f0f0' }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                                <LocationOn sx={{ fontSize: 16, color: '#d32f2f' }} />
-                                <Typography variant="caption" fontWeight={700} color="#555" letterSpacing={0.3}>ĐỊA CHỈ GIAO HÀNG</Typography>
-                            </Box>
-                            <Typography variant="body2" fontWeight={600}>{order.shippingName}</Typography>
-                            <Typography variant="caption" color="text.secondary" display="block">{order.shippingPhone}</Typography>
-                            <Typography variant="body2" color="#555" fontSize={12} mt={0.5}>{order.shippingAddress}</Typography>
-                        </Paper>
-                    </Grid>
+                    {!isOffline && (
+                        <Grid size={{ xs: 12, md: 6 }}>
+                            <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #f0f0f0' }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                                    <LocationOn sx={{ fontSize: 16, color: '#d32f2f' }} />
+                                    <Typography variant="caption" fontWeight={700} color="#555" letterSpacing={0.3}>ĐỊA CHỈ GIAO HÀNG</Typography>
+                                </Box>
+                                <Typography variant="body2" fontWeight={600}>{order.shippingName}</Typography>
+                                <Typography variant="caption" color="text.secondary" display="block">{order.shippingPhone}</Typography>
+                                <Typography variant="body2" color="#555" fontSize={12} mt={0.5}>{order.shippingAddress}</Typography>
+                            </Paper>
+                        </Grid>
+                    )}
 
                     {/* Thông tin đơn hàng */}
                     <Grid size={{ xs: 12, md: 6 }}>
@@ -254,26 +342,29 @@ const OrderDetailDialog: React.FC<{
                     </Grid>
 
                     {/* Kho & vận chuyển */}
-                    <Grid size={{ xs: 12, md: 6 }}>
-                        <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #f0f0f0' }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                                <LocalShipping sx={{ fontSize: 16, color: '#6a1b9a' }} />
-                                <Typography variant="caption" fontWeight={700} color="#555" letterSpacing={0.3}>VẬN CHUYỂN</Typography>
-                            </Box>
-                            {[
-                                { label: 'Kho đóng gói', value: order.assignedWarehouseName || 'Chờ gán kho' },
-                                { label: 'Loại đơn', value: TYPE_MAP[order.type]?.label || order.type },
-                                { label: 'Mã vận đơn', value: order.trackingCode || '—' },
-                                { label: 'Đơn vị vận chuyển', value: order.shippingProvider || '—' },
-                                { label: 'Khu vực', value: PROVINCES.find(p => p.code === order.provinceCode)?.name || order.provinceCode || '—' },
-                            ].map(row => (
-                                <Box key={row.label} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                    <Typography variant="caption" color="text.secondary">{row.label}</Typography>
-                                    <Typography variant="caption" fontWeight={600} color="#333">{row.value}</Typography>
+                    {!isOffline && (
+                        <Grid size={{ xs: 12, md: 6 }}>
+                            <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #f0f0f0' }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                                    <LocalShipping sx={{ fontSize: 16, color: '#6a1b9a' }} />
+                                    <Typography variant="caption" fontWeight={700} color="#555" letterSpacing={0.3}>VẬN CHUYỂN</Typography>
                                 </Box>
-                            ))}
-                        </Paper>
-                    </Grid>
+                                {[
+                                    { label: 'Kho đóng gói', value: order.assignedWarehouseName || 'Chờ gán kho' },
+                                    { label: 'Nhân viên đóng gói', value: order.packedByName || '—' },
+                                    { label: 'Loại đơn', value: TYPE_MAP[order.type]?.label || order.type },
+                                    { label: 'Mã vận đơn', value: order.trackingCode || '—' },
+                                    { label: 'Đơn vị vận chuyển', value: order.shippingProvider || '—' },
+                                    { label: 'Khu vực', value: PROVINCES.find(p => p.code === order.provinceCode)?.name || order.provinceCode || '—' },
+                                ].map(row => (
+                                    <Box key={row.label} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                        <Typography variant="caption" color="text.secondary">{row.label}</Typography>
+                                        <Typography variant="caption" fontWeight={600} color="#333">{row.value}</Typography>
+                                    </Box>
+                                ))}
+                            </Paper>
+                        </Grid>
+                    )}
 
                     {/* Danh sách sản phẩm */}
                     {order.items && order.items.length > 0 && (
@@ -339,6 +430,7 @@ const OrderDetailDialog: React.FC<{
                                                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                                                     <Typography variant="body2" fontWeight={600} fontSize={12} color={ns?.color || '#333'}>
                                                         {ns?.label || h.newStatus}
+                                                        {h.changedByName && <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1, fontWeight: 400 }}>({h.changedByName})</Typography>}
                                                     </Typography>
                                                     <Typography variant="caption" color="text.secondary">
                                                         {h.createdAt ? new Date(h.createdAt).toLocaleString('vi-VN') : ''}
@@ -735,14 +827,15 @@ const OrderListPage: React.FC = () => {
     const [provinceFilter, setProvinceFilter] = useState('');
     const [showAdvanced, setShowAdvanced] = useState(false);
 
-    const [orders, setOrders] = useState<OrderResponse[]>([]);
+    const [orders, setOrders] = useState<any[]>([]);
+    const [source, setSource] = useState<'ALL' | 'ONLINE' | 'OFFLINE'>('ALL');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [page, setPage] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
     const [snack, setSnack] = useState<{ message: string; severity: 'success' | 'error' | 'info' } | null>(null);
-    const [detailOrder, setDetailOrder] = useState<OrderResponse | null>(null);
+    const [detailOrder, setDetailOrder] = useState<any>(null);
     const [detailOpen, setDetailOpen] = useState(false);
     const [createOpen, setCreateOpen] = useState(false);
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -756,29 +849,73 @@ const OrderListPage: React.FC = () => {
     const loadOrders = useCallback(async () => {
         setLoading(true); setError('');
         try {
-            const data = await orderService.getOrders({
+            let finalOrders: any[] = [];
+            let tPages = 0;
+            let tElements = 0;
+
+            const params: any = {
                 keyword: search.trim() || undefined,
-                status: statusFilter || undefined,
-                paymentStatus: paymentStatusFilter || undefined,
                 page, size: PAGE_SIZE,
-            });
-            let content = data?.content ?? [];
-            if (paymentMethodFilter) content = content.filter(o => o.paymentMethod === paymentMethodFilter);
-            if (provinceFilter) content = content.filter(o => o.provinceCode === provinceFilter);
-            setOrders(content);
-            setTotalPages(data?.totalPages ?? 0);
-            setTotalElements(data?.totalElements ?? 0);
+            };
+
+            if (source === 'ONLINE' || source === 'ALL') {
+                const res = await orderService.getOrders({
+                    ...params,
+                    status: statusFilter || undefined,
+                    paymentStatus: paymentStatusFilter || undefined,
+                });
+                const mappedOnline = (res?.content ?? []).map(o => ({ ...o, _source: 'ONLINE' }));
+                finalOrders = [...finalOrders, ...mappedOnline];
+                tPages = Math.max(tPages, res?.totalPages ?? 0);
+                tElements += res?.totalElements ?? 0;
+            }
+
+            if (source === 'OFFLINE' || source === 'ALL') {
+                const kwParam = search ? `&keyword=${encodeURIComponent(search)}` : '';
+                const res = await axiosInstance.get(`/pos/invoices?page=${page}&size=${PAGE_SIZE}${kwParam}`);
+                const data = res.data?.data;
+                const mappedOffline = (data?.content ?? []).map((inv: any) => ({
+                    id: inv.id,
+                    code: inv.code,
+                    customerName: inv.customerName || 'Khách lẻ',
+                    customerPhone: inv.customerPhone || '—',
+                    totalAmount: inv.totalAmount,
+                    finalAmount: inv.finalAmount,
+                    status: inv.type === 'RETURN' ? 'RETURNED' : 'DELIVERED',
+                    paymentStatus: 'PAID',
+                    paymentMethod: 'Tiền mặt/Chuyển khoản',
+                    createdAt: inv.createdAt,
+                    assignedWarehouseName: inv.warehouseName,
+                    type: inv.type === 'RETURN' ? 'RETURN' : 'POS',
+                    _source: 'OFFLINE'
+                }));
+                finalOrders = [...finalOrders, ...mappedOffline];
+                tPages = Math.max(tPages, data?.totalPages ?? 0);
+                tElements += data?.totalElements ?? 0;
+            }
+
+            // Nếu là 'ALL', sắp xếp lại theo thời gian
+            if (source === 'ALL') {
+                finalOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            }
+
+            if (paymentMethodFilter) finalOrders = finalOrders.filter(o => o.paymentMethod?.includes(paymentMethodFilter));
+            if (provinceFilter) finalOrders = finalOrders.filter(o => o.provinceCode === provinceFilter);
+
+            setOrders(finalOrders);
+            setTotalPages(tPages);
+            setTotalElements(tElements);
         } catch (e: any) {
             setError(e.response?.data?.message || 'Không thể tải danh sách đơn hàng');
         } finally {
             setLoading(false);
         }
-    }, [page, search, statusFilter, paymentStatusFilter, paymentMethodFilter, provinceFilter]);
+    }, [page, search, statusFilter, paymentStatusFilter, paymentMethodFilter, provinceFilter, source]);
 
-    useEffect(() => { setPage(0); }, [search, statusFilter, paymentStatusFilter, paymentMethodFilter, provinceFilter]);
+    useEffect(() => { setPage(0); }, [search, statusFilter, paymentStatusFilter, paymentMethodFilter, provinceFilter, source]);
     useEffect(() => { loadOrders(); }, [loadOrders]);
 
-    const handleAction = async (action: string, order: OrderResponse) => {
+    const handleAction = React.useCallback(async (action: string, order: OrderResponse) => {
         if (action === 'view') {
             setDetailOrder(order); setDetailOpen(true); return;
         }
@@ -794,7 +931,33 @@ const OrderListPage: React.FC = () => {
         } catch (e: any) {
             setSnack({ message: e.response?.data?.message || 'Cập nhật thất bại', severity: 'error' });
         }
-    };
+    }, [loadOrders]);
+
+    const handleRowClick = React.useCallback(async (order: any) => {
+        if (order._source === 'OFFLINE') {
+            try {
+                const res = await axiosInstance.get(`/pos/invoices/code/${order.code}`);
+                const inv = res.data?.data;
+                const mapped = {
+                    ...order,
+                    items: inv.items,
+                    discountAmount: inv.discountAmount,
+                    assignedWarehouseName: inv.warehouseName || order.assignedWarehouseName,
+                    shippingAddress: 'Bán tại quầy',
+                    paymentMethod: inv.payments?.[0]?.method || 'Tiền mặt',
+                    payments: inv.payments,
+                    _source: 'OFFLINE'
+                };
+                setDetailOrder(mapped);
+            } catch { setDetailOrder(order); }
+        } else {
+            try {
+                const full = await orderService.getById(order.id);
+                setDetailOrder({ ...full, _source: 'ONLINE' });
+            } catch { setDetailOrder(order); }
+        }
+        setDetailOpen(true);
+    }, []);
 
     const handleStatusChange = async (order: OrderResponse, newStatus: string) => {
         try {
@@ -846,6 +1009,18 @@ const OrderListPage: React.FC = () => {
                             Tạo đơn hàng
                         </Button>
                     </Box>
+                </Box>
+                {/* Tabs chọn nguồn */}
+                <Box sx={{ mb: 3 }}>
+                    <Tabs value={source} onChange={(_, v) => setSource(v)}
+                        sx={{
+                            '& .MuiTabs-indicator': { height: 3, borderRadius: '3px 3px 0 0', bgcolor: '#1976d2' },
+                            borderBottom: '1px solid #e0e0e0'
+                        }}>
+                        <Tab label="Tất cả đơn hàng" value="ALL" sx={{ textTransform: 'none', fontWeight: 700, fontSize: 13 }} />
+                        <Tab label="Online (Giao hàng)" value="ONLINE" sx={{ textTransform: 'none', fontWeight: 700, fontSize: 13 }} />
+                        <Tab label="POS (Tại quầy)" value="OFFLINE" sx={{ textTransform: 'none', fontWeight: 700, fontSize: 13 }} />
+                    </Tabs>
                 </Box>
             </Box>
 
@@ -992,74 +1167,17 @@ const OrderListPage: React.FC = () => {
                                     </TableRow>
                                 ))
                             ) : orders.length > 0 ? (
-                                orders.map((order, idx) => {
-                                    const status = STATUS_MAP[order.status as OrderStatus] || { label: order.status, color: '#666', bg: '#f3f4f6', step: 0 };
-                                    const payStatus = PAYMENT_STATUS_MAP[order.paymentStatus as PaymentStatus] || { label: order.paymentStatus, color: '#888' };
-                                    const typeInfo = TYPE_MAP[order.type || ''] || { label: order.type, color: '#555', bg: '#f5f5f5' };
-                                    const provinceName = PROVINCES.find(p => p.code === order.provinceCode)?.name || order.provinceCode || '—';
-                                    const isCancelled = order.status === 'CANCELLED';
-                                    return (
-                                        <TableRow key={order.id} hover
-                                            sx={{ bgcolor: isCancelled ? '#fafafa' : idx % 2 === 0 ? '#fff' : '#fafafa', '&:hover': { bgcolor: '#f5f9ff' }, opacity: isCancelled ? 0.7 : 1, cursor: 'pointer' }}
-                                            onClick={() => { setDetailOrder(order); setDetailOpen(true); }}>
-                                            <TableCell sx={{ py: 1.5 }}>
-                                                <Typography variant="caption" color="#bbb" fontWeight={600}>{page * PAGE_SIZE + idx + 1}</Typography>
-                                            </TableCell>
-                                            <TableCell sx={{ py: 1.5 }}>
-                                                <Typography variant="caption" fontFamily="monospace" fontWeight={700} color="#1976d2" display="block">{order.code}</Typography>
-                                                {order.type && (
-                                                    <Chip label={typeInfo.label} size="small"
-                                                        sx={{ height: 18, fontSize: 10, fontWeight: 700, bgcolor: typeInfo.bg, color: typeInfo.color, mt: 0.25 }} />
-                                                )}
-                                            </TableCell>
-                                            <TableCell sx={{ py: 1.5 }}>
-                                                <Typography variant="body2" fontWeight={700} fontSize={13}>
-                                                    {order.customerName || order.shippingName || 'Khách lẻ'}
-                                                </Typography>
-                                                <Typography variant="caption" color="text.secondary" display="block">
-                                                    {order.customerPhone || order.shippingPhone || '—'}
-                                                </Typography>
-                                            </TableCell>
-                                            <TableCell sx={{ py: 1.5 }}>
-                                                <Typography variant="caption" color="#555" fontSize={12}>{provinceName}</Typography>
-                                            </TableCell>
-                                            <TableCell sx={{ py: 1.5 }}>
-                                                {order.assignedWarehouseName ? (
-                                                    <Typography variant="caption" color="#555" fontSize={12}>{order.assignedWarehouseName}</Typography>
-                                                ) : (
-                                                    <Chip label="Chờ gán kho" size="small"
-                                                        sx={{ height: 18, fontSize: 10, bgcolor: '#fff8e1', color: '#f57c00', fontWeight: 600 }} />
-                                                )}
-                                            </TableCell>
-                                            <TableCell sx={{ py: 1.5 }}>
-                                                <Typography variant="body2" fontSize={12} color="#555">
-                                                    {order.createdAt ? new Date(order.createdAt).toLocaleDateString('vi-VN') : '—'}
-                                                </Typography>
-                                                <Typography variant="caption" color="text.secondary">
-                                                    {order.createdAt ? new Date(order.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : ''}
-                                                </Typography>
-                                            </TableCell>
-                                            <TableCell align="right" sx={{ py: 1.5 }}>
-                                                <Typography variant="body2" fontWeight={700} fontSize={13} color={isCancelled ? '#bbb' : '#1a1a2e'}>
-                                                    {fmt(order.finalAmount)}
-                                                </Typography>
-                                                {order.paymentMethod && (
-                                                    <Typography variant="caption" color="text.secondary">{order.paymentMethod}</Typography>
-                                                )}
-                                            </TableCell>
-                                            <TableCell align="center" sx={{ py: 1.5 }}>
-                                                <Typography variant="caption" fontWeight={700} color={payStatus.color}>{payStatus.label}</Typography>
-                                            </TableCell>
-                                            <TableCell align="center" sx={{ py: 1.5 }}>
-                                                <Chip label={status.label} size="small"
-                                                    sx={{ height: 22, fontSize: 11, fontWeight: 700, bgcolor: status.bg, color: status.color }} />
-                                            </TableCell>
-                                            <TableCell align="center" sx={{ py: 1.5 }} onClick={e => e.stopPropagation()}>
-                                                <RowMenu order={order} onAction={handleAction} />
-                                            </TableCell>
-                                        </TableRow>
-                                    );
-                                })
+                                orders.map((order, idx) => (
+                                    <OrderRow
+                                        key={order.id}
+                                        order={order}
+                                        idx={idx}
+                                        page={page}
+                                        PAGE_SIZE={PAGE_SIZE}
+                                        onClick={handleRowClick}
+                                        onAction={handleAction}
+                                    />
+                                ))
                             ) : (
                                 <TableRow>
                                     <TableCell colSpan={10} align="center" sx={{ py: 6 }}>

@@ -27,6 +27,10 @@ interface FormState {
     role: UserRole;
     warehouseId: string;
     isActive: boolean;
+    posSettings: {
+        autoPrintReceipt: boolean;
+        barcodeSound: boolean;
+    };
 }
 
 interface FormErrors {
@@ -48,6 +52,10 @@ const INITIAL: FormState = {
     role: 'ROLE_CASHIER',
     warehouseId: '',
     isActive: true,
+    posSettings: {
+        autoPrintReceipt: true,
+        barcodeSound: true,
+    },
 };
 
 const UserCreatePage: React.FC = () => {
@@ -97,6 +105,7 @@ const UserCreatePage: React.FC = () => {
                 phone: form.phone.trim() || undefined,
                 role: form.role,
                 warehouseId: form.role !== 'ROLE_ADMIN' ? form.warehouseId : undefined,
+                posSettings: form.role === 'ROLE_CASHIER' ? JSON.stringify(form.posSettings) : undefined,
             };
             await userService.create(payload);
             setSaved(true);
@@ -287,6 +296,33 @@ const UserCreatePage: React.FC = () => {
                             </Grid>
                         </Box>
                     </Paper>
+
+                    {/* Cài đặt POS */}
+                    {form.role === 'ROLE_CASHIER' && (
+                        <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid #f0f0f0', overflow: 'hidden', mt: 2.5 }}>
+                            <Box sx={{ px: 2.5, py: 2, borderBottom: '1px solid #f5f5f5', bgcolor: '#fafafa' }}>
+                                <Typography variant="subtitle1" fontWeight={700} color="#1a1a2e">Cài đặt POS (Thu ngân)</Typography>
+                            </Box>
+                            <Box sx={{ p: 2.5 }}>
+                                <Grid container spacing={2}>
+                                    <Grid size={{ xs: 12, sm: 6 }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1.5, border: '1px solid #eee', borderRadius: 1.5 }}>
+                                            <Typography variant="body2" fontWeight={600}>Tự động in hóa đơn</Typography>
+                                            <Switch size="small" checked={form.posSettings.autoPrintReceipt} 
+                                                onChange={(e) => setForm(f => ({ ...f, posSettings: { ...f.posSettings, autoPrintReceipt: e.target.checked } }))} />
+                                        </Box>
+                                    </Grid>
+                                    <Grid size={{ xs: 12, sm: 6 }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1.5, border: '1px solid #eee', borderRadius: 1.5 }}>
+                                            <Typography variant="body2" fontWeight={600}>Âm quét mã vạch</Typography>
+                                            <Switch size="small" checked={form.posSettings.barcodeSound} 
+                                                onChange={(e) => setForm(f => ({ ...f, posSettings: { ...f.posSettings, barcodeSound: e.target.checked } }))} />
+                                        </Box>
+                                    </Grid>
+                                </Grid>
+                            </Box>
+                        </Paper>
+                    )}
                 </Grid>
 
                 {/* RIGHT */}

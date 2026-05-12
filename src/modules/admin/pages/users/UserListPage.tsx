@@ -14,6 +14,7 @@ import {
 } from '@mui/icons-material';
 import userService from '../../../../services/userService';
 import { UserResponse, UserRole } from '../../../../types';
+import UserCreateModal from './UserCreateModal';
 
 const ROLE_MAP: Record<UserRole, { label: string; color: string; bg: string }> = {
     ROLE_ADMIN: { label: 'Admin', color: '#7b1fa2', bg: '#f3e5f5' },
@@ -69,6 +70,7 @@ const UserListPage: React.FC = () => {
     const [search, setSearch] = useState('');
     const [roleFilter, setRoleFilter] = useState('all');
     const [snack, setSnack] = useState('');
+    const [openCreate, setOpenCreate] = useState(false);
 
     const loadUsers = useCallback(async () => {
         setLoading(true);
@@ -145,7 +147,7 @@ const UserListPage: React.FC = () => {
                         </IconButton>
                     </Tooltip>
                     <Button variant="contained" startIcon={<Add />}
-                        onClick={() => navigate('/admin/users/create')}
+                        onClick={() => setOpenCreate(true)}
                         sx={{ bgcolor: '#1976d2', textTransform: 'none', fontWeight: 700, '&:hover': { bgcolor: '#1565c0' } }}>
                         Tạo tài khoản mới
                     </Button>
@@ -289,6 +291,12 @@ const UserListPage: React.FC = () => {
                     </Typography>
                 </Box>
             </Paper>
+
+            <UserCreateModal 
+                open={openCreate} 
+                onClose={() => setOpenCreate(false)} 
+                onSaved={loadUsers} 
+            />
 
             <Snackbar
                 open={!!snack} autoHideDuration={2500} onClose={() => setSnack('')}

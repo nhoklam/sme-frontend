@@ -4,70 +4,42 @@ import {
     Box, Typography, Button, Paper, Grid, TextField,
     Select, MenuItem, FormControl, Switch,
     Divider, InputAdornment, Alert, IconButton, Tooltip,
-    Skeleton,
+    Skeleton, LinearProgress,
 } from '@mui/material';
 import {
     ArrowBack, Save, InfoOutlined,
-    AddPhotoAlternate, DeleteOutline,
+    AddPhotoAlternate, DeleteOutline, CloudUpload, StarOutline, Print,
 } from '@mui/icons-material';
 import axiosInstance from '../../../../services/axiosConfig';
 import productService from '../../../../services/productService';
 import categoryService from '../../../../services/categoryService';
 import supplierService from '../../../../services/supplierService';
 import { Category, Supplier, CreateProductRequest } from '../../../../types';
+import JsBarcode from 'jsbarcode';
+import BarcodePrintDialog from '../../../../components/common/BarcodePrintDialog';
 
-// ── Helpers ────────────────────────────────────────────────────
+
+
 const fmt = (n: number) =>
     new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n ?? 0);
 
 const UNIT_OPTIONS = ['Cuốn', 'Bộ', 'Tập', 'Hộp', 'Gói'];
 
-// ── Section wrapper ────────────────────────────────────────────
-const Section = ({
-    title,
-    subtitle,
-    children,
-}: {
-    title: string;
-    subtitle?: string;
-    children: React.ReactNode;
-}) => (
-    <Paper
-        elevation={0}
-        sx={{ borderRadius: 2, border: '1px solid #f0f0f0', overflow: 'hidden', mb: 2.5 }}
-    >
+const Section = ({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) => (
+    <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid #f0f0f0', overflow: 'hidden', mb: 2.5 }}>
         <Box sx={{ px: 2.5, py: 2, borderBottom: '1px solid #f5f5f5', bgcolor: '#fafafa' }}>
-            <Typography variant="subtitle1" fontWeight={700} color="#1a1a2e">
-                {title}
-            </Typography>
-            {subtitle && (
-                <Typography variant="caption" color="text.secondary">
-                    {subtitle}
-                </Typography>
-            )}
+            <Typography variant="subtitle1" fontWeight={700} color="#1a1a2e">{title}</Typography>
+            {subtitle && <Typography variant="caption" color="text.secondary">{subtitle}</Typography>}
         </Box>
         <Box sx={{ p: 2.5 }}>{children}</Box>
     </Paper>
 );
 
-// ── Field label ────────────────────────────────────────────────
-const FieldLabel = ({
-    label,
-    required,
-    hint,
-}: {
-    label: string;
-    required?: boolean;
-    hint?: string;
-}) => (
+const FieldLabel = ({ label, required, hint }: { label: string; required?: boolean; hint?: string }) => (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.75 }}>
         <Typography variant="body2" fontWeight={600} color="#333" fontSize={13}>
             {label}
-            {required && (
-                <Typography component="span" color="#d32f2f">
-                    {' '}*
-                </Typography>
-            )}
+            {required && <Typography component="span" color="#d32f2f"> *</Typography>}
         </Typography>
         {hint && (
             <Tooltip title={hint} arrow>
@@ -77,172 +49,250 @@ const FieldLabel = ({
     </Box>
 );
 
-// ── Image upload ───────────────────────────────────────────────
-const ImageUploader = ({
-    imageUrl,
-    onChange,
-}: {
-    imageUrl: string;
-    onChange: (url: string) => void;
-}) => {
+const MultiImageUploader = ({ imageUrls, onChange }: { imageUrls: string[]; onChange: (urls: string[]) => void }) => {
     const inputRef = useRef<HTMLInputElement>(null);
     const [uploading, setUploading] = useState(false);
-    const [err, setErr] = useState(false);
+    const [progress, setProgress] = useState(0);
+    const [uploadError, setUploadError] = useState('');
+    const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
 
-    const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        setUploading(true);
+    const doUpload = async (files: FileList | File[]) => {
+        const validFiles = Array.from(files).filter(f => f.type.startsWith('image/') && f.size <= 10 * 1024 * 1024);
+        if (validFiles.length === 0) { setUploadError('Chỉ chấp nhận file ảnh và tối đa 10MB'); return; }
+        setUploading(true); setUploadError(''); setProgress(10);
+        
         try {
-            const form = new FormData();
-            form.append('file', file);
-            const res = await axiosInstance.post('/upload/image', form, {
-                headers: { 'Content-Type': 'multipart/form-data' },
-            });
-            onChange(res.data?.data?.url ?? '');
-            setErr(false);
-        } catch {
-            onChange(URL.createObjectURL(file));
-            setErr(false);
+            const uploadedUrls: string[] = [];
+            for (let i = 0; i < validFiles.length; i++) {
+                const form = new FormData();
+                form.append('file', validFiles[i]);
+                const res = await axiosInstance.post('/upload/image', form, {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                    onUploadProgress: (e) => { if (e.total) setProgress(10 + Math.round(((i + (e.loaded / e.total)) / validFiles.length) * 85)); },
+                });
+                const url: string = res.data?.data?.url ?? res.data?.url ?? '';
+                if (url) uploadedUrls.push(url);
+            }
+            if (uploadedUrls.length > 0) onChange([...imageUrls, ...uploadedUrls]);
+            setProgress(100);
+        } catch (err: any) {
+            setUploadError(err.response?.data?.message || err.message || 'Upload thất bại, vui lòng thử lại');
         } finally {
             setUploading(false);
+            setTimeout(() => setProgress(0), 800);
             if (inputRef.current) inputRef.current.value = '';
         }
     };
 
+    const handleSetPrimary = (idx: number) => {
+        if (idx === 0) return;
+        const newUrls = [...imageUrls];
+        const temp = newUrls[0];
+        newUrls[0] = newUrls[idx];
+        newUrls[idx] = temp;
+        onChange(newUrls);
+    };
+
+    const handleDragStart = (e: React.DragEvent, idx: number) => {
+        setDraggedIdx(idx);
+        e.dataTransfer.effectAllowed = 'move';
+    };
+
+    const handleDragEnter = (e: React.DragEvent, idx: number) => {
+        e.preventDefault();
+        if (draggedIdx === null || draggedIdx === idx) return;
+        const newUrls = [...imageUrls];
+        const draggedUrl = newUrls[draggedIdx];
+        newUrls.splice(draggedIdx, 1);
+        newUrls.splice(idx, 0, draggedUrl);
+        setDraggedIdx(idx);
+        onChange(newUrls);
+    };
+
+    const handleDragEnd = () => {
+        setDraggedIdx(null);
+    };
+
     return (
         <Box>
-            <FieldLabel label="Ảnh sản phẩm" hint="Ảnh thumbnail hiển thị ở danh sách. Khuyến nghị 500×700px" />
-
-            {imageUrl && !err ? (
-                <Box sx={{ position: 'relative', width: 120, mb: 1.5 }}>
-                    <Box
-                        component="img"
-                        src={imageUrl}
-                        alt="thumb"
-                        onError={() => setErr(true)}
-                        sx={{
-                            width: 120, height: 155, objectFit: 'contain',
-                            borderRadius: 1.5, border: '2px solid #d32f2f', bgcolor: '#fafafa', display: 'block',
-                        }}
-                    />
-                    <IconButton
-                        size="small"
-                        onClick={() => onChange('')}
-                        sx={{
-                            position: 'absolute', top: 4, right: 4,
-                            bgcolor: '#fff', boxShadow: 1, width: 22, height: 22,
-                            '&:hover': { bgcolor: '#ffebee', color: '#d32f2f' },
-                        }}
-                    >
-                        <DeleteOutline sx={{ fontSize: 13 }} />
-                    </IconButton>
-                </Box>
-            ) : (
-                <Box
-                    onClick={() => inputRef.current?.click()}
+            <FieldLabel label="Ảnh sản phẩm" hint="Upload qua server → Cloudinary. Khuyến nghị 500×700px, tối đa 10MB. Ảnh đầu tiên là ảnh chính." />
+            {uploadError && (
+                <Alert severity="error" sx={{ mb: 1.5, borderRadius: 1.5, fontSize: 12 }} onClose={() => setUploadError('')}>
+                    {uploadError}
+                </Alert>
+            )}
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 1.5 }}>
+                {imageUrls.map((url, idx) => (
+                    <Box key={url + idx} 
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, idx)}
+                        onDragEnter={(e) => handleDragEnter(e, idx)}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDragEnd={handleDragEnd}
+                        sx={{ 
+                            position: 'relative', width: 100, height: 130, cursor: 'grab',
+                            opacity: draggedIdx === idx ? 0.5 : 1,
+                            transition: 'all 0.2s'
+                        }}>
+                        <Box component="img" src={url} alt={`img-${idx}`}
+                            sx={{ width: 100, height: 130, objectFit: 'contain', borderRadius: 1.5, border: idx === 0 ? '2px solid #1976d2' : '1px solid #e0e0e0', bgcolor: '#fafafa', display: 'block', pointerEvents: 'none' }} />
+                        {idx === 0 && (
+                            <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bgcolor: 'rgba(25, 118, 210, 0.8)', color: '#fff', fontSize: 10, textAlign: 'center', py: 0.5, borderTopLeftRadius: 6, borderTopRightRadius: 6 }}>
+                                Ảnh chính
+                            </Box>
+                        )}
+                        <Box sx={{ position: 'absolute', top: idx === 0 ? 20 : 4, right: 4, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                            <IconButton size="small" onClick={() => onChange(imageUrls.filter((_, i) => i !== idx))}
+                                sx={{ bgcolor: 'rgba(255,255,255,0.8)', boxShadow: 1, width: 22, height: 22, '&:hover': { bgcolor: '#ffebee', color: '#d32f2f' } }}>
+                                <DeleteOutline sx={{ fontSize: 13 }} />
+                            </IconButton>
+                            {idx !== 0 && (
+                                <Tooltip title="Đặt làm ảnh chính" placement="right">
+                                    <IconButton size="small" onClick={() => handleSetPrimary(idx)}
+                                        sx={{ bgcolor: 'rgba(255,255,255,0.8)', boxShadow: 1, width: 22, height: 22, '&:hover': { bgcolor: '#e3f2fd', color: '#1976d2' } }}>
+                                        <StarOutline sx={{ fontSize: 13 }} />
+                                    </IconButton>
+                                </Tooltip>
+                            )}
+                        </Box>
+                    </Box>
+                ))}
+                
+                <Box onClick={() => !uploading && inputRef.current?.click()}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => { e.preventDefault(); if (!uploading) { const files = e.dataTransfer.files; if (files.length) doUpload(files); } }}
                     sx={{
-                        width: 120, height: 155,
-                        border: '2px dashed #e0e0e0', borderRadius: 1.5,
-                        display: 'flex', flexDirection: 'column',
-                        alignItems: 'center', justifyContent: 'center',
-                        cursor: 'pointer', gap: 0.75, bgcolor: '#fafafa',
-                        '&:hover': { borderColor: '#d32f2f', bgcolor: '#fff8f8' },
-                        transition: 'all 0.2s', mb: 1.5,
-                    }}
-                >
-                    <AddPhotoAlternate sx={{ fontSize: 28, color: '#ccc' }} />
-                    <Typography variant="caption" color="text.secondary" textAlign="center" px={1} fontSize={11}>
+                        width: 100, height: 130, border: `2px dashed ${uploading ? '#1976d2' : '#e0e0e0'}`,
+                        borderRadius: 1.5, display: 'flex', flexDirection: 'column', alignItems: 'center',
+                        justifyContent: 'center', cursor: uploading ? 'wait' : 'pointer', gap: 0.5,
+                        bgcolor: uploading ? '#e3f2fd' : '#fafafa',
+                        '&:hover': !uploading ? { borderColor: '#d32f2f', bgcolor: '#fff8f8' } : {},
+                        transition: 'all 0.2s', position: 'relative', overflow: 'hidden',
+                    }}>
+                    {uploading ? <CloudUpload sx={{ fontSize: 24, color: '#1976d2' }} /> : <AddPhotoAlternate sx={{ fontSize: 24, color: '#ccc' }} />}
+                    <Typography variant="caption" color={uploading ? '#1976d2' : 'text.secondary'} textAlign="center" px={1} fontSize={10} whiteSpace="pre-line">
                         {uploading ? 'Đang tải...' : 'Thêm ảnh'}
                     </Typography>
+                    {uploading && progress > 0 && (
+                        <Box sx={{ position: 'absolute', bottom: 0, left: 0, right: 0 }}>
+                            <LinearProgress variant="determinate" value={progress}
+                                sx={{ height: 3, bgcolor: '#bbdefb', '& .MuiLinearProgress-bar': { bgcolor: '#1976d2' } }} />
+                        </Box>
+                    )}
                 </Box>
-            )}
-
-            <TextField
-                size="small"
-                fullWidth
-                label="Hoặc nhập URL ảnh"
-                value={imageUrl}
-                onChange={(e) => onChange(e.target.value)}
-                placeholder="https://..."
-                sx={{ mt: 0.5 }}
-            />
-
-            <input ref={inputRef} type="file" accept="image/*" hidden onChange={handleFile} />
+            </Box>
+            <Typography variant="caption" color="text.secondary" fontSize={10} display="block" mt={0.5}>
+                Hỗ trợ: JPG, PNG, WEBP, GIF — Tối đa 10MB
+            </Typography>
+            <input ref={inputRef} type="file" accept="image/*" multiple hidden
+                onChange={(e) => { const files = e.target.files; if (files && files.length) doUpload(files); }} />
         </Box>
     );
 };
 
-// ── Initial form ───────────────────────────────────────────────
-const INITIAL: CreateProductRequest & { isActive: boolean } = {
-    categoryId: '',
-    supplierId: '',
-    isbnBarcode: '',
-    sku: '',
-    name: '',
-    description: '',
-    retailPrice: 0,
-    wholesalePrice: 0,
-    imageUrl: '',
-    unit: 'Cuốn',
-    weight: 0,
-    isActive: true,
+const INITIAL = {
+    categoryId: '', supplierId: '', isbnBarcode: '', sku: '',
+    name: '', description: '', retailPrice: '', wholesalePrice: '',
+    imageUrls: [] as string[], unit: 'Cuốn', weight: '', isActive: true,
 };
 
-// ══════════════════════════════════════════════════════════════
 const ProductCreatePage = () => {
     const navigate = useNavigate();
     const [form, setForm] = useState(INITIAL);
     const [categories, setCategories] = useState<Category[]>([]);
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+
+    useEffect(() => {
+        let buffer = '';
+        let lastTime = Date.now();
+
+        const handleGlobalKeydown = (e: KeyboardEvent) => {
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                }
+                return;
+            }
+
+            const now = Date.now();
+            if (now - lastTime > 60) {
+                buffer = '';
+            }
+            lastTime = now;
+
+            if (e.key === 'Enter') {
+                if (buffer.length >= 3) {
+                    e.preventDefault();
+                    const scannedCode = buffer;
+                    setForm(prev => ({ ...prev, isbnBarcode: scannedCode }));
+                }
+                buffer = '';
+            } else if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                buffer += e.key;
+            }
+        };
+
+        window.addEventListener('keydown', handleGlobalKeydown);
+        return () => window.removeEventListener('keydown', handleGlobalKeydown);
+    }, []);
+
     const [loadingMeta, setLoadingMeta] = useState(true);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [saving, setSaving] = useState(false);
     const [savedMsg, setSavedMsg] = useState('');
     const [errorMsg, setErrorMsg] = useState('');
+    const [createdId, setCreatedId] = useState<string | null>(null);
+    const [printOpen, setPrintOpen] = useState(false);
 
     useEffect(() => {
         (async () => {
             setLoadingMeta(true);
             try {
-                const [cats, sups] = await Promise.all([
+                const [cats, supsPage] = await Promise.all([
                     categoryService.getAll(),
                     supplierService.getAll(),
                 ]);
                 setCategories(cats);
-                setSuppliers(sups);
+                setSuppliers(supsPage.content ?? []);
             } catch { }
             setLoadingMeta(false);
         })();
     }, []);
 
-    const set =
-        (field: string) =>
-            (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | any) => {
-                const val = e?.target !== undefined ? e.target.value : e;
-                setForm((f) => ({ ...f, [field]: val }));
-                if (errors[field]) setErrors((er) => ({ ...er, [field]: '' }));
-            };
+    useEffect(() => {
+        if (!createdId) return;
+        const timer = setTimeout(() => {
+            navigate(`/admin/products/${createdId}`, { replace: true });
+        }, 1500);
+        return () => clearTimeout(timer);
+    }, [createdId, navigate]);
+
+    const set = (field: string) => (e: any) => {
+        const val = e?.target !== undefined ? e.target.value : e;
+        setForm((f) => ({ ...f, [field]: val }));
+        if (errors[field]) setErrors((er) => ({ ...er, [field]: '' }));
+    };
 
     const validate = () => {
         const errs: Record<string, string> = {};
         if (!form.name.trim()) errs.name = 'Tên sản phẩm không được để trống';
         if (!form.isbnBarcode.trim()) errs.isbnBarcode = 'ISBN / Barcode không được để trống';
         if (!form.categoryId) errs.categoryId = 'Vui lòng chọn danh mục';
-        if (!form.retailPrice || +form.retailPrice <= 0)
-            errs.retailPrice = 'Giá bán lẻ phải là số dương';
+        if (!form.retailPrice || Number(form.retailPrice) <= 0) errs.retailPrice = 'Giá bán lẻ phải là số dương';
         return errs;
     };
 
     const handleSave = async () => {
         const errs = validate();
-        if (Object.keys(errs).length) {
-            setErrors(errs);
-            return;
-        }
+        if (Object.keys(errs).length) { setErrors(errs); return; }
         setSaving(true);
         setErrorMsg('');
+        setSavedMsg('');
         try {
+            const retailPrice = Number(form.retailPrice);
+            const wholesalePrice = form.wholesalePrice !== '' ? Number(form.wholesalePrice) : undefined;
+            const weight = form.weight !== '' ? Number(form.weight) : undefined;
+
             const payload: CreateProductRequest = {
                 categoryId: form.categoryId,
                 supplierId: form.supplierId || undefined,
@@ -250,205 +300,150 @@ const ProductCreatePage = () => {
                 sku: form.sku?.trim() || undefined,
                 name: form.name.trim(),
                 description: form.description?.trim() || undefined,
-                retailPrice: +form.retailPrice,
-                wholesalePrice: form.wholesalePrice ? +form.wholesalePrice : undefined,
-                imageUrl: form.imageUrl || undefined,
+                retailPrice,
+                wholesalePrice,
+                imageUrls: form.imageUrls,
                 unit: form.unit,
-                weight: form.weight ? +form.weight : undefined,
+                weight,
             };
-
             const created = await productService.create(payload);
-            setSavedMsg('✅ Tạo sản phẩm thành công!');
-            setTimeout(() => navigate(`/admin/products/${created.id}`), 1200);
+            setSavedMsg('✅ Tạo sản phẩm thành công! Đang chuyển hướng...');
+            setCreatedId(created.id);
         } catch (e: any) {
-            setErrorMsg(e.response?.data?.message || 'Tạo sản phẩm thất bại. Vui lòng thử lại.');
+            const status = e?.response?.status;
+            // Nếu lỗi 500, thử tìm lại sản phẩm vừa tạo qua barcode search
+            if (status === 500 || status === undefined) {
+                try {
+                    const result = await productService.search({
+                        keyword: form.isbnBarcode.trim(),
+                        page: 0,
+                        size: 5,
+                    });
+                    const found = result?.content?.find(
+                        (p) => p.isbnBarcode === form.isbnBarcode.trim()
+                    );
+                    if (found) {
+                        // Sản phẩm đã được tạo thành công, lỗi 500 do hệ thống phụ (cache...)
+                        setSavedMsg('✅ Tạo sản phẩm thành công! Đang chuyển hướng...');
+                        setCreatedId(found.id);
+                        return;
+                    }
+                } catch {
+                    // Không verify được → hiện lỗi thật
+                }
+            }
+            // Kiểm tra lỗi duplicate barcode (400)
+            const msg = e?.response?.data?.message || e?.message || '';
+            if (msg.toLowerCase().includes('barcode') || msg.toLowerCase().includes('duplicate') || msg.includes('DUPLICATE_BARCODE')) {
+                setErrors((er) => ({ ...er, isbnBarcode: 'ISBN/Barcode này đã tồn tại trong hệ thống' }));
+            } else {
+                setErrorMsg(msg || 'Tạo sản phẩm thất bại. Vui lòng thử lại.');
+            }
         } finally {
             setSaving(false);
         }
     };
 
-    const profitMargin =
-        +form.retailPrice > 0 && +form.wholesalePrice > 0
-            ? (((+form.retailPrice - +form.wholesalePrice) / +form.retailPrice) * 100).toFixed(1)
-            : null;
+    const retailNum = Number(form.retailPrice) || 0;
+    const wholesaleNum = Number(form.wholesalePrice) || 0;
+    const profitMargin = retailNum > 0 && wholesaleNum > 0
+        ? (((retailNum - wholesaleNum) / retailNum) * 100).toFixed(1)
+        : null;
 
     return (
         <Box sx={{ p: 3, bgcolor: '#f8f9fb', minHeight: '100vh' }}>
-            {/* ── Header ── */}
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    <IconButton
-                        size="small"
-                        onClick={() => navigate('/admin/products')}
-                        sx={{ border: '1px solid #e0e0e0', borderRadius: 1.5 }}
-                    >
+                    <IconButton size="small" onClick={() => navigate('/admin/products')}
+                        sx={{ border: '1px solid #e0e0e0', borderRadius: 1.5 }}>
                         <ArrowBack sx={{ fontSize: 18 }} />
                     </IconButton>
                     <Box>
-                        <Typography variant="h5" fontWeight={800} color="#1a1a2e">
-                            Thêm sản phẩm mới
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                            Điền đầy đủ thông tin để tạo sản phẩm
-                        </Typography>
+                        <Typography variant="h5" fontWeight={800} color="#1a1a2e">Thêm sản phẩm mới</Typography>
+                        <Typography variant="body2" color="text.secondary">Điền đầy đủ thông tin để tạo sản phẩm</Typography>
                     </Box>
                 </Box>
                 <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-                    <Box
-                        sx={{
-                            display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 0.75,
-                            borderRadius: 1.5, border: '1px solid #e0e0e0', bgcolor: '#fff',
-                        }}
-                    >
-                        <Typography
-                            variant="body2"
-                            fontWeight={600}
-                            color={form.isActive ? '#2e7d32' : '#888'}
-                        >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 0.75, borderRadius: 1.5, border: '1px solid #e0e0e0', bgcolor: '#fff' }}>
+                        <Typography variant="body2" fontWeight={600} color={form.isActive ? '#2e7d32' : '#888'}>
                             {form.isActive ? 'Đang bán' : 'Ngừng bán'}
                         </Typography>
-                        <Switch
-                            size="small"
-                            checked={form.isActive}
+                        <Switch size="small" checked={form.isActive}
                             onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
-                            sx={{
-                                '& .MuiSwitch-switchBase.Mui-checked': { color: '#2e7d32' },
-                                '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#2e7d32' },
-                            }}
-                        />
+                            sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: '#2e7d32' }, '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#2e7d32' } }} />
                     </Box>
-                    <Button
-                        variant="outlined"
-                        onClick={() => navigate('/admin/products')}
-                        sx={{ textTransform: 'none', borderColor: '#bbb', color: '#444' }}
-                    >
-                        Hủy
-                    </Button>
-                    <Button
-                        variant="contained"
-                        startIcon={<Save />}
-                        onClick={handleSave}
-                        disabled={saving}
-                        sx={{
-                            bgcolor: '#d32f2f', textTransform: 'none', fontWeight: 700, px: 3,
-                            '&:hover': { bgcolor: '#b71c1c' },
-                        }}
-                    >
+                    <Button variant="outlined" onClick={() => navigate('/admin/products')}
+                        sx={{ textTransform: 'none', borderColor: '#bbb', color: '#444' }}>Hủy</Button>
+                    <Button variant="contained" startIcon={<Save />} onClick={handleSave}
+                        disabled={saving || !!createdId}
+                        sx={{ bgcolor: '#d32f2f', textTransform: 'none', fontWeight: 700, px: 3, '&:hover': { bgcolor: '#b71c1c' } }}>
                         {saving ? 'Đang lưu...' : 'Lưu sản phẩm'}
                     </Button>
                 </Box>
             </Box>
 
-            {savedMsg && (
-                <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }}>
-                    {savedMsg}
-                </Alert>
-            )}
-            {errorMsg && (
-                <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setErrorMsg('')}>
-                    {errorMsg}
-                </Alert>
-            )}
+            {savedMsg && <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }}>{savedMsg}</Alert>}
+            {errorMsg && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setErrorMsg('')}>{errorMsg}</Alert>}
 
             <Grid container spacing={2.5}>
-                {/* ── CỘT TRÁI ── */}
                 <Grid size={{ xs: 12, md: 8 }}>
                     <Section title="Thông tin cơ bản" subtitle="Tên, mô tả và phân loại sản phẩm">
                         <Grid container spacing={2}>
                             <Grid size={{ xs: 12 }}>
                                 <FieldLabel label="Tên sản phẩm" required />
-                                <TextField
-                                    fullWidth size="small" placeholder="Nhập tên sách / sản phẩm..."
+                                <TextField fullWidth size="small" placeholder="Nhập tên sách / sản phẩm..."
                                     value={form.name} onChange={set('name')}
-                                    error={!!errors.name} helperText={errors.name}
-                                    inputProps={{ maxLength: 255 }}
-                                />
+                                    error={!!errors.name} helperText={errors.name} inputProps={{ maxLength: 255 }} />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
                                 <FieldLabel label="Danh mục" required />
-                                {loadingMeta ? (
-                                    <Skeleton height={40} />
-                                ) : (
+                                {loadingMeta ? <Skeleton height={40} /> : (
                                     <FormControl fullWidth size="small" error={!!errors.categoryId}>
-                                        <Select
-                                            value={form.categoryId}
-                                            onChange={set('categoryId')}
-                                            displayEmpty
-                                        >
-                                            <MenuItem value="" disabled>
-                                                Chọn danh mục
-                                            </MenuItem>
-                                            {categories.map((c) => (
-                                                <MenuItem key={c.id} value={c.id}>
-                                                    {c.name}
-                                                </MenuItem>
-                                            ))}
+                                        <Select value={form.categoryId} onChange={set('categoryId')} displayEmpty>
+                                            <MenuItem value="" disabled>Chọn danh mục</MenuItem>
+                                            {categories.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
                                         </Select>
-                                        {errors.categoryId && (
-                                            <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.75 }}>
-                                                {errors.categoryId}
-                                            </Typography>
-                                        )}
+                                        {errors.categoryId && <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.75 }}>{errors.categoryId}</Typography>}
                                     </FormControl>
                                 )}
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
                                 <FieldLabel label="Nhà cung cấp / NXB" />
-                                {loadingMeta ? (
-                                    <Skeleton height={40} />
-                                ) : (
+                                {loadingMeta ? <Skeleton height={40} /> : (
                                     <FormControl fullWidth size="small">
-                                        <Select
-                                            value={form.supplierId ?? ''}
-                                            onChange={set('supplierId')}
-                                            displayEmpty
-                                        >
+                                        <Select value={form.supplierId ?? ''} onChange={set('supplierId')} displayEmpty>
                                             <MenuItem value="">Chọn nhà cung cấp</MenuItem>
-                                            {suppliers.map((s) => (
-                                                <MenuItem key={s.id} value={s.id}>
-                                                    {s.name}
-                                                </MenuItem>
-                                            ))}
+                                            {suppliers.map((s) => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
                                         </Select>
                                     </FormControl>
                                 )}
                             </Grid>
                             <Grid size={{ xs: 12 }}>
                                 <FieldLabel label="Mô tả" />
-                                <TextField
-                                    fullWidth multiline rows={4} size="small"
+                                <TextField fullWidth multiline rows={4} size="small"
                                     placeholder="Mô tả nội dung, tác giả, thể loại..."
-                                    value={form.description ?? ''} onChange={set('description')}
-                                />
+                                    value={form.description ?? ''} onChange={set('description')} />
                             </Grid>
                         </Grid>
                     </Section>
 
-                    <Section title="Hình ảnh sản phẩm" subtitle="Ảnh thumbnail hiển thị ở danh sách sản phẩm">
-                        <ImageUploader
-                            imageUrl={form.imageUrl ?? ''}
-                            onChange={(url) => setForm((f) => ({ ...f, imageUrl: url }))}
-                        />
+                    <Section title="Hình ảnh sản phẩm" subtitle="Upload ảnh qua server (Cloudinary) hoặc nhập URL">
+                        <MultiImageUploader imageUrls={form.imageUrls} onChange={(urls) => setForm((f) => ({ ...f, imageUrls: urls }))} />
                     </Section>
 
                     <Section title="Mã nhận diện" subtitle="ISBN/Barcode dùng quét tại POS, SKU quản lý nội bộ">
                         <Grid container spacing={2}>
                             <Grid size={{ xs: 12, sm: 6 }}>
                                 <FieldLabel label="ISBN-13 / Barcode" required hint="Quét mã vạch tại quầy POS" />
-                                <TextField
-                                    fullWidth size="small" placeholder="VD: 9786041184565"
+                                <TextField fullWidth size="small" placeholder="VD: 9786041184565"
                                     value={form.isbnBarcode} onChange={set('isbnBarcode')}
-                                    error={!!errors.isbnBarcode} helperText={errors.isbnBarcode}
-                                    inputProps={{ maxLength: 50 }}
-                                />
+                                    onKeyDown={e => { if (e.key === 'Enter') e.preventDefault(); }}
+                                    error={!!errors.isbnBarcode} helperText={errors.isbnBarcode} inputProps={{ maxLength: 50 }} />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
                                 <FieldLabel label="SKU" hint="Mã nội bộ quản lý sản phẩm" />
-                                <TextField
-                                    fullWidth size="small" placeholder="VD: VH-001"
-                                    value={form.sku ?? ''} onChange={set('sku')}
-                                    inputProps={{ maxLength: 100 }}
-                                />
+                                <TextField fullWidth size="small" placeholder="VD: VH-001"
+                                    value={form.sku ?? ''} onChange={set('sku')} inputProps={{ maxLength: 100 }} />
                             </Grid>
                         </Grid>
                     </Section>
@@ -457,64 +452,40 @@ const ProductCreatePage = () => {
                         <Grid container spacing={2}>
                             <Grid size={{ xs: 12, sm: 4 }}>
                                 <FieldLabel label="Giá bán lẻ" required hint="Giá niêm yết cho khách lẻ" />
-                                <TextField
-                                    fullWidth size="small" type="number" placeholder="0"
-                                    value={form.retailPrice || ''} onChange={set('retailPrice')}
+                                <TextField fullWidth size="small" type="number" placeholder="0"
+                                    value={form.retailPrice} onChange={set('retailPrice')}
                                     error={!!errors.retailPrice} helperText={errors.retailPrice}
-                                    InputProps={{
-                                        endAdornment: <InputAdornment position="end">₫</InputAdornment>,
-                                    }}
-                                />
+                                    inputProps={{ min: 0 }}
+                                    InputProps={{ endAdornment: <InputAdornment position="end">₫</InputAdornment> }} />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 4 }}>
                                 <FieldLabel label="Giá bán sỉ" hint="Áp dụng cho khách mua số lượng lớn" />
-                                <TextField
-                                    fullWidth size="small" type="number" placeholder="0"
-                                    value={form.wholesalePrice || ''} onChange={set('wholesalePrice')}
-                                    InputProps={{
-                                        endAdornment: <InputAdornment position="end">₫</InputAdornment>,
-                                    }}
-                                />
+                                <TextField fullWidth size="small" type="number" placeholder="0"
+                                    value={form.wholesalePrice} onChange={set('wholesalePrice')}
+                                    inputProps={{ min: 0 }}
+                                    InputProps={{ endAdornment: <InputAdornment position="end">₫</InputAdornment> }} />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 4 }}>
-                                <FieldLabel
-                                    label="Giá vốn (MAC)"
-                                    hint="Moving Average Cost — tự tính sau khi nhập kho"
-                                />
-                                <TextField
-                                    fullWidth size="small" disabled
-                                    value="Tự động sau khi nhập kho"
-                                    sx={{
-                                        '& .MuiInputBase-input.Mui-disabled': {
-                                            WebkitTextFillColor: '#aaa', fontSize: 12,
-                                        },
-                                    }}
-                                />
+                                <FieldLabel label="Giá vốn (MAC)" hint="Moving Average Cost — tự tính sau khi nhập kho" />
+                                <TextField fullWidth size="small" disabled value="Tự động sau khi nhập kho"
+                                    sx={{ '& .MuiInputBase-input.Mui-disabled': { WebkitTextFillColor: '#aaa', fontSize: 12 } }} />
                             </Grid>
                         </Grid>
                         {profitMargin !== null && (
-                            <Box
-                                sx={{
-                                    mt: 2, p: 1.5, bgcolor: '#f0fff4',
-                                    borderRadius: 1.5, border: '1px solid #c8e6c9',
-                                    display: 'flex', gap: 3, flexWrap: 'wrap',
-                                }}
-                            >
+                            <Box sx={{ mt: 2, p: 1.5, bgcolor: '#f0fff4', borderRadius: 1.5, border: '1px solid #c8e6c9', display: 'flex', gap: 3, flexWrap: 'wrap' }}>
                                 <Box>
-                                    <Typography variant="caption" color="text.secondary">
-                                        Lợi nhuận gộp ước tính
-                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">Lợi nhuận gộp ước tính</Typography>
                                     <Typography variant="body2" fontWeight={700} color="#2e7d32">
-                                        {fmt(+form.retailPrice - +(form.wholesalePrice ?? 0))} ({profitMargin}%)
+                                        {fmt(retailNum - wholesaleNum)} ({profitMargin}%)
                                     </Typography>
                                 </Box>
                                 <Box>
                                     <Typography variant="caption" color="text.secondary">Giá bán lẻ</Typography>
-                                    <Typography variant="body2" fontWeight={700}>{fmt(+form.retailPrice)}</Typography>
+                                    <Typography variant="body2" fontWeight={700}>{fmt(retailNum)}</Typography>
                                 </Box>
                                 <Box>
                                     <Typography variant="caption" color="text.secondary">Giá sỉ</Typography>
-                                    <Typography variant="body2" fontWeight={700}>{fmt(+(form.wholesalePrice ?? 0))}</Typography>
+                                    <Typography variant="body2" fontWeight={700}>{fmt(wholesaleNum)}</Typography>
                                 </Box>
                             </Box>
                         )}
@@ -526,175 +497,118 @@ const ProductCreatePage = () => {
                                 <FieldLabel label="Đơn vị tính" />
                                 <FormControl fullWidth size="small">
                                     <Select value={form.unit} onChange={set('unit')}>
-                                        {UNIT_OPTIONS.map((u) => (
-                                            <MenuItem key={u} value={u}>
-                                                {u}
-                                            </MenuItem>
-                                        ))}
+                                        {UNIT_OPTIONS.map((u) => <MenuItem key={u} value={u}>{u}</MenuItem>)}
                                     </Select>
                                 </FormControl>
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
                                 <FieldLabel label="Trọng lượng" hint="Dùng tính phí vận chuyển" />
-                                <TextField
-                                    fullWidth size="small" type="number" placeholder="0"
-                                    value={form.weight || ''} onChange={set('weight')}
-                                    InputProps={{
-                                        endAdornment: <InputAdornment position="end">gram</InputAdornment>,
-                                    }}
-                                />
+                                <TextField fullWidth size="small" type="number" placeholder="0"
+                                    value={form.weight} onChange={set('weight')}
+                                    inputProps={{ min: 0 }}
+                                    InputProps={{ endAdornment: <InputAdornment position="end">gram</InputAdornment> }} />
                             </Grid>
                         </Grid>
                     </Section>
                 </Grid>
 
-                {/* ── CỘT PHẢI ── */}
                 <Grid size={{ xs: 12, md: 4 }}>
-                    {/* Preview */}
-                    <Paper
-                        elevation={0}
-                        sx={{ borderRadius: 2, border: '1px solid #f0f0f0', p: 2.5, mb: 2.5 }}
-                    >
-                        <Typography variant="subtitle1" fontWeight={700} color="#1a1a2e" mb={1.5}>
-                            Preview thumbnail
-                        </Typography>
-                        {form.imageUrl ? (
-                            <Box sx={{ textAlign: 'center' }}>
-                                <Box
-                                    component="img"
-                                    src={form.imageUrl}
-                                    alt="thumbnail"
-                                    sx={{
-                                        width: '100%', maxWidth: 180, height: 230,
-                                        objectFit: 'contain', borderRadius: 2,
-                                        border: '2px solid #d32f2f', bgcolor: '#fafafa',
-                                        display: 'block', mx: 'auto',
-                                    }}
-                                    onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')}
-                                />
-                            </Box>
+                    <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid #f0f0f0', p: 2.5, mb: 2.5 }}>
+                        <Typography variant="subtitle1" fontWeight={700} color="#1a1a2e" mb={1.5}>Preview thumbnail</Typography>
+                        {form.imageUrls.length > 0 ? (
+                            <Box component="img" src={form.imageUrls[0]} alt="thumbnail"
+                                sx={{ width: '100%', maxWidth: 180, height: 230, objectFit: 'contain', borderRadius: 2, border: '2px solid #d32f2f', bgcolor: '#fafafa', display: 'block', mx: 'auto' }}
+                                onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')} />
                         ) : (
-                            <Box
-                                sx={{
-                                    height: 180, display: 'flex', flexDirection: 'column',
-                                    alignItems: 'center', justifyContent: 'center',
-                                    bgcolor: '#f5f5f5', borderRadius: 2, gap: 1,
-                                }}
-                            >
+                            <Box sx={{ height: 180, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', bgcolor: '#f5f5f5', borderRadius: 2, gap: 1 }}>
                                 <AddPhotoAlternate sx={{ fontSize: 40, color: '#ddd' }} />
-                                <Typography variant="caption" color="text.secondary">
-                                    Chưa có ảnh nào
-                                </Typography>
+                                <Typography variant="caption" color="text.secondary">Chưa có ảnh nào</Typography>
                             </Box>
                         )}
                     </Paper>
 
-                    {/* Trạng thái */}
-                    <Paper
-                        elevation={0}
-                        sx={{ borderRadius: 2, border: '1px solid #f0f0f0', p: 2.5, mb: 2.5 }}
-                    >
-                        <Typography variant="subtitle1" fontWeight={700} color="#1a1a2e" mb={1.5}>
-                            Trạng thái
-                        </Typography>
-                        <Box
-                            sx={{
-                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                p: 1.5, borderRadius: 1.5,
-                                bgcolor: form.isActive ? '#e8f5e9' : '#f5f5f5',
-                                border: `1px solid ${form.isActive ? '#c8e6c9' : '#e0e0e0'}`,
-                            }}
-                        >
+                    <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid #f0f0f0', p: 2.5, mb: 2.5 }}>
+                        <Typography variant="subtitle1" fontWeight={700} color="#1a1a2e" mb={1.5}>Trạng thái</Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1.5, borderRadius: 1.5, bgcolor: form.isActive ? '#e8f5e9' : '#f5f5f5', border: `1px solid ${form.isActive ? '#c8e6c9' : '#e0e0e0'}` }}>
                             <Box>
-                                <Typography
-                                    variant="body2"
-                                    fontWeight={700}
-                                    color={form.isActive ? '#2e7d32' : '#888'}
-                                >
+                                <Typography variant="body2" fontWeight={700} color={form.isActive ? '#2e7d32' : '#888'}>
                                     {form.isActive ? 'Đang bán' : 'Ngừng bán'}
                                 </Typography>
                                 <Typography variant="caption" color="text.secondary">
                                     {form.isActive ? 'Hiển thị trên cửa hàng' : 'Ẩn khỏi cửa hàng'}
                                 </Typography>
                             </Box>
-                            <Switch
-                                checked={form.isActive}
+                            <Switch checked={form.isActive}
                                 onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
-                                sx={{
-                                    '& .MuiSwitch-switchBase.Mui-checked': { color: '#2e7d32' },
-                                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#2e7d32' },
-                                }}
-                            />
+                                sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: '#2e7d32' }, '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#2e7d32' } }} />
                         </Box>
                     </Paper>
 
-                    {/* Tóm tắt + nút lưu */}
-                    <Paper
-                        elevation={0}
-                        sx={{ borderRadius: 2, border: '1px solid #f0f0f0', p: 2.5 }}
-                    >
-                        <Typography variant="subtitle1" fontWeight={700} color="#1a1a2e" mb={1.5}>
-                            Tóm tắt
-                        </Typography>
+                    {form.isbnBarcode && (
+                        <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid #f0f0f0', p: 2.5, mb: 2.5 }}>
+                            <Typography variant="subtitle1" fontWeight={700} color="#1a1a2e" mb={1.5}>Mã vạch</Typography>
+                            <Box sx={{ textAlign: 'center', mb: 1.5 }}>
+                                <canvas
+                                    ref={(el) => {
+                                        if (el && form.isbnBarcode) {
+                                            try {
+                                                JsBarcode(el, form.isbnBarcode, {
+                                                    width: 2, height: 50, displayValue: true,
+                                                    fontSize: 14, margin: 8, background: '#fff',
+                                                });
+                                            } catch {}
+                                        }
+                                    }}
+                                    style={{ maxWidth: '100%' }}
+                                />
+                            </Box>
+                            <Button
+                                fullWidth variant="outlined" startIcon={<Print />}
+                                onClick={() => setPrintOpen(true)}
+                                sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 2 }}
+                            >
+                                In mã vạch để dán kệ
+                            </Button>
+                        </Paper>
+                    )}
+
+                    <BarcodePrintDialog 
+                        open={printOpen} 
+                        onClose={() => setPrintOpen(false)} 
+                        items={[{
+                            name: form.name || 'Sản phẩm mới',
+                            sku: form.sku || '',
+                            barcode: form.isbnBarcode,
+                            price: Number(form.retailPrice) || 0
+                        }]} 
+                    />
+
+                    <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid #f0f0f0', p: 2.5 }}>
+                        <Typography variant="subtitle1" fontWeight={700} color="#1a1a2e" mb={1.5}>Tóm tắt</Typography>
                         {[
                             { label: 'Tên', value: form.name || '—' },
-                            {
-                                label: 'Danh mục',
-                                value: categories.find((c) => c.id === form.categoryId)?.name || '—',
-                            },
+                            { label: 'Danh mục', value: categories.find((c) => c.id === form.categoryId)?.name || '—' },
                             { label: 'SKU', value: form.sku || '—' },
                             { label: 'ISBN', value: form.isbnBarcode || '—' },
-                            {
-                                label: 'Giá lẻ',
-                                value: form.retailPrice ? fmt(+form.retailPrice) : '—',
-                            },
-                            {
-                                label: 'Giá sỉ',
-                                value: form.wholesalePrice ? fmt(+form.wholesalePrice) : '—',
-                            },
+                            { label: 'Giá lẻ', value: form.retailPrice ? fmt(retailNum) : '—' },
+                            { label: 'Giá sỉ', value: form.wholesalePrice ? fmt(wholesaleNum) : '—' },
                         ].map((row) => (
-                            <Box
-                                key={row.label}
-                                sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}
-                            >
-                                <Typography variant="caption" color="text.secondary">
-                                    {row.label}
-                                </Typography>
-                                <Typography
-                                    variant="caption"
-                                    fontWeight={600}
-                                    color="#333"
-                                    sx={{
-                                        maxWidth: 140, textAlign: 'right',
-                                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                                    }}
-                                >
+                            <Box key={row.label} sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                                <Typography variant="caption" color="text.secondary">{row.label}</Typography>
+                                <Typography variant="caption" fontWeight={600} color="#333"
+                                    sx={{ maxWidth: 140, textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                     {row.value}
                                 </Typography>
                             </Box>
                         ))}
                         <Divider sx={{ my: 1.5 }} />
-                        <Button
-                            fullWidth
-                            variant="contained"
-                            startIcon={<Save />}
-                            onClick={handleSave}
-                            disabled={saving}
-                            sx={{
-                                bgcolor: '#d32f2f', textTransform: 'none', fontWeight: 700,
-                                '&:hover': { bgcolor: '#b71c1c' },
-                            }}
-                        >
+                        <Button fullWidth variant="contained" startIcon={<Save />} onClick={handleSave}
+                            disabled={saving || !!createdId}
+                            sx={{ bgcolor: '#d32f2f', textTransform: 'none', fontWeight: 700, '&:hover': { bgcolor: '#b71c1c' } }}>
                             {saving ? 'Đang lưu...' : 'Lưu sản phẩm'}
                         </Button>
-                        <Button
-                            fullWidth
-                            variant="text"
-                            onClick={() => navigate('/admin/products')}
-                            sx={{ mt: 1, textTransform: 'none', color: '#888' }}
-                        >
-                            Hủy bỏ
-                        </Button>
+                        <Button fullWidth variant="text" onClick={() => navigate('/admin/products')}
+                            sx={{ mt: 1, textTransform: 'none', color: '#888' }}>Hủy bỏ</Button>
                     </Paper>
                 </Grid>
             </Grid>

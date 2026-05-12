@@ -35,6 +35,18 @@ const orderService = {
         return res.data.data;
     },
 
+    // Tìm đơn hàng theo mã code (cho trang tra cứu đơn hàng)
+    getByCode: async (code: string): Promise<OrderResponse> => {
+        const res = await axiosInstance.get<ApiResponse<PageResponse<OrderResponse>>>(
+            `/orders?keyword=${encodeURIComponent(code)}&page=0&size=1`
+        );
+        const list = res.data.data;
+        if (!list.content || list.content.length === 0) {
+            throw new Error('Order not found');
+        }
+        return list.content[0];
+    },
+
     // Tạo đơn hàng mới
     create: async (data: CreateOrderRequest): Promise<OrderResponse> => {
         const res = await axiosInstance.post<ApiResponse<OrderResponse>>('/orders', data);
@@ -57,6 +69,20 @@ const orderService = {
             { reason }
         );
         return res.data.data;
+    },
+
+    // Chỉ định kho xử lý đơn hàng (Smart Routing override)
+    assignWarehouse: async (id: string, warehouseId: string): Promise<OrderResponse> => {
+        const res = await axiosInstance.patch<ApiResponse<OrderResponse>>(
+            `/orders/${id}/assign-warehouse`,
+            { warehouseId }
+        );
+        return res.data.data;
+    },
+
+    // Đối soát COD hàng loạt
+    reconcileCod: async (orderIds: string[]): Promise<void> => {
+        await axiosInstance.post('/orders/reconcile-cod', { orderIds });
     },
 };
 

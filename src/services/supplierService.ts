@@ -43,6 +43,12 @@ const supplierService = {
         return res.data.data;
     },
 
+    // ── Import hàng loạt ────────────────────────────────────────
+    importBulk: async (dataList: any[]): Promise<any> => {
+        const res = await axiosInstance.post<ApiResponse<any>>('/suppliers/bulk', dataList);
+        return res.data;
+    },
+
     // ── Cập nhật ────────────────────────────────────────────────
     update: async (id: string, data: UpdateSupplierRequest): Promise<Supplier> => {
         const res = await axiosInstance.put<ApiResponse<Supplier>>(`/suppliers/${id}`, data);

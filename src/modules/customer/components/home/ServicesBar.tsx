@@ -1,30 +1,68 @@
-// src/modules/customer/components/Home/ServicesBar.jsx
 import React from 'react';
-import { Grid, Paper, Typography, Box } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import { SERVICES } from '../../../../utils/constants';
 
 const ServicesBar = () => (
-    <Grid container spacing={1.5} sx={{ mb: 3 }}>
+    <Box sx={{
+        display: 'grid',
+        gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
+        mb: 2,
+        bgcolor: '#fff',
+        border: '1px solid #ececec',
+        borderRadius: 1.5,
+        overflow: 'hidden',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+    }}>
         {SERVICES.map((s, i) => (
-            <Grid item xs={6} md={3} key={i}>
-                <Paper elevation={0} sx={{
-                    p: 2, borderRadius: 2,
-                    display: 'flex', alignItems: 'center', gap: 1.5,
-                    bgcolor: '#fff', border: '1px solid #f0f0f0',
-                }}>
-                    <Typography fontSize={24}>{s.icon}</Typography>
-                    <Box>
-                        <Typography variant="body2" fontWeight={700} fontSize={12}>
-                            {s.title}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                            {s.sub}
-                        </Typography>
-                    </Box>
-                </Paper>
-            </Grid>
+            <Box
+                key={i}
+                sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1.25,
+                    px: 2,
+                    py: 1.6,
+                    borderRight: {
+                        xs: i % 2 === 0 ? '1px solid #ececec' : 'none',
+                        md: i < SERVICES.length - 1 ? '1px solid #ececec' : 'none',
+                    },
+                    borderBottom: {
+                        xs: i < SERVICES.length - 2 ? '1px solid #ececec' : 'none',
+                        md: 'none',
+                    },
+                    transition: 'background 0.15s',
+                    '&:hover': { bgcolor: '#fafafa' },
+                }}
+            >
+                <Typography sx={{ fontSize: 24, lineHeight: 1, flexShrink: 0 }}>
+                    {s.icon}
+                </Typography>
+                <Box>
+                    <Typography
+                        sx={{
+                            fontSize: 12.5,
+                            fontWeight: 700,
+                            color: '#1a1a1a',
+                            lineHeight: 1.3,
+                            fontFamily: '"Segoe UI", sans-serif',
+                        }}
+                    >
+                        {s.title}
+                    </Typography>
+                    <Typography
+                        sx={{
+                            fontSize: 11,
+                            color: '#888',
+                            lineHeight: 1.4,
+                            fontFamily: '"Segoe UI", sans-serif',
+                        }}
+                    >
+                        {s.sub}
+                    </Typography>
+                </Box>
+            </Box>
         ))}
-    </Grid>
+    </Box>
 );
 
 export default ServicesBar;

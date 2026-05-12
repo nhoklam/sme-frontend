@@ -1,5 +1,4 @@
-// src/modules/admin/pages/inventory/InventoryHistoryPage.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -7,108 +6,460 @@ import {
     TableCell, TableContainer, TableHead, TableRow,
     TextField, InputAdornment, Chip, IconButton,
     Select, MenuItem, FormControl, Skeleton, Pagination,
-    Alert, Grid, Card, CardContent,
+    Alert, Grid, Card, CardContent, Tooltip,
+    Dialog, DialogTitle, DialogContent, DialogActions,
+    Divider,
 } from '@mui/material';
 import {
-    Search, Refresh, ArrowBack, History as HistoryIcon,
-    LocalShipping, Edit, SwapHoriz, CheckCircle, ShoppingCart,
+    Search, Refresh, ArrowBack,
+    History as HistoryIcon, LocalShipping, Edit,
+    SwapHoriz, CheckCircle, ShoppingCart,
+    CalendarToday, FilterAlt, FileDownloadOutlined,
+    Close, OpenInNew, ErrorOutline, InfoOutlined,
+    Warning as WarningIcon,
 } from '@mui/icons-material';
+import axiosInstance from '../../../../services/axiosConfig';
 import warehouseService from '../../../../services/warehouseService';
 import productService from '../../../../services/productService';
-import { InventoryTransaction, ProductResponse } from '../../../../types';
+import useAuth from '../../../../store/hooks/useAuth';
+import { InventoryTransaction, PageResponse, ApiResponse, ProductResponse } from '../../../../types';
+import { exportToExcel } from '../../../../utils/excelExport';
 
-// ── Helper ─────────────────────────────────────────────────────
+// ── helpers ────────────────────────────────────────────────────
 const TX_TYPE_MAP: Record<string, { label: string; color: string; bg: string; icon: React.ReactElement }> = {
     IMPORT: { label: 'Nhập kho', color: '#1976d2', bg: '#e3f2fd', icon: <LocalShipping sx={{ fontSize: 14 }} /> },
     SALE: { label: 'Bán hàng', color: '#d32f2f', bg: '#ffebee', icon: <ShoppingCart sx={{ fontSize: 14 }} /> },
+    SALE_POS: { label: 'Bán POS', color: '#d32f2f', bg: '#ffebee', icon: <ShoppingCart sx={{ fontSize: 14 }} /> },
+    SALE_ONLINE: { label: 'Bán Online', color: '#e65100', bg: '#fff3e0', icon: <ShoppingCart sx={{ fontSize: 14 }} /> },
     ADJUSTMENT: { label: 'Điều chỉnh', color: '#e65100', bg: '#fff3e0', icon: <Edit sx={{ fontSize: 14 }} /> },
     TRANSFER_OUT: { label: 'Xuất chuyển', color: '#6a1b9a', bg: '#f3e5f5', icon: <SwapHoriz sx={{ fontSize: 14 }} /> },
     TRANSFER_IN: { label: 'Nhận chuyển', color: '#2e7d32', bg: '#e8f5e9', icon: <SwapHoriz sx={{ fontSize: 14 }} /> },
     RETURN: { label: 'Trả hàng', color: '#2e7d32', bg: '#e8f5e9', icon: <CheckCircle sx={{ fontSize: 14 }} /> },
+    RETURN_TO_STOCK: { label: 'Trả về kho', color: '#2e7d32', bg: '#e8f5e9', icon: <CheckCircle sx={{ fontSize: 14 }} /> },
+    RESERVE: { label: 'Giữ chỗ', color: '#0277bd', bg: '#e1f5fe', icon: <CheckCircle sx={{ fontSize: 14 }} /> },
+    RELEASE: { label: 'Giải phóng', color: '#2e7d32', bg: '#e8f5e9', icon: <CheckCircle sx={{ fontSize: 14 }} /> },
 };
 
-// ── Main Component ─────────────────────────────────────────────
-const InventoryHistoryPage: React.FC = () => {
-    const navigate = useNavigate();
-    const [page, setPage] = useState(0);
-    const [selectedWarehouse, setSelectedWarehouse] = useState('');
-    const [searchProduct, setSearchProduct] = useState('');
-    const [products, setProducts] = useState<Map<string, ProductResponse>>(new Map());
-    const PAGE_SIZE = 20;
+const PAGE_SIZE = 20;
 
-    // Lấy danh sách kho
-    const { data: warehouses } = useQuery({
-        queryKey: ['warehouses'],
-        queryFn: () => warehouseService.getAll(),
-    });
-
-    // Lấy danh sách sản phẩm để map
-    useEffect(() => {
-        productService.search({ size: 1000, isActive: true })
-            .then(res => {
-                const map = new Map<string, ProductResponse>();
-                res.content.forEach(p => map.set(p.id, p));
-                setProducts(map);
-            })
-            .catch(() => { });
-    }, []);
-
-    // Lấy lịch sử giao dịch (cần API tổng hợp, tạm thời dùng mock data)
-    const [transactions, setTransactions] = useState<InventoryTransaction[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [totalElements, setTotalElements] = useState(0);
-    const [totalPages, setTotalPages] = useState(0); // THÊM state totalPages
-
-    const loadHistory = async () => {
-        setLoading(true);
-        try {
-            // TODO: Khi có API tổng hợp lịch sử, thay thế bằng:
-            // const data = await inventoryService.getHistory({ page, size: PAGE_SIZE, warehouseId: selectedWarehouse });
-            // setTransactions(data.content);
-            // setTotalElements(data.totalElements);
-            // setTotalPages(data.totalPages);
-
-            // Tạm thời lấy dữ liệu rỗng
-            setTransactions([]);
-            setTotalElements(0);
-            setTotalPages(0);
-        } catch (error) {
-            console.error('Lỗi tải lịch sử:', error);
-        } finally {
-            setLoading(false);
+// ── Preset date ranges ──────────────────────────────────────────
+const getDateRange = (preset: string): { from: string; to: string } => {
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    switch (preset) {
+        case 'today': return { from: today, to: today };
+        case 'yesterday': {
+            const d = new Date(now); d.setDate(d.getDate() - 1);
+            const s = d.toISOString().slice(0, 10);
+            return { from: s, to: s };
         }
+        case 'last7': {
+            const d = new Date(now); d.setDate(d.getDate() - 6);
+            return { from: d.toISOString().slice(0, 10), to: today };
+        }
+        case 'last30': {
+            const d = new Date(now); d.setDate(d.getDate() - 29);
+            return { from: d.toISOString().slice(0, 10), to: today };
+        }
+        case 'thisMonth': {
+            const d = new Date(now.getFullYear(), now.getMonth(), 1);
+            return { from: d.toISOString().slice(0, 10), to: today };
+        }
+        default: return { from: '', to: '' };
+    }
+};
+
+interface EnrichedTransaction extends InventoryTransaction {
+    productName?: string;
+    productSku?: string;
+    productImage?: string;
+    warehouseName?: string;
+}
+
+// ── API fetch helper ──
+const fetchInventoryHistory = async (params: {
+    page: number;
+    warehouseId?: string;
+    transactionType?: string;
+    keyword?: string;
+    fromDate?: string;
+    toDate?: string;
+}): Promise<PageResponse<InventoryTransaction>> => {
+    const query = new URLSearchParams();
+    query.set('page', String(params.page));
+    query.set('size', String(PAGE_SIZE));
+    if (params.warehouseId) query.set('warehouseId', params.warehouseId);
+    if (params.transactionType) query.set('transactionType', params.transactionType);
+    if (params.keyword) query.set('keyword', params.keyword);
+    if (params.fromDate) query.set('fromDate', params.fromDate);
+    if (params.toDate) query.set('toDate', params.toDate);
+
+    const res = await axiosInstance.get<ApiResponse<PageResponse<InventoryTransaction>>>(
+        `/inventory/transactions?${query}`
+    );
+    return res.data.data;
+};
+
+// ── Error code helper ──
+const getErrorCode = (err: unknown): number | null => {
+    const e = err as any;
+    return e?.response?.status ?? null;
+};
+
+// ── Transaction Detail Dialog ──
+const TransactionDetailDialog: React.FC<{
+    open: boolean;
+    transaction: EnrichedTransaction | null;
+    onClose: () => void;
+    onNavigate?: (referenceId: string, type: string) => void;
+}> = ({ open, transaction, onClose, onNavigate }) => {
+    if (!transaction) return null;
+    const typeInfo = TX_TYPE_MAP[transaction.transactionType] ?? {
+        label: transaction.transactionType, color: '#666', bg: '#f5f5f5',
+        icon: <HistoryIcon sx={{ fontSize: 14 }} />,
     };
 
-    useEffect(() => {
-        loadHistory();
-    }, [page, selectedWarehouse]);
+    const getReferenceLabel = (type: string) => {
+        if (['SALE', 'SALE_POS', 'SALE_ONLINE'].includes(type)) return 'Mã hóa đơn / Đơn hàng';
+        if (type === 'IMPORT') return 'Mã phiếu nhập';
+        if (['TRANSFER_IN', 'TRANSFER_OUT'].includes(type)) return 'Mã phiếu chuyển';
+        if (['RETURN', 'RETURN_TO_STOCK'].includes(type)) return 'Mã phiếu trả hàng';
+        return 'Mã tham chiếu';
+    };
 
-    const clearFilters = () => {
-        setSelectedWarehouse('');
-        setSearchProduct('');
+    const canNavigate = transaction.referenceId &&
+        ['SALE', 'SALE_POS', 'SALE_ONLINE', 'IMPORT', 'TRANSFER_IN', 'TRANSFER_OUT'].includes(transaction.transactionType);
+
+    return (
+        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 2.5 } }}>
+            <DialogTitle sx={{ pb: 0.5, pt: 2.5, px: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
+                        <Typography fontWeight={800} fontSize={16}>Chi tiết giao dịch</Typography>
+                        <Chip
+                            icon={<Box sx={{ color: typeInfo.color, display: 'flex', pl: 0.5 }}>{typeInfo.icon}</Box>}
+                            label={typeInfo.label} size="small"
+                            sx={{ height: 22, fontSize: 10, fontWeight: 700, bgcolor: typeInfo.bg, color: typeInfo.color }}
+                        />
+                    </Box>
+                    <Typography variant="caption" color="text.secondary">
+                        {transaction.createdAt ? new Date(transaction.createdAt).toLocaleString('vi-VN') : '—'}
+                    </Typography>
+                </Box>
+                <IconButton size="small" onClick={onClose}><Close sx={{ fontSize: 18 }} /></IconButton>
+            </DialogTitle>
+            <Divider sx={{ mx: 3, mt: 1 }} />
+            <DialogContent sx={{ px: 3, pt: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2, bgcolor: '#f8f9fb', borderRadius: 2, mb: 2 }}>
+                    {transaction.productImage && (
+                        <Box component="img" src={transaction.productImage} alt={transaction.productName}
+                            sx={{ width: 56, height: 72, objectFit: 'contain', borderRadius: 1, border: '1px solid #e0e0e0', bgcolor: '#fff' }} />
+                    )}
+                    <Box sx={{ flex: 1 }}>
+                        <Typography variant="body1" fontWeight={700}>{transaction.productName}</Typography>
+                        {transaction.productSku && (
+                            <Typography variant="caption" color="#888" fontFamily="monospace">{transaction.productSku}</Typography>
+                        )}
+                        {transaction.warehouseName && (
+                            <Chip label={transaction.warehouseName} size="small"
+                                sx={{ mt: 0.5, height: 20, fontSize: 10, bgcolor: '#f0f0f0', color: '#555', display: 'block', width: 'fit-content' }} />
+                        )}
+                    </Box>
+                </Box>
+
+                <Grid container spacing={1.5} sx={{ mb: 2 }}>
+                    {[
+                        { label: 'Tồn trước', value: transaction.quantityBefore, color: '#555' },
+                        {
+                            label: 'Thay đổi',
+                            value: `${transaction.quantityChange > 0 ? '+' : ''}${transaction.quantityChange}`,
+                            color: transaction.quantityChange > 0 ? '#2e7d32' : transaction.quantityChange < 0 ? '#d32f2f' : '#888',
+                        },
+                        { label: 'Tồn sau', value: transaction.quantityAfter, color: '#1976d2' },
+                    ].map(s => (
+                        <Grid key={s.label} size={{ xs: 4 }}>
+                            <Paper elevation={0} sx={{ p: 1.5, textAlign: 'center', borderRadius: 2, border: '1px solid #f0f0f0' }}>
+                                <Typography variant="caption" color="text.secondary" display="block">{s.label}</Typography>
+                                <Typography variant="h6" fontWeight={800} color={s.color}>{s.value}</Typography>
+                            </Paper>
+                        </Grid>
+                    ))}
+                </Grid>
+
+                <Grid container spacing={1.5} sx={{ mb: 2 }}>
+                    {transaction.batchNumber && (
+                        <Grid size={{ xs: 6 }}>
+                            <Box sx={{ p: 1.5, bgcolor: '#fff7ed', borderRadius: 1.5, border: '1px solid #ffedd5' }}>
+                                <Typography variant="caption" color="#9a3412" display="block">Số lô (Batch)</Typography>
+                                <Typography variant="body2" fontWeight={700} color="#9a3412">{transaction.batchNumber}</Typography>
+                            </Box>
+                        </Grid>
+                    )}
+                    {transaction.expiryDate && (
+                        <Grid size={{ xs: 6 }}>
+                            <Box sx={{ p: 1.5, bgcolor: '#fef2f2', borderRadius: 1.5, border: '1px solid #fee2e2' }}>
+                                <Typography variant="caption" color="#991b1b" display="block">Hạn sử dụng</Typography>
+                                <Typography variant="body2" fontWeight={700} color="#991b1b">{new Date(transaction.expiryDate).toLocaleDateString('vi-VN')}</Typography>
+                            </Box>
+                        </Grid>
+                    )}
+                </Grid>
+
+                {transaction.referenceId && (
+                    <Box sx={{ p: 1.5, bgcolor: '#f0f7ff', borderRadius: 1.5, mb: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Box>
+                            <Typography variant="caption" color="#555" display="block">{getReferenceLabel(transaction.transactionType)}</Typography>
+                            <Typography variant="body2" fontWeight={700} fontFamily="monospace" color="#1976d2">
+                                {transaction.referenceId.slice(0, 12)}...
+                            </Typography>
+                        </Box>
+                        {canNavigate && onNavigate && (
+                            <Button size="small" variant="outlined" endIcon={<OpenInNew sx={{ fontSize: 13 }} />}
+                                onClick={() => { onNavigate(transaction.referenceId, transaction.transactionType); onClose(); }}
+                                sx={{ textTransform: 'none', fontSize: 11, borderColor: '#1976d2', color: '#1976d2' }}>
+                                Xem chi tiết
+                            </Button>
+                        )}
+                    </Box>
+                )}
+
+                {transaction.note && (
+                    <Box sx={{ p: 1.5, bgcolor: '#f5f5f5', borderRadius: 1.5 }}>
+                        <Typography variant="caption" fontWeight={700} color="#555">Ghi chú:</Typography>
+                        <Typography variant="body2" color="#555" mt={0.5}>{transaction.note}</Typography>
+                    </Box>
+                )}
+
+                {transaction.createdBy && (
+                    <Box sx={{ mt: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <InfoOutlined sx={{ fontSize: 13, color: '#bbb' }} />
+                        <Typography variant="caption" color="#888">Thực hiện bởi: <strong>{transaction.createdBy}</strong></Typography>
+                    </Box>
+                )}
+            </DialogContent>
+            <DialogActions sx={{ px: 3, pb: 2.5 }}>
+                <Button onClick={onClose} variant="outlined" sx={{ textTransform: 'none' }}>Đóng</Button>
+            </DialogActions>
+        </Dialog>
+    );
+};
+
+// ── Backend missing endpoint notice ──────────────────────────────
+const BackendMissingNotice: React.FC<{ onRetry: () => void }> = ({ onRetry }) => (
+    <Alert
+        severity="warning"
+        icon={<WarningIcon />}
+        sx={{ mb: 2, borderRadius: 2 }}
+        action={
+            <Button size="small" variant="outlined" color="warning" onClick={onRetry}
+                sx={{ textTransform: 'none', fontSize: 11 }}>
+                Thử lại
+            </Button>
+        }
+    >
+        <Typography variant="body2" fontWeight={700}>Backend chưa có endpoint lịch sử giao dịch tổng hợp</Typography>
+        <Typography variant="caption" display="block" mt={0.5}>
+            API <code>/api/inventory/transactions</code> trả về lỗi 500.{' '}
+            Cần thêm endpoint này vào <code>InventoryController.java</code>.{' '}
+            Tạm thời bạn có thể xem lịch sử theo từng sản phẩm trong trang <strong>Tồn kho → biểu tượng đồng hồ</strong>.
+        </Typography>
+    </Alert>
+);
+
+// ── Main Component ──────────────────────────────────────────────
+const InventoryHistoryPage: React.FC = () => {
+    const navigate = useNavigate();
+    const { isAdmin, warehouseId: myWarehouseId } = useAuth();
+
+    const [page, setPage] = useState(0);
+    const [selectedWarehouse, setSelectedWarehouse] = useState('');
+    const [selectedType, setSelectedType] = useState('');
+    const [keyword, setKeyword] = useState('');
+    const [fromDate, setFromDate] = useState('');
+    const [toDate, setToDate] = useState('');
+    const [activePreset, setActivePreset] = useState('');
+    const [exporting, setExporting] = useState(false);
+    const [detailOpen, setDetailOpen] = useState(false);
+    const [selectedTx, setSelectedTx] = useState<EnrichedTransaction | null>(null);
+
+    const applyPreset = (preset: string) => {
+        const range = getDateRange(preset);
+        setFromDate(range.from);
+        setToDate(range.to);
+        setActivePreset(preset);
         setPage(0);
     };
 
-    const filteredTransactions = transactions.filter(tx => {
-        if (!searchProduct) return true;
-        const product = products.get(tx.inventoryId.split('-')[0]);
-        return product?.name?.toLowerCase().includes(searchProduct.toLowerCase()) || false;
+    const clearDateFilter = () => { setFromDate(''); setToDate(''); setActivePreset(''); setPage(0); };
+
+    const { data: warehouses } = useQuery({
+        queryKey: ['warehouses'],
+        queryFn: warehouseService.getAll,
     });
 
-    const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
-    const userRole = userStr ? JSON.parse(userStr)?.user?.role : '';
-    const isAdmin = userRole === 'ROLE_ADMIN';
+    const { data: productsData } = useQuery({
+        queryKey: ['products-all'],
+        queryFn: () => productService.search({ size: 2000, isActive: true }).then(r => r.content),
+        staleTime: 5 * 60 * 1000,
+    });
+
+    const productMap = React.useMemo(() => {
+        const m = new Map<string, ProductResponse>();
+        productsData?.forEach(p => m.set(p.id, p));
+        return m;
+    }, [productsData]);
+
+    const warehouseMap = React.useMemo(() => {
+        const m = new Map<string, string>();
+        warehouses?.forEach(w => m.set(w.id, w.name));
+        return m;
+    }, [warehouses]);
+
+    const {
+        data: historyData,
+        isLoading,
+        isError,
+        error,
+        refetch,
+    } = useQuery({
+        queryKey: ['inventory-history', page, selectedWarehouse, selectedType, keyword, fromDate, toDate],
+        queryFn: () => fetchInventoryHistory({
+            page,
+            warehouseId: selectedWarehouse || (isAdmin ? undefined : myWarehouseId ?? undefined),
+            transactionType: selectedType || undefined,
+            keyword: keyword || undefined,
+            fromDate: fromDate || undefined,
+            toDate: toDate || undefined,
+        }),
+        placeholderData: (prev) => prev,
+        retry: 0, // Không retry để tránh spam log khi backend chưa có endpoint
+    });
+
+    const errorCode = getErrorCode(error);
+    // Phân biệt lỗi 500 "endpoint chưa tồn tại" vs lỗi khác
+    const isMissingEndpoint = isError && (errorCode === 500 || errorCode === 404);
+
+    const transactions = historyData?.content ?? [];
+    const totalPages = historyData?.totalPages ?? 0;
+    const totalElements = historyData?.totalElements ?? 0;
+
+    const enrichedTransactions: EnrichedTransaction[] = React.useMemo(() => {
+        return transactions.map(tx => {
+            const anyTx = tx as any;
+            const productId = anyTx.productId ?? anyTx.product_id;
+            const warehouseId = anyTx.warehouseId ?? anyTx.warehouse_id;
+            const product = productId ? productMap.get(productId) : undefined;
+            return {
+                ...tx,
+                productName: anyTx.productName ?? product?.name ?? `Kho: ${tx.inventoryId?.slice(0, 8) ?? '—'}`,
+                productSku: anyTx.productSku ?? product?.sku ?? product?.isbnBarcode,
+                productImage: anyTx.productImage ?? product?.imageUrl,
+                warehouseName: anyTx.warehouseName ?? (warehouseId ? warehouseMap.get(warehouseId) : undefined),
+            };
+        });
+    }, [transactions, productMap, warehouseMap]);
+
+    const clearAllFilters = () => {
+        setSelectedWarehouse(''); setSelectedType(''); setKeyword('');
+        clearDateFilter(); setPage(0);
+    };
+
+    const activeFilterCount = [selectedWarehouse, selectedType, keyword, fromDate || toDate].filter(Boolean).length;
+
+    const stats = {
+        total: totalElements,
+        import: enrichedTransactions.filter(t => t.transactionType === 'IMPORT').length,
+        sale: enrichedTransactions.filter(t => ['SALE', 'SALE_POS', 'SALE_ONLINE'].includes(t.transactionType)).length,
+        transfer: enrichedTransactions.filter(t => ['TRANSFER_IN', 'TRANSFER_OUT'].includes(t.transactionType)).length,
+    };
+
+    const dateRangeLabel = React.useMemo(() => {
+        if (!fromDate && !toDate) return null;
+        if (fromDate === toDate) return fromDate;
+        if (fromDate && toDate) return `${fromDate} → ${toDate}`;
+        if (fromDate) return `Từ ${fromDate}`;
+        return `Đến ${toDate}`;
+    }, [fromDate, toDate]);
+
+    const handleExportAll = async () => {
+        setExporting(true);
+        try {
+            const bigData = await fetchInventoryHistory({
+                page: 0,
+                warehouseId: selectedWarehouse || (isAdmin ? undefined : myWarehouseId ?? undefined),
+                transactionType: selectedType || undefined,
+                keyword: keyword || undefined,
+                fromDate: fromDate || undefined,
+                toDate: toDate || undefined,
+            });
+            const rows = (bigData.content ?? []).map(tx => {
+                const anyTx = tx as any;
+                const productId = anyTx.productId ?? anyTx.product_id;
+                const product = productId ? productMap.get(productId) : undefined;
+                const warehouseId = anyTx.warehouseId ?? anyTx.warehouse_id;
+                return {
+                    createdAt: tx.createdAt ? new Date(tx.createdAt).toLocaleString('vi-VN') : '',
+                    transactionType: TX_TYPE_MAP[tx.transactionType]?.label ?? tx.transactionType,
+                    productName: anyTx.productName ?? product?.name ?? '',
+                    productSku: anyTx.productSku ?? product?.sku ?? '',
+                    warehouseName: anyTx.warehouseName ?? (warehouseId ? warehouseMap.get(warehouseId) : '') ?? '',
+                    quantityChange: tx.quantityChange,
+                    quantityBefore: tx.quantityBefore,
+                    quantityAfter: tx.quantityAfter,
+                    note: tx.note ?? '',
+                    createdBy: tx.createdBy ?? '',
+                    referenceId: tx.referenceId ?? '',
+                    batchNumber: tx.batchNumber ?? '',
+                    expiryDate: tx.expiryDate ? new Date(tx.expiryDate).toLocaleDateString('vi-VN') : '',
+                };
+            });
+            exportToExcel(rows, [
+                { header: 'Thời gian', key: 'createdAt', width: 22 },
+                { header: 'Loại giao dịch', key: 'transactionType', width: 16 },
+                { header: 'Sản phẩm', key: 'productName', width: 40 },
+                { header: 'SKU / ISBN', key: 'productSku', width: 18 },
+                { header: 'Kho', key: 'warehouseName', width: 22 },
+                { header: 'Thay đổi', key: 'quantityChange', width: 12 },
+                { header: 'Tồn trước', key: 'quantityBefore', width: 12 },
+                { header: 'Tồn sau', key: 'quantityAfter', width: 12 },
+                { header: 'Số lô', key: 'batchNumber', width: 15 },
+                { header: 'Hạn dùng', key: 'expiryDate', width: 15 },
+                { header: 'Ghi chú', key: 'note', width: 30 },
+                { header: 'Người TH', key: 'createdBy', width: 20 },
+                { header: 'Mã tham chiếu', key: 'referenceId', width: 30 },
+            ], `lich-su-kho-${fromDate || 'all'}-${toDate || 'all'}`, 'Lịch sử kho');
+        } catch {
+            // Silent fail
+        } finally {
+            setExporting(false);
+        }
+    };
+
+    const handleNavigate = (referenceId: string, type: string) => {
+        if (['SALE', 'SALE_POS', 'SALE_ONLINE'].includes(type)) {
+            navigate('/admin/orders');
+        } else if (type === 'IMPORT') {
+            navigate('/admin/inventory/import');
+        } else if (['TRANSFER_IN', 'TRANSFER_OUT'].includes(type)) {
+            navigate('/admin/inventory/transfers');
+        }
+    };
+
+    const PRESETS = [
+        { key: 'today', label: 'Hôm nay' },
+        { key: 'yesterday', label: 'Hôm qua' },
+        { key: 'last7', label: '7 ngày' },
+        { key: 'last30', label: '30 ngày' },
+        { key: 'thisMonth', label: 'Tháng này' },
+    ];
 
     return (
         <Box sx={{ p: 3, bgcolor: '#f8f9fb', minHeight: '100vh' }}>
             {/* Header */}
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    <IconButton
-                        size="small"
-                        onClick={() => navigate('/admin/inventory')}
-                        sx={{ border: '1px solid #e0e0e0', borderRadius: 1.5 }}
-                    >
+                    <IconButton size="small" onClick={() => navigate('/admin/inventory')}
+                        sx={{ border: '1px solid #e0e0e0', borderRadius: 1.5 }}>
                         <ArrowBack sx={{ fontSize: 18 }} />
                     </IconButton>
                     <Box>
@@ -119,85 +470,105 @@ const InventoryHistoryPage: React.FC = () => {
                             Lịch sử giao dịch kho
                         </Typography>
                         <Typography variant="body2" color="text.secondary" fontSize={12}>
-                            Xem toàn bộ lịch sử nhập, xuất, điều chỉnh tồn kho
+                            Xem toàn bộ lịch sử nhập, xuất, điều chỉnh, chuyển kho
                         </Typography>
                     </Box>
                 </Box>
-                <Button
-                    variant="outlined"
-                    startIcon={<Refresh />}
-                    onClick={loadHistory}
-                    sx={{ textTransform: 'none' }}
-                >
-                    Làm mới
-                </Button>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button variant="outlined" startIcon={<FileDownloadOutlined sx={{ fontSize: 15 }} />}
+                        onClick={handleExportAll} disabled={exporting || isMissingEndpoint}
+                        sx={{ textTransform: 'none', borderColor: '#2e7d32', color: '#2e7d32', fontSize: 12 }}>
+                        {exporting ? 'Đang xuất...' : 'Excel (tất cả)'}
+                    </Button>
+                    <Button variant="outlined" startIcon={<Refresh />} onClick={() => refetch()} sx={{ textTransform: 'none' }}>
+                        Làm mới
+                    </Button>
+                </Box>
             </Box>
 
-            {/* Stats Cards */}
-            <Grid container spacing={1.5} sx={{ mb: 2 }}>
-                <Grid size={{ xs: 6, sm: 3 }}>
-                    <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid #f0f0f0' }}>
-                        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                            <Typography variant="caption" color="text.secondary">Tổng giao dịch</Typography>
-                            <Typography variant="h5" fontWeight={800} color="#1a1a2e">
-                                {loading ? <Skeleton width={60} /> : totalElements}
-                            </Typography>
-                        </CardContent>
-                    </Card>
+            {/* Stats Cards — chỉ hiển thị khi không lỗi */}
+            {!isMissingEndpoint && (
+                <Grid container spacing={1.5} sx={{ mb: 2 }}>
+                    {[
+                        { label: 'Tổng giao dịch', value: stats.total, color: '#1a1a2e' },
+                        { label: 'Nhập kho', value: stats.import, color: '#1976d2' },
+                        { label: 'Bán hàng', value: stats.sale, color: '#d32f2f' },
+                        { label: 'Chuyển kho', value: stats.transfer, color: '#6a1b9a' },
+                    ].map(s => (
+                        <Grid size={{ xs: 6, sm: 3 }} key={s.label}>
+                            <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid #f0f0f0' }}>
+                                <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                                    <Typography variant="caption" color="text.secondary">{s.label}</Typography>
+                                    {isLoading ? <Skeleton width={60} height={32} /> : (
+                                        <Typography variant="h5" fontWeight={800} color={s.color}>
+                                            {s.value.toLocaleString()}
+                                        </Typography>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </Grid>
+                    ))}
                 </Grid>
-                <Grid size={{ xs: 6, sm: 3 }}>
-                    <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid #f0f0f0' }}>
-                        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                            <Typography variant="caption" color="text.secondary">Nhập kho</Typography>
-                            <Typography variant="h5" fontWeight={800} color="#1976d2">
-                                {loading ? <Skeleton width={60} /> : transactions.filter(t => t.transactionType === 'IMPORT').length}
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                </Grid>
-                <Grid size={{ xs: 6, sm: 3 }}>
-                    <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid #f0f0f0' }}>
-                        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                            <Typography variant="caption" color="text.secondary">Bán hàng</Typography>
-                            <Typography variant="h5" fontWeight={800} color="#d32f2f">
-                                {loading ? <Skeleton width={60} /> : transactions.filter(t => t.transactionType === 'SALE').length}
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                </Grid>
-                <Grid size={{ xs: 6, sm: 3 }}>
-                    <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid #f0f0f0' }}>
-                        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                            <Typography variant="caption" color="text.secondary">Điều chỉnh</Typography>
-                            <Typography variant="h5" fontWeight={800} color="#e65100">
-                                {loading ? <Skeleton width={60} /> : transactions.filter(t => t.transactionType === 'ADJUSTMENT').length}
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                </Grid>
-            </Grid>
+            )}
 
-            {/* Filters */}
+            {/* Date Range Filter */}
+            <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #f0f0f0', mb: 1.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
+                    <CalendarToday sx={{ fontSize: 15, color: '#555' }} />
+                    <Typography variant="caption" fontWeight={700} color="#555">Lọc theo ngày</Typography>
+                    {PRESETS.map(p => (
+                        <Button key={p.key} size="small"
+                            variant={activePreset === p.key ? 'contained' : 'outlined'}
+                            onClick={() => applyPreset(p.key)}
+                            sx={{
+                                textTransform: 'none', fontSize: 11, minWidth: 0, px: 1.25, py: 0.4, height: 26,
+                                bgcolor: activePreset === p.key ? '#1976d2' : undefined,
+                                borderColor: activePreset === p.key ? '#1976d2' : '#e0e0e0',
+                                color: activePreset === p.key ? '#fff' : '#555',
+                            }}>
+                            {p.label}
+                        </Button>
+                    ))}
+                    {(fromDate || toDate) && (
+                        <Button size="small" onClick={clearDateFilter}
+                            sx={{ textTransform: 'none', color: '#d32f2f', fontSize: 11, ml: 0.5 }}>
+                            Xóa ngày
+                        </Button>
+                    )}
+                </Box>
+                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="caption" color="#555" sx={{ minWidth: 28 }}>Từ</Typography>
+                        <TextField size="small" type="date" value={fromDate}
+                            onChange={e => { setFromDate(e.target.value); setActivePreset(''); setPage(0); }}
+                            inputProps={{ max: toDate || undefined }}
+                            sx={{ width: 155 }} />
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="caption" color="#555" sx={{ minWidth: 28 }}>Đến</Typography>
+                        <TextField size="small" type="date" value={toDate}
+                            onChange={e => { setToDate(e.target.value); setActivePreset(''); setPage(0); }}
+                            inputProps={{ min: fromDate || undefined }}
+                            sx={{ width: 155 }} />
+                    </Box>
+                    {dateRangeLabel && (
+                        <Chip icon={<CalendarToday sx={{ fontSize: 13 }} />} label={dateRangeLabel} size="small"
+                            sx={{ height: 24, fontSize: 11, bgcolor: '#e3f2fd', color: '#1565c0', fontWeight: 600 }} />
+                    )}
+                </Box>
+            </Paper>
+
+            {/* Keyword / Warehouse / Type Filters */}
             <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #f0f0f0', mb: 2 }}>
                 <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <TextField
-                        size="small"
-                        placeholder="Tìm theo tên sản phẩm..."
-                        value={searchProduct}
-                        onChange={e => setSearchProduct(e.target.value)}
+                    <FilterAlt sx={{ fontSize: 15, color: '#888' }} />
+                    <TextField size="small" placeholder="Tìm theo tên sản phẩm, mã..."
+                        value={keyword} onChange={e => { setKeyword(e.target.value); setPage(0); }}
                         sx={{ flex: 1, minWidth: 200 }}
-                        InputProps={{
-                            startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 17, color: '#bbb' }} /></InputAdornment>
-                        }}
-                    />
-
+                        InputProps={{ startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 17, color: '#bbb' }} /></InputAdornment> }} />
                     {isAdmin && (
                         <FormControl size="small" sx={{ minWidth: 200 }}>
-                            <Select
-                                value={selectedWarehouse}
-                                onChange={e => setSelectedWarehouse(e.target.value)}
-                                displayEmpty
-                            >
+                            <Select value={selectedWarehouse} onChange={e => { setSelectedWarehouse(e.target.value); setPage(0); }} displayEmpty>
                                 <MenuItem value="">Tất cả kho</MenuItem>
                                 {warehouses?.filter(w => w.isActive).map(w => (
                                     <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>
@@ -205,17 +576,46 @@ const InventoryHistoryPage: React.FC = () => {
                             </Select>
                         </FormControl>
                     )}
-
-                    <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={clearFilters}
-                        sx={{ textTransform: 'none', color: '#d32f2f', borderColor: '#d32f2f' }}
-                    >
-                        Xóa bộ lọc
-                    </Button>
+                    <FormControl size="small" sx={{ minWidth: 160 }}>
+                        <Select value={selectedType} onChange={e => { setSelectedType(e.target.value); setPage(0); }} displayEmpty>
+                            <MenuItem value="">Tất cả loại</MenuItem>
+                            {Object.entries(TX_TYPE_MAP).map(([k, v]) => (
+                                <MenuItem key={k} value={k}>{v.label}</MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                    {activeFilterCount > 0 && (
+                        <Button size="small" variant="outlined" onClick={clearAllFilters}
+                            sx={{ textTransform: 'none', color: '#d32f2f', borderColor: '#d32f2f', fontSize: 12 }}>
+                            Xóa tất cả ({activeFilterCount})
+                        </Button>
+                    )}
                 </Box>
             </Paper>
+
+            {/* ── Error Banner — phân biệt loại lỗi ── */}
+            {isMissingEndpoint && (
+                <BackendMissingNotice onRetry={() => refetch()} />
+            )}
+
+            {isError && !isMissingEndpoint && (
+                <Alert severity="error" icon={<ErrorOutline />} sx={{ mb: 2, borderRadius: 2 }}
+                    action={
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                            <Button size="small" color="error" variant="outlined"
+                                onClick={() => { clearDateFilter(); setSelectedType(''); refetch(); }}
+                                sx={{ textTransform: 'none', fontSize: 11 }}>
+                                Xóa filter & thử lại
+                            </Button>
+                            <Button size="small" color="error" onClick={() => refetch()} sx={{ textTransform: 'none', fontSize: 11 }}>
+                                Thử lại
+                            </Button>
+                        </Box>
+                    }>
+                    <Typography variant="body2" fontWeight={700}>Lỗi tải dữ liệu</Typography>
+                    <Typography variant="caption">Không thể kết nối tới server.</Typography>
+                </Alert>
+            )}
 
             {/* Table */}
             <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid #f0f0f0', overflow: 'hidden' }}>
@@ -223,7 +623,7 @@ const InventoryHistoryPage: React.FC = () => {
                     <Table size="small">
                         <TableHead>
                             <TableRow sx={{ bgcolor: '#fafafa' }}>
-                                {['Thời gian', 'Loại giao dịch', 'Sản phẩm', 'Thay đổi', 'Trước', 'Sau', 'Ghi chú', 'Người thực hiện'].map(c => (
+                                {['Thời gian', 'Loại giao dịch', 'Sản phẩm', 'Kho', 'Thay đổi', 'Trước', 'Sau', 'Ghi chú', 'Người TH'].map(c => (
                                     <TableCell key={c} sx={{ fontWeight: 700, fontSize: 11, color: '#888', py: 1.5 }}>
                                         {c.toUpperCase()}
                                     </TableCell>
@@ -231,47 +631,83 @@ const InventoryHistoryPage: React.FC = () => {
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {loading ? (
+                            {isLoading ? (
                                 [1, 2, 3, 4, 5].map(i => (
                                     <TableRow key={i}>
-                                        {[1, 2, 3, 4, 5, 6, 7, 8].map(j => <TableCell key={j}><Skeleton height={20} /></TableCell>)}
+                                        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(j => <TableCell key={j}><Skeleton height={20} /></TableCell>)}
                                     </TableRow>
                                 ))
-                            ) : filteredTransactions.length > 0 ? (
-                                filteredTransactions.map((tx, idx) => {
-                                    const typeInfo = TX_TYPE_MAP[tx.transactionType] || {
-                                        label: tx.transactionType,
-                                        color: '#666',
-                                        bg: '#f5f5f5',
-                                        icon: <HistoryIcon sx={{ fontSize: 14 }} />
+                            ) : isMissingEndpoint ? (
+                                // Khi backend chưa có endpoint — hiển thị empty state rõ ràng
+                                <TableRow>
+                                    <TableCell colSpan={9} align="center" sx={{ py: 8 }}>
+                                        <WarningIcon sx={{ fontSize: 48, color: '#f59e0b', mb: 1, display: 'block', mx: 'auto' }} />
+                                        <Typography variant="body1" fontWeight={700} color="#555" mb={1}>
+                                            Chức năng chưa sẵn sàng
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary" mb={2} maxWidth={500} mx="auto">
+                                            Backend cần thêm endpoint <code>/api/inventory/transactions</code> để hiển thị lịch sử tổng hợp.
+                                            Trong khi chờ, bạn có thể xem lịch sử từng sản phẩm trong trang <strong>Tồn kho</strong>.
+                                        </Typography>
+                                        <Button variant="outlined" size="small"
+                                            onClick={() => navigate('/admin/inventory')}
+                                            sx={{ textTransform: 'none', mr: 1 }}>
+                                            Về trang Tồn kho
+                                        </Button>
+                                        <Button variant="outlined" size="small" color="warning"
+                                            onClick={() => refetch()}
+                                            sx={{ textTransform: 'none' }}>
+                                            Thử lại
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            ) : enrichedTransactions.length > 0 ? (
+                                enrichedTransactions.map((tx, idx) => {
+                                    const typeInfo = TX_TYPE_MAP[tx.transactionType] ?? {
+                                        label: tx.transactionType, color: '#666', bg: '#f5f5f5',
+                                        icon: <HistoryIcon sx={{ fontSize: 14 }} />,
                                     };
-                                    const product = products.get(tx.inventoryId.split('-')[0]);
                                     return (
-                                        <TableRow key={tx.id} hover sx={{ bgcolor: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
+                                        <TableRow key={tx.id} hover
+                                            onClick={() => { setSelectedTx(tx); setDetailOpen(true); }}
+                                            sx={{ bgcolor: idx % 2 === 0 ? '#fff' : '#fafafa', cursor: 'pointer' }}>
                                             <TableCell sx={{ py: 1.25 }}>
-                                                <Typography variant="caption" fontFamily="monospace">
+                                                <Typography variant="caption" fontFamily="monospace" fontSize={11}>
                                                     {tx.createdAt ? new Date(tx.createdAt).toLocaleString('vi-VN') : '—'}
                                                 </Typography>
                                             </TableCell>
                                             <TableCell sx={{ py: 1.25 }}>
                                                 <Chip
-                                                    icon={typeInfo.icon}
-                                                    label={typeInfo.label}
-                                                    size="small"
+                                                    icon={<Box sx={{ color: typeInfo.color, display: 'flex', pl: 0.5 }}>{typeInfo.icon}</Box>}
+                                                    label={typeInfo.label} size="small"
                                                     sx={{ height: 22, fontSize: 10, fontWeight: 700, bgcolor: typeInfo.bg, color: typeInfo.color }}
                                                 />
                                             </TableCell>
                                             <TableCell sx={{ py: 1.25 }}>
-                                                <Typography variant="body2" fontWeight={600} fontSize={13}>
-                                                    {product?.name || tx.inventoryId.slice(0, 8)}
-                                                </Typography>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                    {tx.productImage && (
+                                                        <Box component="img" src={tx.productImage} alt={tx.productName}
+                                                            sx={{ width: 28, height: 36, objectFit: 'contain', borderRadius: 0.5, border: '1px solid #e0e0e0' }} />
+                                                    )}
+                                                    <Box>
+                                                        <Typography variant="body2" fontWeight={600} fontSize={12}>{tx.productName}</Typography>
+                                                        {tx.productSku && (
+                                                            <Typography variant="caption" color="text.secondary" fontFamily="monospace" fontSize={10}>
+                                                                {tx.productSku}
+                                                            </Typography>
+                                                        )}
+                                                    </Box>
+                                                </Box>
                                             </TableCell>
                                             <TableCell sx={{ py: 1.25 }}>
-                                                <Typography
-                                                    variant="body2"
-                                                    fontWeight={700}
-                                                    color={tx.quantityChange > 0 ? '#2e7d32' : tx.quantityChange < 0 ? '#d32f2f' : '#888'}
-                                                >
+                                                {tx.warehouseName ? (
+                                                    <Chip label={tx.warehouseName} size="small"
+                                                        sx={{ height: 20, fontSize: 10, bgcolor: '#f5f5f5', color: '#555' }} />
+                                                ) : <Typography variant="caption" color="#bbb">—</Typography>}
+                                            </TableCell>
+                                            <TableCell sx={{ py: 1.25 }}>
+                                                <Typography variant="body2" fontWeight={700}
+                                                    color={tx.quantityChange > 0 ? '#2e7d32' : tx.quantityChange < 0 ? '#d32f2f' : '#888'}>
                                                     {tx.quantityChange > 0 ? '+' : ''}{tx.quantityChange}
                                                 </Typography>
                                             </TableCell>
@@ -281,8 +717,12 @@ const InventoryHistoryPage: React.FC = () => {
                                             <TableCell sx={{ py: 1.25 }}>
                                                 <Typography variant="caption" fontWeight={700}>{tx.quantityAfter}</Typography>
                                             </TableCell>
-                                            <TableCell sx={{ py: 1.25 }}>
-                                                <Typography variant="caption" color="#888">{tx.note || '—'}</Typography>
+                                            <TableCell sx={{ py: 1.25, maxWidth: 180 }}>
+                                                <Tooltip title={tx.note || ''} placement="top">
+                                                    <Typography variant="caption" color="#888" noWrap sx={{ maxWidth: 160, display: 'block' }}>
+                                                        {tx.note || '—'}
+                                                    </Typography>
+                                                </Tooltip>
                                             </TableCell>
                                             <TableCell sx={{ py: 1.25 }}>
                                                 <Typography variant="caption" color="text.secondary">{tx.createdBy || '—'}</Typography>
@@ -292,9 +732,17 @@ const InventoryHistoryPage: React.FC = () => {
                                 })
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
+                                    <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
                                         <HistoryIcon sx={{ fontSize: 48, color: '#ccc', mb: 1 }} />
-                                        <Typography variant="body2" color="text.secondary">Chưa có dữ liệu lịch sử giao dịch</Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            {fromDate || toDate ? 'Không có giao dịch trong khoảng thời gian đã chọn'
+                                                : 'Chưa có dữ liệu lịch sử giao dịch'}
+                                        </Typography>
+                                        {(fromDate || toDate) && (
+                                            <Button size="small" variant="outlined" onClick={clearDateFilter} sx={{ mt: 1, textTransform: 'none' }}>
+                                                Xóa bộ lọc ngày
+                                            </Button>
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             )}
@@ -302,18 +750,30 @@ const InventoryHistoryPage: React.FC = () => {
                     </Table>
                 </TableContainer>
                 {totalPages > 1 && (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 2, borderTop: '1px solid #f0f0f0' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 2, py: 1.5, borderTop: '1px solid #f0f0f0' }}>
+                        <Typography variant="caption" color="text.secondary">
+                            Tổng <strong>{totalElements.toLocaleString()}</strong> giao dịch
+                            {dateRangeLabel && <span> · <strong>{dateRangeLabel}</strong></span>}
+                        </Typography>
                         <Pagination count={totalPages} page={page + 1} onChange={(_, v) => setPage(v - 1)} size="small" />
                     </Box>
                 )}
             </Paper>
 
-            <Alert severity="info" sx={{ mt: 2, borderRadius: 2 }}>
-                <Typography variant="caption">
-                    💡 Lịch sử giao dịch hiển thị tất cả các hoạt động nhập kho, bán hàng, điều chỉnh tồn kho.
-                    Để xem chi tiết từng sản phẩm, hãy nhấn vào nút "Lịch sử" trong trang Tồn kho.
-                </Typography>
-            </Alert>
+            {!isMissingEndpoint && (
+                <Alert severity="info" sx={{ mt: 2, borderRadius: 2 }}>
+                    <Typography variant="caption">
+                        Click vào bất kỳ dòng nào để xem chi tiết giao dịch và điều hướng đến phiếu nhập/đơn hàng liên quan.
+                    </Typography>
+                </Alert>
+            )}
+
+            <TransactionDetailDialog
+                open={detailOpen}
+                transaction={selectedTx}
+                onClose={() => setDetailOpen(false)}
+                onNavigate={handleNavigate}
+            />
         </Box>
     );
 };

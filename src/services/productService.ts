@@ -55,6 +55,12 @@ const productService = {
         const res = await axiosInstance.put<ApiResponse<ProductResponse>>(`/products/${id}`, data);
         return res.data.data;
     },
+
+    // Lấy lịch sử giá
+    getPriceHistory: async (id: string): Promise<any[]> => {
+        const res = await axiosInstance.get<ApiResponse<any[]>>(`/products/${id}/price-history`);
+        return res.data.data;
+    },
 };
 
 export default productService;

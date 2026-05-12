@@ -4,15 +4,17 @@ import {
     Box, Typography, Button, Paper, Grid, Chip,
     Divider, IconButton, Switch, Alert, Snackbar,
     Skeleton, Table, TableBody, TableCell, TableRow,
+    TableContainer, TableHead, Tabs, Tab
 } from '@mui/material';
 import {
     ArrowBack, Edit, ImageNotSupported,
     ZoomIn, Close,
     Inventory2Outlined, TrendingUp, LocalOffer,
-    StorefrontOutlined, QrCodeOutlined, Refresh,
+    StorefrontOutlined, QrCodeOutlined, Refresh, History,
 } from '@mui/icons-material';
 import axiosInstance from '../../../../services/axiosConfig';
 import productService from '../../../../services/productService';
+import BarcodeGenerator from '../../components/products/BarcodeGenerator';
 import { ProductResponse, Category, Supplier, Inventory } from '../../../../types';
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -26,11 +28,14 @@ const fmt = (n?: number) =>
         }).format(n);
 
 // ── Image Panel ────────────────────────────────────────────────
-const ImagePanel = ({ url }: { url?: string }) => {
-    const [err, setErr] = useState(false);
-    const [lightbox, setLightbox] = useState(false);
+const MultiImagePanel = ({ urls }: { urls: string[] }) => {
+    const [err, setErr] = useState<Record<number, boolean>>({});
+    const [lightbox, setLightbox] = useState<string | null>(null);
+    const [activeIdx, setActiveIdx] = useState(0);
 
-    if (!url || err) {
+    const validUrls = urls && urls.length > 0 ? urls : [];
+
+    if (validUrls.length === 0) {
         return (
             <Box
                 sx={{
@@ -54,7 +59,7 @@ const ImagePanel = ({ url }: { url?: string }) => {
     }
 
     return (
-        <>
+        <Box>
             <Box
                 sx={{
                     position: 'relative',
@@ -63,21 +68,27 @@ const ImagePanel = ({ url }: { url?: string }) => {
                     border: '1px solid #e8e8e8',
                     bgcolor: '#f9f9f9',
                     cursor: 'zoom-in',
+                    mb: 1,
                     '&:hover .zoom-btn': { opacity: 1 },
                 }}
-                onClick={() => setLightbox(true)}
+                onClick={() => setLightbox(validUrls[activeIdx])}
             >
                 <Box
                     component="img"
-                    src={url}
+                    src={validUrls[activeIdx]}
                     alt="product"
-                    onError={() => setErr(true)}
-                    sx={{ width: '100%', height: 220, objectFit: 'contain', display: 'block' }}
+                    onError={() => setErr(prev => ({ ...prev, [activeIdx]: true }))}
+                    sx={{ width: '100%', height: 220, objectFit: 'contain', display: err[activeIdx] ? 'none' : 'block' }}
                 />
+                {err[activeIdx] && (
+                    <Box sx={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <ImageNotSupported sx={{ fontSize: 36, color: '#ccc' }} />
+                    </Box>
+                )}
                 <IconButton
                     className="zoom-btn"
                     size="small"
-                    onClick={(e) => { e.stopPropagation(); setLightbox(true); }}
+                    onClick={(e) => { e.stopPropagation(); setLightbox(validUrls[activeIdx]); }}
                     sx={{
                         position: 'absolute', top: 6, right: 6,
                         bgcolor: 'rgba(255,255,255,0.92)', boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
@@ -88,10 +99,25 @@ const ImagePanel = ({ url }: { url?: string }) => {
                     <ZoomIn sx={{ fontSize: 14 }} />
                 </IconButton>
             </Box>
+            
+            {validUrls.length > 1 && (
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    {validUrls.map((u, i) => (
+                        <Box key={i} onClick={() => setActiveIdx(i)}
+                            sx={{
+                                width: 48, height: 60, borderRadius: 1, border: i === activeIdx ? '2px solid #d32f2f' : '1px solid #e0e0e0',
+                                overflow: 'hidden', cursor: 'pointer', bgcolor: '#fff',
+                                p: 0.5, display: 'flex', alignItems: 'center', justifyContent: 'center'
+                            }}>
+                            <Box component="img" src={u} sx={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                        </Box>
+                    ))}
+                </Box>
+            )}
 
             {lightbox && (
                 <Box
-                    onClick={() => setLightbox(false)}
+                    onClick={() => setLightbox(null)}
                     sx={{
                         position: 'fixed', inset: 0, zIndex: 9999,
                         bgcolor: 'rgba(0,0,0,0.88)',
@@ -100,7 +126,7 @@ const ImagePanel = ({ url }: { url?: string }) => {
                     }}
                 >
                     <IconButton
-                        onClick={() => setLightbox(false)}
+                        onClick={() => setLightbox(null)}
                         sx={{
                             position: 'fixed', top: 16, right: 16,
                             bgcolor: 'rgba(255,255,255,0.15)', color: '#fff',
@@ -111,7 +137,7 @@ const ImagePanel = ({ url }: { url?: string }) => {
                     </IconButton>
                     <Box
                         component="img"
-                        src={url}
+                        src={lightbox}
                         alt="zoom"
                         onClick={(e) => e.stopPropagation()}
                         sx={{
@@ -123,7 +149,7 @@ const ImagePanel = ({ url }: { url?: string }) => {
                     />
                 </Box>
             )}
-        </>
+        </Box>
     );
 };
 
@@ -264,7 +290,9 @@ const ProductDetailPage = () => {
     const [category, setCategory] = useState<Category | null>(null);
     const [supplier, setSupplier] = useState<Supplier | null>(null);
     const [inventories, setInventories] = useState<Inventory[]>([]);
+    const [priceHistory, setPriceHistory] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [tab, setTab] = useState(0);
     const [error, setError] = useState('');
     const [snack, setSnack] = useState('');
 
@@ -303,6 +331,11 @@ const ProductDetailPage = () => {
                 );
                 const results = await Promise.all(invPromises);
                 setInventories(results.filter(Boolean));
+            } catch { }
+
+            try {
+                const hist = await productService.getPriceHistory(id);
+                setPriceHistory(hist);
             } catch { }
         } catch (e: any) {
             setError(e.response?.data?.message || 'Không thể tải thông tin sản phẩm');
@@ -538,8 +571,14 @@ const ProductDetailPage = () => {
                 {/* ── CỘT TRÁI ── */}
                 <Grid size={{ xs: 12, md: 3 }}>
                     <AdminSection title="Hình ảnh" icon={<StorefrontOutlined sx={{ fontSize: 14 }} />}>
-                        <ImagePanel url={product.imageUrl} />
+                        <MultiImagePanel urls={product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls : (product.imageUrl ? [product.imageUrl] : [])} />
                     </AdminSection>
+                    
+                    {product.isbnBarcode && (
+                        <AdminSection title="Mã vạch" icon={<QrCodeOutlined sx={{ fontSize: 14 }} />}>
+                            <BarcodeGenerator value={product.isbnBarcode} />
+                        </AdminSection>
+                    )}
 
                     <AdminSection title="Thông số" icon={<LocalOffer sx={{ fontSize: 14 }} />}>
                         <FieldRow label="Đơn vị tính" value={product.unit} />
@@ -553,105 +592,174 @@ const ProductDetailPage = () => {
 
                 {/* ── CỘT GIỮA ── */}
                 <Grid size={{ xs: 12, md: 5 }}>
-                    <AdminSection title="Thông tin sản phẩm" icon={<QrCodeOutlined sx={{ fontSize: 14 }} />}>
-                        <FieldRow label="Tên sản phẩm" value={product.name} />
-                        <FieldRow label="ISBN / Barcode" value={product.isbnBarcode} mono />
-                        <FieldRow label="SKU" value={product.sku || '—'} mono />
-                        <FieldRow label="Danh mục" value={category?.name || '—'} />
-                        <FieldRow label="Nhà cung cấp" value={supplier?.name || '—'} border={false} />
-                    </AdminSection>
+                    <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid #eeeeee', mb: 2, bgcolor: '#fff' }}>
+                        <Tabs 
+                            value={tab} 
+                            onChange={(_, v) => setTab(v)}
+                            sx={{ 
+                                borderBottom: '1px solid #f0f0f0', px: 2, pt: 1,
+                                '& .MuiTab-root': { textTransform: 'none', fontWeight: 700, minWidth: 100, fontSize: 13 }
+                            }}
+                        >
+                            <Tab label="Thông tin" />
+                            <Tab label="Lịch sử giá" icon={<History sx={{ fontSize: 16 }} />} iconPosition="start" />
+                        </Tabs>
 
-                    {product.description && (
-                        <AdminSection title="Mô tả">
-                            <Typography variant="body2" color="#555" lineHeight={1.75} fontSize={13}>
-                                {product.description}
-                            </Typography>
-                        </AdminSection>
-                    )}
+                        <Box sx={{ p: 0 }}>
+                            {tab === 0 && (
+                                <Box sx={{ p: 2.5 }}>
+                                    <AdminSection title="Thông tin sản phẩm" icon={<QrCodeOutlined sx={{ fontSize: 14 }} />}>
+                                        <FieldRow label="Tên sản phẩm" value={product.name} />
+                                        <FieldRow label="ISBN / Barcode" value={product.isbnBarcode} mono />
+                                        <FieldRow label="SKU" value={product.sku || '—'} mono />
+                                        <FieldRow label="Danh mục" value={category?.name || '—'} />
+                                        <FieldRow label="Nhà cung cấp" value={supplier?.name || '—'} border={false} />
+                                    </AdminSection>
 
-                    {/* Tồn kho */}
-                    <AdminSection
-                        title="Tồn kho"
-                        icon={<Inventory2Outlined sx={{ fontSize: 14 }} />}
-                        action={
-                            <Typography
-                                variant="caption"
-                                fontWeight={800}
-                                color={totalStock === 0 ? '#d32f2f' : totalStock < 20 ? '#f57c00' : '#2e7d32'}
-                            >
-                                Khả dụng: {totalStock.toLocaleString()}
-                            </Typography>
-                        }
-                        noPad
-                    >
-                        {inventories.length > 0 ? (
-                            <Table size="small">
-                                <TableBody>
-                                    {inventories.map((inv: any, idx: number) => {
-                                        const qty = inv.availableQuantity ?? inv.quantity ?? 0;
-                                        const isOut = qty === 0;
-                                        const isLow = !isOut && qty < (inv.minQuantity ?? 10);
-                                        return (
-                                            <TableRow
-                                                key={inv.id ?? idx}
+                                    {product.description && (
+                                        <AdminSection title="Mô tả">
+                                            <Typography variant="body2" color="#555" lineHeight={1.75} fontSize={13}>
+                                                {product.description}
+                                            </Typography>
+                                        </AdminSection>
+                                    )}
+
+                                    {/* Tồn kho */}
+                                    <AdminSection
+                                        title="Tồn kho"
+                                        icon={<Inventory2Outlined sx={{ fontSize: 14 }} />}
+                                        action={
+                                            <Typography
+                                                variant="caption"
+                                                fontWeight={800}
+                                                color={totalStock === 0 ? '#d32f2f' : totalStock < 20 ? '#f57c00' : '#2e7d32'}
+                                            >
+                                                Khả dụng: {totalStock.toLocaleString()}
+                                            </Typography>
+                                        }
+                                        noPad
+                                    >
+                                        {inventories.length > 0 ? (
+                                            <Table size="small">
+                                                <TableBody>
+                                                    {inventories.map((inv: any, idx: number) => {
+                                                        const qty = inv.availableQuantity ?? inv.quantity ?? 0;
+                                                        const isOut = qty === 0;
+                                                        const isLow = !isOut && qty < (inv.minQuantity ?? 10);
+                                                        return (
+                                                            <TableRow
+                                                                key={inv.id ?? idx}
+                                                                sx={{
+                                                                    '&:last-child td': { border: 0 },
+                                                                    bgcolor: idx % 2 === 0 ? '#fff' : '#fafafa',
+                                                                }}
+                                                            >
+                                                                <TableCell sx={{ py: 1.1, px: 2.5, fontSize: 12, color: '#555', fontWeight: 500 }}>
+                                                                    {inv.warehouseName || inv.warehouseId}
+                                                                </TableCell>
+                                                                <TableCell align="right" sx={{ py: 1.1, px: 2.5 }}>
+                                                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
+                                                                        <Typography
+                                                                            variant="body2"
+                                                                            fontWeight={700}
+                                                                            fontSize={13}
+                                                                            color={isOut ? '#d32f2f' : isLow ? '#f57c00' : '#2e7d32'}
+                                                                        >
+                                                                            {qty.toLocaleString()}
+                                                                        </Typography>
+                                                                        <Chip
+                                                                            label={isOut ? 'Hết' : isLow ? 'Sắp hết' : 'Còn hàng'}
+                                                                            size="small"
+                                                                            sx={{
+                                                                                height: 18, fontSize: 10, fontWeight: 700,
+                                                                                bgcolor: isOut ? '#ffebee' : isLow ? '#fff3e0' : '#e8f5e9',
+                                                                                color: isOut ? '#d32f2f' : isLow ? '#e65100' : '#2e7d32',
+                                                                            }}
+                                                                        />
+                                                                    </Box>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        );
+                                                    })}
+                                                </TableBody>
+                                            </Table>
+                                        ) : (
+                                            <Box sx={{ px: 2.5, py: 2 }}>
+                                                <Typography variant="body2" color="text.secondary" fontSize={13}>
+                                                    Chưa có tồn kho tại bất kỳ kho nào
+                                                </Typography>
+                                            </Box>
+                                        )}
+                                        <Box sx={{ px: 2.5, py: 1.5, borderTop: '1px solid #f0f0f0' }}>
+                                            <Button
+                                                size="small"
+                                                variant="outlined"
+                                                fullWidth
+                                                startIcon={<Inventory2Outlined sx={{ fontSize: 14 }} />}
+                                                onClick={() => navigate('/admin/inventory/import')}
                                                 sx={{
-                                                    '&:last-child td': { border: 0 },
-                                                    bgcolor: idx % 2 === 0 ? '#fff' : '#fafafa',
+                                                    textTransform: 'none', fontSize: 12,
+                                                    borderColor: '#e0e0e0', color: '#555',
+                                                    '&:hover': { bgcolor: '#f5f5f5', borderColor: '#bbb' },
                                                 }}
                                             >
-                                                <TableCell sx={{ py: 1.1, px: 2.5, fontSize: 12, color: '#555', fontWeight: 500 }}>
-                                                    {inv.warehouseName || inv.warehouseId}
-                                                </TableCell>
-                                                <TableCell align="right" sx={{ py: 1.1, px: 2.5 }}>
-                                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
-                                                        <Typography
-                                                            variant="body2"
-                                                            fontWeight={700}
-                                                            fontSize={13}
-                                                            color={isOut ? '#d32f2f' : isLow ? '#f57c00' : '#2e7d32'}
-                                                        >
-                                                            {qty.toLocaleString()}
-                                                        </Typography>
-                                                        <Chip
-                                                            label={isOut ? 'Hết' : isLow ? 'Sắp hết' : 'Còn hàng'}
-                                                            size="small"
-                                                            sx={{
-                                                                height: 18, fontSize: 10, fontWeight: 700,
-                                                                bgcolor: isOut ? '#ffebee' : isLow ? '#fff3e0' : '#e8f5e9',
-                                                                color: isOut ? '#d32f2f' : isLow ? '#e65100' : '#2e7d32',
-                                                            }}
-                                                        />
-                                                    </Box>
-                                                </TableCell>
-                                            </TableRow>
-                                        );
-                                    })}
-                                </TableBody>
-                            </Table>
-                        ) : (
-                            <Box sx={{ px: 2.5, py: 2 }}>
-                                <Typography variant="body2" color="text.secondary" fontSize={13}>
-                                    Chưa có tồn kho tại bất kỳ kho nào
-                                </Typography>
-                            </Box>
-                        )}
-                        <Box sx={{ px: 2.5, py: 1.5, borderTop: '1px solid #f0f0f0' }}>
-                            <Button
-                                size="small"
-                                variant="outlined"
-                                fullWidth
-                                startIcon={<Inventory2Outlined sx={{ fontSize: 14 }} />}
-                                onClick={() => navigate('/admin/inventory/import')}
-                                sx={{
-                                    textTransform: 'none', fontSize: 12,
-                                    borderColor: '#e0e0e0', color: '#555',
-                                    '&:hover': { bgcolor: '#f5f5f5', borderColor: '#bbb' },
-                                }}
-                            >
-                                Tạo phiếu nhập kho
-                            </Button>
+                                                Tạo phiếu nhập kho
+                                            </Button>
+                                        </Box>
+                                    </AdminSection>
+                                </Box>
+                            )}
+
+                            {tab === 1 && (
+                                <Box sx={{ p: 2.5 }}>
+                                    <TableContainer component={Box}>
+                                        <Table size="small">
+                                            <TableHead>
+                                                <TableRow sx={{ bgcolor: '#fafafa' }}>
+                                                    <TableCell sx={{ fontWeight: 800, fontSize: 11, color: '#888' }}>NGÀY THAY ĐỔI</TableCell>
+                                                    <TableCell align="right" sx={{ fontWeight: 800, fontSize: 11, color: '#888' }}>GIÁ LẺ</TableCell>
+                                                    <TableCell align="right" sx={{ fontWeight: 800, fontSize: 11, color: '#888' }}>GIÁ VỐN</TableCell>
+                                                    <TableCell sx={{ fontWeight: 800, fontSize: 11, color: '#888' }}>NGƯỜI SỬA</TableCell>
+                                                </TableRow>
+                                            </TableHead>
+                                            <TableBody>
+                                                {priceHistory.length === 0 ? (
+                                                    <TableRow>
+                                                        <TableCell colSpan={4} align="center" sx={{ py: 4, color: '#aaa', fontSize: 13 }}>
+                                                            Chưa có lịch sử thay đổi giá
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ) : (
+                                                    priceHistory.map((h, i) => (
+                                                        <TableRow key={i} hover>
+                                                            <TableCell sx={{ py: 1.5, fontSize: 12 }}>
+                                                                <Typography variant="body2" fontWeight={600} fontSize={12}>
+                                                                    {new Date(h.changedAt).toLocaleString('vi-VN')}
+                                                                </Typography>
+                                                            </TableCell>
+                                                            <TableCell align="right" sx={{ py: 1.5 }}>
+                                                                <Typography variant="body2" fontWeight={800} color="#d32f2f" fontSize={13}>
+                                                                    {fmt(h.retailPrice)}
+                                                                </Typography>
+                                                            </TableCell>
+                                                            <TableCell align="right" sx={{ py: 1.5 }}>
+                                                                <Typography variant="body2" fontWeight={600} color="#666" fontSize={12}>
+                                                                    {fmt(h.macPrice)}
+                                                                </Typography>
+                                                            </TableCell>
+                                                            <TableCell sx={{ py: 1.5 }}>
+                                                                <Chip label={h.changedBy} size="small" sx={{ height: 18, fontSize: 10, fontWeight: 600 }} />
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))
+                                                )}
+                                            </TableBody>
+                                        </Table>
+                                    </TableContainer>
+                                </Box>
+                            )}
                         </Box>
-                    </AdminSection>
+                    </Paper>
                 </Grid>
 
                 {/* ── CỘT PHẢI ── */}

@@ -6,25 +6,38 @@ import {
     IconButton, Badge, InputBase, Paper,
 } from '@mui/material';
 import { Search, ShoppingCart, Phone, Email } from '@mui/icons-material';
-import { NAV_LINKS } from '../../utils/constants';
 import { useCartContext } from '../../store/CartContext';
+import { useCurrentUser } from '../../modules/customer/hooks/useAccount';
+import { useCategories } from '../../modules/customer/hooks/useCategories';
+import { Link } from 'react-router-dom';
+import { AccountCircle } from '@mui/icons-material';
 
-const NAV_MAP = {
-    'Trang chủ': '/',
-    'Sách văn học': '/shop?category=Văn học',   
-    'Sách kinh tế': '/shop?category=Kinh tế',
-    'Thiếu nhi': '/shop?category=Thiếu nhi',
-    'Sách kỹ năng sống': '/shop?category=Kỹ Năng',
-    'Combo sách': '/shop',
-    'Flash sale': '/shop?sort=price_asc',
-    'Tin tức': '/',
-};
+// Các link cố định luôn xuất hiện
+const FIXED_NAV = [
+    { name: 'Trang chủ', url: '/' },
+];
+
+const EXTRA_NAV = [
+    { name: 'Flash sale', url: '/shop?sort=price_asc' },
+    { name: 'Tin tức', url: '/' },
+];
 
 const Header = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { totalItems, openCart } = useCartContext();
+    const { user, isLoggedIn } = useCurrentUser();
+    const { categories } = useCategories();
     const [searchVal, setSearchVal] = React.useState('');
+
+    // Xây dựng danh sách link động từ categories
+    const navLinks = React.useMemo(() => {
+        const catLinks = categories.slice(0, 5).map(c => ({
+            name: c.name,
+            url: `/shop?category=${encodeURIComponent(c.name)}`
+        }));
+        return [...FIXED_NAV, ...catLinks, ...EXTRA_NAV];
+    }, [categories]);
 
     const handleSearch = (e) => {
         if (e.key === 'Enter' && searchVal.trim()) {
@@ -32,31 +45,24 @@ const Header = () => {
         }
     };
 
-    const handleNavClick = (link) => {
-        navigate(NAV_MAP[link] || '/');
+    const handleNavClick = (url: string) => {
+        navigate(url);
     };
 
     // Kiểm tra nav link nào đang active dựa trên URL hiện tại
-    const isActive = (link) => {
-        const target = NAV_MAP[link] || '/';
+    const isActive = (target: string) => {
         const [targetPath, targetQuery] = target.split('?');
         const currentPath = location.pathname;
         const currentSearch = location.search;
 
-        // Trang chủ: chỉ active khi đúng là '/'
-        if (target === '/') {
-            return currentPath === '/';
-        }
+        if (target === '/') return currentPath === '/';
 
-        // Các link shop: so sánh cả path lẫn query string
         if (targetPath === '/shop') {
             if (currentPath !== '/shop') return false;
             if (!targetQuery) {
-                // "Combo sách" → /shop không có query → active khi không có category/sort
                 const params = new URLSearchParams(currentSearch);
                 return !params.get('category') && !params.get('sort');
             }
-            // So sánh từng query param
             const targetParams = new URLSearchParams(targetQuery);
             const currentParams = new URLSearchParams(currentSearch);
             for (const [key, val] of targetParams.entries()) {
@@ -64,7 +70,6 @@ const Header = () => {
             }
             return true;
         }
-
         return currentPath === targetPath;
     };
 
@@ -129,17 +134,33 @@ const Header = () => {
                                     <ShoppingCart />
                                 </Badge>
                             </IconButton>
-                            <Button variant="outlined" size="small" href="/login" sx={{
-                                borderColor: '#d32f2f', color: '#d32f2f', textTransform: 'none', fontWeight: 600,
-                                '&:hover': { bgcolor: '#ffebee' },
-                            }}>
-                                Đăng nhập
-                            </Button>
-                            <Button variant="contained" size="small" href="/register" sx={{
-                                bgcolor: '#d32f2f', textTransform: 'none', fontWeight: 600, '&:hover': { bgcolor: '#b71c1c' },
-                            }}>
-                                Đăng ký
-                            </Button>
+
+                            {isLoggedIn ? (
+                                <Button
+                                    onClick={() => navigate('/account')}
+                                    startIcon={<AccountCircle />}
+                                    sx={{
+                                        color: '#333', textTransform: 'none', fontWeight: 600,
+                                        '&:hover': { color: '#d32f2f' }
+                                    }}
+                                >
+                                    {user?.fullName?.split(' ').pop() || 'Tài khoản'}
+                                </Button>
+                            ) : (
+                                <>
+                                    <Button variant="outlined" size="small" onClick={() => navigate('/login')} sx={{
+                                        borderColor: '#d32f2f', color: '#d32f2f', textTransform: 'none', fontWeight: 600,
+                                        '&:hover': { bgcolor: '#ffebee', borderColor: '#d32f2f' },
+                                    }}>
+                                        Đăng nhập
+                                    </Button>
+                                    <Button variant="contained" size="small" onClick={() => navigate('/register')} sx={{
+                                        bgcolor: '#d32f2f', textTransform: 'none', fontWeight: 600, '&:hover': { bgcolor: '#b71c1c' },
+                                    }}>
+                                        Đăng ký
+                                    </Button>
+                                </>
+                            )}
                         </Box>
                     </Box>
                 </Container>
@@ -148,10 +169,10 @@ const Header = () => {
                 <Box sx={{ borderTop: '1px solid #f5f5f5' }}>
                     <Container maxWidth="lg">
                         <Box sx={{ display: 'flex' }}>
-                            {NAV_LINKS.map((link) => {
-                                const active = isActive(link);
+                            {navLinks.map((item) => {
+                                const active = isActive(item.url);
                                 return (
-                                    <Button key={link} onClick={() => handleNavClick(link)} sx={{
+                                    <Button key={item.name} onClick={() => handleNavClick(item.url)} sx={{
                                         color: active ? '#d32f2f' : '#333',
                                         textTransform: 'none',
                                         fontWeight: active ? 700 : 500,
@@ -159,7 +180,7 @@ const Header = () => {
                                         borderBottom: active ? '2px solid #d32f2f' : '2px solid transparent',
                                         '&:hover': { color: '#d32f2f', bgcolor: 'transparent', borderBottomColor: '#d32f2f' },
                                     }}>
-                                        {link}
+                                        {item.name}
                                     </Button>
                                 );
                             })}

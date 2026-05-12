@@ -1,164 +1,235 @@
-// src/modules/customer/components/Home/HeroBanner.jsx
-import React, { useState } from 'react';
-import { Box, Grid, Button, Chip, IconButton, Typography } from '@mui/material';
-import { ArrowForwardIos, ArrowBackIos } from '@mui/icons-material';
+import React, { useState, useEffect } from 'react';
+import { Box, Button, Chip, IconButton, Typography } from '@mui/material';
+import { ChevronLeft, ChevronRight } from '@mui/icons-material';
 import { BANNERS } from '../../../../utils/constants';
 
 const HeroBanner = () => {
     const [idx, setIdx] = useState(0);
+    const [animating, setAnimating] = useState(false);
     const banner = BANNERS[idx];
 
-    const prev = () => setIdx((idx - 1 + BANNERS.length) % BANNERS.length);
-    const next = () => setIdx((idx + 1) % BANNERS.length);
+    const prev = () => {
+        if (animating) return;
+        setAnimating(true);
+        setTimeout(() => { setIdx((idx - 1 + BANNERS.length) % BANNERS.length); setAnimating(false); }, 120);
+    };
+    const next = () => {
+        if (animating) return;
+        setAnimating(true);
+        setTimeout(() => { setIdx((idx + 1) % BANNERS.length); setAnimating(false); }, 120);
+    };
 
-    // Chiều cao đồng nhất giữa main banner và 2 side banners
-    const TOTAL_HEIGHT = 320;
-    const SIDE_GAP = 2; // spacing giữa 2 side banner (theme spacing)
+    useEffect(() => {
+        const timer = setInterval(next, 5000);
+        return () => clearInterval(timer);
+    }, [idx]);
+
+    const TOTAL_HEIGHT = 290;
 
     return (
-        <Box sx={{ display: 'flex', gap: 2, mb: 2, alignItems: 'stretch' }}>
+        <Box sx={{ display: 'flex', gap: 1.5, mb: 2, alignItems: 'stretch', height: TOTAL_HEIGHT }}>
 
-            {/* ── Main banner (chiếm ~65%) ── */}
+            {/* ── Main Banner (65%) ── */}
             <Box sx={{
-                flex: '0 0 calc(65% - 8px)',
+                flex: '0 0 calc(65% - 6px)',
                 background: banner.bg,
-                borderRadius: 3,
-                p: { xs: 3, md: 5 },
-                minHeight: TOTAL_HEIGHT,
+                borderRadius: 2,
+                px: { xs: 2.5, md: 3.5 },
+                py: 3,
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'center',
                 position: 'relative',
                 overflow: 'hidden',
             }}>
-                {/* Decorative circles */}
-                <Box sx={{ position: 'absolute', right: -50, top: -50, width: 240, height: 240, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.08)', pointerEvents: 'none' }} />
-                <Box sx={{ position: 'absolute', right: 80, bottom: -70, width: 180, height: 180, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.06)', pointerEvents: 'none' }} />
-                <Box sx={{ position: 'absolute', left: -30, top: '50%', transform: 'translateY(-50%)', width: 120, height: 120, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
+                {/* Subtle decorative circles */}
+                <Box sx={{ position: 'absolute', right: -50, top: -50, width: 220, height: 220, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.06)', pointerEvents: 'none' }} />
+                <Box sx={{ position: 'absolute', right: 80, bottom: -60, width: 160, height: 160, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
 
-                <Chip label={banner.tag} sx={{
-                    bgcolor: 'rgba(255,255,255,0.22)', color: '#fff',
-                    fontWeight: 700, width: 'fit-content', mb: 2, fontSize: 12,
-                    letterSpacing: 0.5,
-                }} />
+                <Chip
+                    label={banner.tag}
+                    size="small"
+                    sx={{
+                        bgcolor: 'rgba(255,255,255,0.2)',
+                        color: '#fff',
+                        fontWeight: 700,
+                        width: 'fit-content',
+                        mb: 1.5,
+                        fontSize: 10.5,
+                        height: 22,
+                        letterSpacing: 0.5,
+                        fontFamily: '"Segoe UI", sans-serif',
+                    }}
+                />
 
                 <Typography
-                    variant="h2" fontWeight={900} color="#fff"
+                    fontWeight={900}
+                    color="#fff"
                     sx={{
-                        lineHeight: 1.05, mb: 2,
+                        lineHeight: 1.1,
+                        mb: 1.25,
                         whiteSpace: 'pre-line',
-                        fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
-                        textShadow: '0 2px 12px rgba(0,0,0,0.15)',
+                        fontSize: { xs: '1.5rem', sm: '1.85rem', md: '2.2rem' },
+                        textShadow: '0 1px 8px rgba(0,0,0,0.1)',
+                        opacity: animating ? 0.7 : 1,
+                        transition: 'opacity 0.12s',
+                        fontFamily: '"Segoe UI", sans-serif',
                     }}
                 >
                     {banner.title}
                 </Typography>
 
-                <Typography variant="body1" color="rgba(255,255,255,0.88)" sx={{ mb: 3, fontSize: 15 }}>
+                <Typography
+                    color="rgba(255,255,255,0.88)"
+                    sx={{ mb: 2.5, fontSize: 13, lineHeight: 1.6, fontFamily: '"Segoe UI", sans-serif' }}
+                >
                     {banner.sub}
                 </Typography>
 
-                <Button variant="contained" sx={{
-                    bgcolor: '#fff', color: '#d32f2f', fontWeight: 800,
-                    textTransform: 'none', width: 'fit-content',
-                    px: 3.5, py: 1.2, fontSize: 15,
-                    borderRadius: 2.5,
-                    boxShadow: '0 4px 14px rgba(0,0,0,0.15)',
-                    '&:hover': { bgcolor: '#ffebee', transform: 'translateY(-1px)', boxShadow: '0 6px 18px rgba(0,0,0,0.2)' },
-                    transition: 'all 0.2s',
-                }}>
+                <Button
+                    variant="contained"
+                    size="small"
+                    sx={{
+                        bgcolor: '#fff',
+                        color: '#e8401c',
+                        fontWeight: 800,
+                        textTransform: 'none',
+                        width: 'fit-content',
+                        px: 2.5,
+                        py: 0.85,
+                        fontSize: 13,
+                        borderRadius: 1.5,
+                        boxShadow: '0 2px 10px rgba(0,0,0,0.12)',
+                        fontFamily: '"Segoe UI", sans-serif',
+                        '&:hover': {
+                            bgcolor: '#fff3f0',
+                            transform: 'translateY(-1px)',
+                            boxShadow: '0 4px 14px rgba(0,0,0,0.16)',
+                        },
+                        transition: 'all 0.18s',
+                    }}
+                >
                     {banner.btn} →
                 </Button>
 
-                {/* Dots */}
-                <Box sx={{ position: 'absolute', bottom: 18, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 0.75 }}>
+                {/* Dot indicators */}
+                <Box sx={{
+                    position: 'absolute', bottom: 12, left: '50%',
+                    transform: 'translateX(-50%)',
+                    display: 'flex', gap: 0.5,
+                }}>
                     {BANNERS.map((_, i) => (
-                        <Box key={i} onClick={() => setIdx(i)} sx={{
-                            width: i === idx ? 24 : 8, height: 8, borderRadius: 4,
-                            bgcolor: i === idx ? '#fff' : 'rgba(255,255,255,0.45)',
-                            cursor: 'pointer', transition: 'all 0.3s',
-                        }} />
+                        <Box
+                            key={i}
+                            onClick={() => setIdx(i)}
+                            sx={{
+                                width: i === idx ? 18 : 6,
+                                height: 6,
+                                borderRadius: 3,
+                                bgcolor: i === idx ? '#fff' : 'rgba(255,255,255,0.45)',
+                                cursor: 'pointer',
+                                transition: 'all 0.3s',
+                            }}
+                        />
                     ))}
                 </Box>
 
-                {/* Arrows */}
-                <IconButton onClick={prev} size="small" sx={{
-                    position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
-                    bgcolor: 'rgba(255,255,255,0.22)', color: '#fff',
-                    '&:hover': { bgcolor: 'rgba(255,255,255,0.4)' },
-                }}>
-                    <ArrowBackIos sx={{ fontSize: 14, ml: 0.5 }} />
+                {/* Arrow buttons */}
+                <IconButton
+                    onClick={prev}
+                    size="small"
+                    sx={{
+                        position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)',
+                        bgcolor: 'rgba(255,255,255,0.18)', color: '#fff', width: 28, height: 28,
+                        '&:hover': { bgcolor: 'rgba(255,255,255,0.32)' },
+                    }}
+                >
+                    <ChevronLeft sx={{ fontSize: 18 }} />
                 </IconButton>
-                <IconButton onClick={next} size="small" sx={{
-                    position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-                    bgcolor: 'rgba(255,255,255,0.22)', color: '#fff',
-                    '&:hover': { bgcolor: 'rgba(255,255,255,0.4)' },
-                }}>
-                    <ArrowForwardIos sx={{ fontSize: 14 }} />
+                <IconButton
+                    onClick={next}
+                    size="small"
+                    sx={{
+                        position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                        bgcolor: 'rgba(255,255,255,0.18)', color: '#fff', width: 28, height: 28,
+                        '&:hover': { bgcolor: 'rgba(255,255,255,0.32)' },
+                    }}
+                >
+                    <ChevronRight sx={{ fontSize: 18 }} />
                 </IconButton>
             </Box>
 
-            {/* ── Side banners (chiếm ~35%) — 2 ô xếp dọc bằng đúng chiều cao main ── */}
+            {/* ── Side Banners (35%) ── */}
             <Box sx={{
                 flex: 1,
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 2,
-                minHeight: TOTAL_HEIGHT,
+                gap: 1.5,
+                height: TOTAL_HEIGHT,
             }}>
-                {/* Side 1: Flash Sale */}
+                {/* Flash Sale */}
                 <Box sx={{
                     flex: 1,
-                    background: 'linear-gradient(135deg, #f57c00 0%, #e65100 100%)',
-                    borderRadius: 2.5, p: 2.5,
+                    background: 'linear-gradient(135deg, #e8401c 0%, #c62828 100%)',
+                    borderRadius: 2, px: 2.5, py: 2,
                     display: 'flex', flexDirection: 'column', justifyContent: 'center',
                     position: 'relative', overflow: 'hidden',
+                    cursor: 'pointer',
+                    '&:hover': { filter: 'brightness(1.06)' },
+                    transition: 'filter 0.2s',
                 }}>
-                    <Box sx={{ position: 'absolute', right: -20, top: -20, width: 90, height: 90, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.1)' }} />
-                    <Typography variant="caption" color="rgba(255,255,255,0.85)" fontWeight={700} sx={{ letterSpacing: 0.5 }}>
+                    <Box sx={{ position: 'absolute', right: -18, top: -18, width: 80, height: 80, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.07)', pointerEvents: 'none' }} />
+                    <Typography sx={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.85)', letterSpacing: '0.8px', mb: 0.5, fontFamily: '"Segoe UI", sans-serif' }}>
                         ⚡ FLASH SALE
                     </Typography>
-                    <Typography variant="h6" fontWeight={900} color="#fff" sx={{ mt: 0.5, lineHeight: 1.2 }}>
+                    <Typography fontWeight={900} color="#fff" sx={{ lineHeight: 1.2, fontSize: 15, mb: 0.5, fontFamily: '"Segoe UI", sans-serif' }}>
                         Combo 3 cuốn
                     </Typography>
-                    <Typography variant="body2" color="rgba(255,255,255,0.88)" sx={{ mt: 0.5, mb: 1.5 }}>
-                        Chỉ từ 150.000đ
+                    <Typography color="rgba(255,255,255,0.88)" sx={{ mb: 1.5, fontSize: 12, fontFamily: '"Segoe UI", sans-serif' }}>
+                        Chỉ từ <strong>150.000đ</strong>
                     </Typography>
                     <Button size="small" sx={{
-                        bgcolor: '#fff', color: '#e65100',
+                        bgcolor: '#fff', color: '#e8401c',
                         textTransform: 'none', fontWeight: 700,
-                        width: 'fit-content', borderRadius: 2,
-                        px: 2, '&:hover': { bgcolor: '#fff3e0' },
+                        width: 'fit-content', borderRadius: 1.5,
+                        px: 1.5, py: 0.4, fontSize: 12,
+                        fontFamily: '"Segoe UI", sans-serif',
+                        '&:hover': { bgcolor: '#fff3f0' },
                     }}>
-                        Xem ngay
+                        Xem ngay →
                     </Button>
                 </Box>
 
-                {/* Side 2: Thành viên */}
+                {/* Member benefits */}
                 <Box sx={{
                     flex: 1,
-                    background: 'linear-gradient(135deg, #6a1b9a 0%, #4a148c 100%)',
-                    borderRadius: 2.5, p: 2.5,
+                    background: 'linear-gradient(135deg, #1565c0 0%, #0d47a1 100%)',
+                    borderRadius: 2, px: 2.5, py: 2,
                     display: 'flex', flexDirection: 'column', justifyContent: 'center',
                     position: 'relative', overflow: 'hidden',
+                    cursor: 'pointer',
+                    '&:hover': { filter: 'brightness(1.06)' },
+                    transition: 'filter 0.2s',
                 }}>
-                    <Box sx={{ position: 'absolute', right: -20, bottom: -20, width: 90, height: 90, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.1)' }} />
-                    <Typography variant="caption" color="rgba(255,255,255,0.85)" fontWeight={700} sx={{ letterSpacing: 0.5 }}>
+                    <Box sx={{ position: 'absolute', right: -18, bottom: -18, width: 80, height: 80, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.07)', pointerEvents: 'none' }} />
+                    <Typography sx={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.85)', letterSpacing: '0.8px', mb: 0.5, fontFamily: '"Segoe UI", sans-serif' }}>
                         🎁 ƯU ĐÃI THÀNH VIÊN
                     </Typography>
-                    <Typography variant="h6" fontWeight={900} color="#fff" sx={{ mt: 0.5, lineHeight: 1.2 }}>
+                    <Typography fontWeight={900} color="#fff" sx={{ lineHeight: 1.2, fontSize: 15, mb: 0.5, fontFamily: '"Segoe UI", sans-serif' }}>
                         Tích điểm đổi quà
                     </Typography>
-                    <Typography variant="body2" color="rgba(255,255,255,0.88)" sx={{ mt: 0.5, mb: 1.5 }}>
-                        Đăng ký miễn phí ngay
+                    <Typography color="rgba(255,255,255,0.88)" sx={{ mb: 1.5, fontSize: 12, fontFamily: '"Segoe UI", sans-serif' }}>
+                        Đăng ký <strong>miễn phí</strong> ngay!
                     </Typography>
                     <Button size="small" href="/register" sx={{
-                        bgcolor: '#fff', color: '#6a1b9a',
+                        bgcolor: '#fff', color: '#1565c0',
                         textTransform: 'none', fontWeight: 700,
-                        width: 'fit-content', borderRadius: 2,
-                        px: 2, '&:hover': { bgcolor: '#f3e5f5' },
+                        width: 'fit-content', borderRadius: 1.5,
+                        px: 1.5, py: 0.4, fontSize: 12,
+                        fontFamily: '"Segoe UI", sans-serif',
+                        '&:hover': { bgcolor: '#e3f2fd' },
                     }}>
-                        Đăng ký
+                        Đăng ký →
                     </Button>
                 </Box>
             </Box>

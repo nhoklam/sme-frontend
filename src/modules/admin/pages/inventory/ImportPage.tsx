@@ -1,4 +1,3 @@
-// src/modules/admin/pages/inventory/ImportPage.tsx
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -8,11 +7,12 @@ import {
     Dialog, DialogTitle, DialogContent, DialogActions,
     Select, MenuItem, FormControl, Snackbar, Alert,
     Skeleton, Pagination, Divider, CircularProgress,
-    Grid, Avatar,
+    Grid, Avatar, Collapse, Tooltip,
 } from '@mui/material';
 import {
     Search, Add, Refresh, Visibility, CheckCircle, Cancel,
-    Close, Delete, Business, LocalShipping,
+    Close, Delete, Business, LocalShipping, ExpandMore, ExpandLess,
+    QrCode, Warning, Print, ContentCopy,
 } from '@mui/icons-material';
 import { purchaseService } from '../../../../services/purchaseService';
 import supplierService from '../../../../services/supplierService';
@@ -42,7 +42,7 @@ const STATUS_COLORS: Record<PurchaseStatus, { label: string; color: string; bg: 
     CANCELLED: { label: 'Đã hủy', color: '#d32f2f', bg: '#ffebee' },
 };
 
-// ── Cart Item Interface ────────────────────────────────────────
+// ── Cart Item với Batch fields ─────────────────────────────────
 interface CartItem {
     productId: string;
     productName: string;
@@ -53,10 +53,35 @@ interface CartItem {
     imageUrl?: string;
     sku?: string;
     currentStock?: number;
+    macPrice?: number;
+    // Batch / Lot
+    batchNumber?: string;
+    lotNumber?: string;
+    expiryDate?: string;
+    manufacturingDate?: string;
+    showBatchFields: boolean;
 }
 
+// ── Expiry warning helper ──────────────────────────────────────
+const getExpiryWarning = (expiryDate?: string): { label: string; color: string } | null => {
+    if (!expiryDate) return null;
+    const exp = new Date(expiryDate);
+    const today = new Date();
+    const diffDays = Math.floor((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays < 0) return { label: 'Đã hết hạn!', color: '#d32f2f' };
+    if (diffDays < 90) return { label: `Còn ${diffDays} ngày`, color: '#e65100' };
+    if (diffDays < 180) return { label: `Còn ${diffDays} ngày`, color: '#f59e0b' };
+    return null;
+};
+
+// ── Import price vs MAC warning ────────────────────────────────
+const getPriceWarning = (importPrice: number, macPrice?: number): boolean => {
+    if (!macPrice || macPrice === 0) return false;
+    return importPrice < macPrice * 0.9;
+};
+
 // ══════════════════════════════════════════════════════════════
-// DETAIL DIALOG
+// DETAIL DIALOG (giữ nguyên từ bản cũ, không thay đổi)
 // ══════════════════════════════════════════════════════════════
 const PurchaseOrderDetailDialog: React.FC<{
     open: boolean;
@@ -69,10 +94,11 @@ const PurchaseOrderDetailDialog: React.FC<{
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
     const [products, setProducts] = useState<Map<string, ProductResponse>>(new Map());
+    const printRef = React.useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (open) {
-            supplierService.getAllSimple().then(setSuppliers).catch(() => { });  // ← fixed
+            supplierService.getAllSimple().then(setSuppliers).catch(() => { });
             warehouseService.getAll().then(setWarehouses).catch(() => { });
             productService.search({ size: 1000, isActive: true })
                 .then(res => {
@@ -87,145 +113,231 @@ const PurchaseOrderDetailDialog: React.FC<{
     const supplier = suppliers.find(s => s.id === order?.supplierId);
     const warehouse = warehouses.find(w => w.id === order?.warehouseId);
     const statusInfo = order ? STATUS_COLORS[order.status] : { label: '', color: '', bg: '' };
+    const totalQty = order?.items.reduce((s, i) => s + i.quantity, 0) ?? 0;
+
+    const handlePrint = () => {
+        const printContent = printRef.current;
+        if (!printContent) return;
+        const printWindow = window.open('', '_blank', 'width=800,height=600');
+        if (!printWindow) return;
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html><head><title>Phiếu nhập hàng - ${order?.code || ''}</title>
+            <style>
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body { font-family: 'Times New Roman', serif; font-size: 13px; color: #000; padding: 20px; }
+                .header { text-align: center; margin-bottom: 16px; }
+                .header h1 { font-size: 22px; font-weight: bold; margin-bottom: 4px; }
+                .header .sub { font-size: 12px; color: #555; }
+                .info-grid { display: flex; gap: 24px; margin-bottom: 16px; }
+                .info-grid .col { flex: 1; }
+                .info-row { display: flex; margin-bottom: 4px; }
+                .info-label { font-weight: bold; min-width: 130px; }
+                .info-value { flex: 1; }
+                .status-badge { display: inline-block; padding: 2px 10px; border-radius: 4px; font-weight: bold; font-size: 12px; }
+                table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+                th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; font-size: 12px; }
+                th { background: #f5f5f5; font-weight: bold; text-align: center; }
+                td.right { text-align: right; }
+                td.center { text-align: center; }
+                .total-row td { font-weight: bold; border-top: 2px solid #333; }
+                .signatures { display: flex; justify-content: space-between; margin-top: 40px; text-align: center; }
+                .signatures .sig { flex: 1; }
+                .signatures .title { font-weight: bold; margin-bottom: 60px; }
+                .signatures .note { font-size: 11px; color: #888; font-style: italic; }
+                @media print { body { padding: 10px; } }
+            </style>
+            </head><body>
+            ${printContent.innerHTML}
+            <script>window.onload = function() { window.print(); window.close(); }<\/script>
+            </body></html>
+        `);
+        printWindow.document.close();
+    };
+
+    const handleCopyCode = () => {
+        if (order?.code) {
+            navigator.clipboard.writeText(order.code);
+        }
+    };
+
+    const formatDate = (dateStr?: string) => {
+        if (!dateStr) return '—';
+        return new Date(dateStr).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    };
+
+    const formatDateTime = (dateStr?: string) => {
+        if (!dateStr) return '—';
+        return new Date(dateStr).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' });
+    };
 
     return (
-        <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth
-            PaperProps={{ sx: { borderRadius: 2.5 } }}>
-            <DialogTitle sx={{ pb: 0.5, pt: 2.5, px: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
-                        <Typography fontWeight={800} fontSize={16}>Chi tiết phiếu nhập</Typography>
-                        <Typography variant="caption" fontFamily="monospace" color="#1976d2" fontWeight={700}>
-                            {order?.code}
-                        </Typography>
-                        {order && (
-                            <Chip label={statusInfo.label} size="small"
-                                sx={{ bgcolor: statusInfo.bg, color: statusInfo.color, fontWeight: 700, height: 22 }} />
-                        )}
-                    </Box>
-                    <Typography variant="caption" color="text.secondary">
-                        Ngày tạo: {order?.createdAt ? new Date(order.createdAt).toLocaleString('vi-VN') : '—'}
-                    </Typography>
+        <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 2.5 } }}>
+            {/* Dialog Header (not printed) */}
+            <DialogTitle sx={{ pb: 0.5, pt: 2, px: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <Typography fontWeight={800} fontSize={15}>Chi tiết phiếu nhập: {order?.code}</Typography>
+                    <IconButton size="small" onClick={handleCopyCode} sx={{ color: '#94a3b8' }}>
+                        <ContentCopy sx={{ fontSize: 14 }} />
+                    </IconButton>
                 </Box>
                 <IconButton size="small" onClick={onClose}><Close sx={{ fontSize: 18 }} /></IconButton>
             </DialogTitle>
-            <Divider sx={{ mx: 3, mt: 1 }} />
+            <Divider />
+
+            {/* Printable Content */}
             <DialogContent sx={{ px: 3, pt: 2 }}>
-                <Grid container spacing={2} sx={{ mb: 3 }}>
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                        <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #f0f0f0', bgcolor: '#fafafa' }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                                <Business sx={{ fontSize: 16, color: '#1976d2' }} />
-                                <Typography variant="caption" fontWeight={700} color="#555" letterSpacing={0.3}>NHÀ CUNG CẤP</Typography>
+                <Box ref={printRef}>
+                    {/* Receipt Header */}
+                    <Box sx={{ textAlign: 'center', mb: 2.5, '@media print': { mb: 1 } }}>
+                        <Typography fontWeight={900} fontSize={20} letterSpacing={1} color="#1a1a2e">
+                            PHIẾU NHẬP HÀNG
+                        </Typography>
+                        <Typography variant="caption" color="#64748b" display="block" fontSize={12}>
+                            Số phiếu: {order?.code}
+                        </Typography>
+                        <Typography variant="caption" color="#64748b" display="block" fontSize={12}>
+                            Ngày: {formatDate(order?.createdAt)}
+                        </Typography>
+                    </Box>
+
+                    {/* Info Grid */}
+                    <Box sx={{ display: 'flex', gap: 3, mb: 2.5, flexWrap: 'wrap' }}>
+                        <Box sx={{ flex: 1, minWidth: 260 }}>
+                            <Box sx={{ display: 'flex', mb: 0.75, alignItems: 'baseline' }}>
+                                <Typography variant="body2" fontWeight={700} sx={{ minWidth: 130 }} color="#475569">Mã phiếu:</Typography>
+                                <Typography variant="body2" fontWeight={700} fontFamily="monospace" color="#1976d2">{order?.code}</Typography>
                             </Box>
-                            <Typography variant="body2" fontWeight={700}>{supplier?.name || order?.supplierId}</Typography>
-                            {supplier?.phone && (
-                                <Typography variant="caption" color="text.secondary" display="block">📞 {supplier.phone}</Typography>
+                            <Box sx={{ display: 'flex', mb: 0.75, alignItems: 'baseline' }}>
+                                <Typography variant="body2" fontWeight={700} sx={{ minWidth: 130 }} color="#475569">Nhà cung cấp:</Typography>
+                                <Typography variant="body2" fontWeight={600}>{supplier?.name || order?.supplierId}</Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', mb: 0.75, alignItems: 'baseline' }}>
+                                <Typography variant="body2" fontWeight={700} sx={{ minWidth: 130 }} color="#475569">Ngày tạo:</Typography>
+                                <Typography variant="body2">{formatDateTime(order?.createdAt)}</Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', mb: 0.75, alignItems: 'baseline' }}>
+                                <Typography variant="body2" fontWeight={700} sx={{ minWidth: 130 }} color="#475569">Kho nhập:</Typography>
+                                <Typography variant="body2" fontWeight={600}>{warehouse?.name || order?.warehouseId}</Typography>
+                            </Box>
+                        </Box>
+                        <Box sx={{ flex: 1, minWidth: 200 }}>
+                            <Box sx={{ display: 'flex', mb: 0.75, alignItems: 'center' }}>
+                                <Typography variant="body2" fontWeight={700} sx={{ minWidth: 100 }} color="#475569">Trạng thái:</Typography>
+                                <Chip label={statusInfo.label} size="small"
+                                    sx={{ bgcolor: statusInfo.bg, color: statusInfo.color, fontWeight: 700, height: 24, fontSize: 12 }} />
+                            </Box>
+                            {order?.note && (
+                                <Box sx={{ display: 'flex', mb: 0.75, alignItems: 'baseline' }}>
+                                    <Typography variant="body2" fontWeight={700} sx={{ minWidth: 100 }} color="#475569">Ghi chú:</Typography>
+                                    <Typography variant="body2" color="#555">{order.note}</Typography>
+                                </Box>
                             )}
-                        </Paper>
-                    </Grid>
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                        <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #f0f0f0', bgcolor: '#fafafa' }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                                <LocalShipping sx={{ fontSize: 16, color: '#2e7d32' }} />
-                                <Typography variant="caption" fontWeight={700} color="#555" letterSpacing={0.3}>KHO NHẬP</Typography>
-                            </Box>
-                            <Typography variant="body2" fontWeight={700}>{warehouse?.name || order?.warehouseId}</Typography>
-                        </Paper>
-                    </Grid>
-                </Grid>
-
-                <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #f0f0f0', mb: 2, bgcolor: '#fff' }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-                        <Box>
-                            <Typography variant="caption" color="text.secondary">Tổng số lượng</Typography>
-                            <Typography variant="h6" fontWeight={700} color="#1976d2">
-                                {order?.items.reduce((s, i) => s + i.quantity, 0).toLocaleString()}
-                            </Typography>
-                        </Box>
-                        <Box sx={{ textAlign: 'right' }}>
-                            <Typography variant="caption" color="text.secondary">Tổng tiền</Typography>
-                            <Typography variant="h5" fontWeight={800} color="#d32f2f">
-                                {fmtCurrency(order?.totalAmount)}
-                            </Typography>
                         </Box>
                     </Box>
-                </Paper>
 
-                <Typography variant="subtitle2" fontWeight={700} mb={1.5}>Danh sách hàng hóa</Typography>
-                <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #f0f0f0', mb: 2 }}>
-                    <Table size="small">
-                        <TableHead>
-                            <TableRow sx={{ bgcolor: '#fafafa' }}>
-                                <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>Sản phẩm</TableCell>
-                                <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>Mã vạch</TableCell>
-                                <TableCell align="center" sx={{ fontWeight: 700, fontSize: 11 }}>Số lượng</TableCell>
-                                <TableCell align="right" sx={{ fontWeight: 700, fontSize: 11 }}>Giá nhập</TableCell>
-                                <TableCell align="right" sx={{ fontWeight: 700, fontSize: 11 }}>Thành tiền</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {order?.items.map((item, idx) => {
-                                const product = products.get(item.productId);
-                                return (
-                                    <TableRow key={item.id} sx={{ bgcolor: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
-                                        <TableCell sx={{ py: 1.5 }}>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                                {product?.imageUrl ? (
-                                                    <Box component="img" src={product.imageUrl} alt={product.name}
-                                                        sx={{ width: 40, height: 52, objectFit: 'contain', borderRadius: 1, border: '1px solid #e0e0e0' }} />
-                                                ) : (
-                                                    <Avatar sx={{ width: 40, height: 40, bgcolor: '#f5f5f5' }}>
-                                                        <LocalShipping sx={{ fontSize: 20, color: '#bbb' }} />
-                                                    </Avatar>
-                                                )}
-                                                <Box>
-                                                    <Typography variant="body2" fontWeight={600} fontSize={13}>
-                                                        {product?.name || item.productId.slice(0, 8)}
-                                                    </Typography>
-                                                </Box>
-                                            </Box>
-                                        </TableCell>
-                                        <TableCell sx={{ py: 1.5 }}>
-                                            <Typography variant="caption" fontFamily="monospace" color="#888">
-                                                {product?.isbnBarcode || '—'}
-                                            </Typography>
-                                        </TableCell>
-                                        <TableCell align="center" sx={{ py: 1.5 }}>
-                                            <Typography variant="body2" fontWeight={700}>{item.quantity}</Typography>
-                                        </TableCell>
-                                        <TableCell align="right" sx={{ py: 1.5 }}>
-                                            <Typography variant="body2">{fmtCurrency(item.importPrice)}</Typography>
-                                        </TableCell>
-                                        <TableCell align="right" sx={{ py: 1.5 }}>
-                                            <Typography variant="body2" fontWeight={700} color="#1976d2">
-                                                {fmtCurrency(item.quantity * item.importPrice)}
-                                            </Typography>
-                                        </TableCell>
-                                    </TableRow>
-                                );
-                            })}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
+                    {/* Separator */}
+                    <Divider sx={{ mb: 2 }} />
 
-                {order?.note && (
-                    <Box sx={{ p: 1.5, bgcolor: '#f5f5f5', borderRadius: 1.5 }}>
-                        <Typography variant="caption" fontWeight={700} color="#555">Ghi chú:</Typography>
-                        <Typography variant="body2" color="#555" mt={0.5}>{order.note}</Typography>
+                    {/* Items table header */}
+                    <Typography variant="subtitle2" fontWeight={800} mb={1.5} textAlign="center" fontSize={14} color="#1a1a2e">
+                        Danh sách hàng nhập
+                    </Typography>
+
+                    {/* Items Table */}
+                    <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #d0d0d0', mb: 2, borderRadius: 1 }}>
+                        <Table size="small">
+                            <TableHead>
+                                <TableRow sx={{ bgcolor: '#f5f5f5' }}>
+                                    <TableCell sx={{ fontWeight: 800, fontSize: 12, textAlign: 'center', borderBottom: '2px solid #aaa', width: 200 }}>Sản phẩm</TableCell>
+                                    <TableCell sx={{ fontWeight: 800, fontSize: 12, textAlign: 'center', borderBottom: '2px solid #aaa', width: 100 }}>SKU</TableCell>
+                                    <TableCell sx={{ fontWeight: 800, fontSize: 12, textAlign: 'center', borderBottom: '2px solid #aaa', width: 60 }}>SL</TableCell>
+                                    <TableCell sx={{ fontWeight: 800, fontSize: 12, textAlign: 'right', borderBottom: '2px solid #aaa', width: 110 }}>Giá nhập</TableCell>
+                                    <TableCell sx={{ fontWeight: 800, fontSize: 12, textAlign: 'right', borderBottom: '2px solid #aaa', width: 120 }}>Thành tiền</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {order?.items.map((item, idx) => {
+                                    const product = products.get(item.productId);
+                                    return (
+                                        <TableRow key={item.id} sx={{ bgcolor: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
+                                            <TableCell sx={{ py: 1.25 }}>
+                                                <Typography variant="body2" fontWeight={600} fontSize={12.5}>
+                                                    {product?.name || item.productId.slice(0, 8)}
+                                                </Typography>
+                                            </TableCell>
+                                            <TableCell sx={{ textAlign: 'center' }}>
+                                                <Typography variant="caption" fontFamily="monospace" color="#555" fontSize={11}>
+                                                    {product?.sku || product?.isbnBarcode || '—'}
+                                                </Typography>
+                                            </TableCell>
+                                            <TableCell sx={{ textAlign: 'center' }}>
+                                                <Typography variant="body2" fontWeight={700}>{item.quantity}</Typography>
+                                            </TableCell>
+                                            <TableCell sx={{ textAlign: 'right' }}>
+                                                <Typography variant="body2" fontSize={12}>{fmtCurrency(item.importPrice)}</Typography>
+                                            </TableCell>
+                                            <TableCell sx={{ textAlign: 'right' }}>
+                                                <Typography variant="body2" fontWeight={700} color="#1976d2" fontSize={12}>
+                                                    {fmtCurrency(item.quantity * item.importPrice)}
+                                                </Typography>
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })}
+                                {/* Total Row */}
+                                <TableRow>
+                                    <TableCell colSpan={2} sx={{ borderTop: '2px solid #333' }} />
+                                    <TableCell sx={{ textAlign: 'center', fontWeight: 800, borderTop: '2px solid #333', fontSize: 13 }}>
+                                        {totalQty}
+                                    </TableCell>
+                                    <TableCell sx={{ textAlign: 'right', fontWeight: 800, borderTop: '2px solid #333', fontSize: 13 }}>
+                                        Tổng cộng
+                                    </TableCell>
+                                    <TableCell sx={{ textAlign: 'right', fontWeight: 900, borderTop: '2px solid #333', color: '#d32f2f', fontSize: 14 }}>
+                                        {fmtCurrency(order?.totalAmount)}
+                                    </TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+
+                    {/* Signatures */}
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4, textAlign: 'center' }}>
+                        <Box sx={{ flex: 1 }}>
+                            <Typography variant="body2" fontWeight={700} mb={0.5}>Người lập phiếu</Typography>
+                            <Typography variant="caption" color="#94a3b8" fontStyle="italic">(Ký và ghi rõ họ tên)</Typography>
+                        </Box>
+                        <Box sx={{ flex: 1 }}>
+                            <Typography variant="body2" fontWeight={700} mb={0.5}>Người giao hàng</Typography>
+                            <Typography variant="caption" color="#94a3b8" fontStyle="italic">(Ký và ghi rõ họ tên)</Typography>
+                        </Box>
+                        <Box sx={{ flex: 1 }}>
+                            <Typography variant="body2" fontWeight={700} mb={0.5}>Thủ kho</Typography>
+                            <Typography variant="caption" color="#94a3b8" fontStyle="italic">(Ký và ghi rõ họ tên)</Typography>
+                        </Box>
                     </Box>
-                )}
+                </Box>
             </DialogContent>
-            <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+
+            {/* Actions */}
+            <DialogActions sx={{ px: 3, pb: 2.5, gap: 1, borderTop: '1px solid #e2e8f0' }}>
+                <Button onClick={handlePrint} variant="contained" startIcon={<Print />}
+                    sx={{ textTransform: 'none', bgcolor: '#1976d2', '&:hover': { bgcolor: '#1565c0' } }}>
+                    In phiếu nhập
+                </Button>
                 <Button onClick={onClose} variant="outlined" sx={{ textTransform: 'none' }}>Đóng</Button>
+                <Box sx={{ flex: 1 }} />
                 {order?.status === 'PENDING' && (
-                    <Button onClick={onApprove} variant="contained" disabled={loading} sx={{ bgcolor: '#2e7d32' }}>
-                        {loading ? 'Đang xử lý...' : 'Duyệt phiếu'}
+                    <Button onClick={onApprove} variant="contained" disabled={loading}
+                        sx={{ textTransform: 'none', bgcolor: '#2e7d32', '&:hover': { bgcolor: '#1b5e20' } }}>
+                        {loading ? 'Đang xử lý...' : '✓ Duyệt phiếu'}
                     </Button>
                 )}
                 {(order?.status === 'DRAFT' || order?.status === 'PENDING') && (
-                    <Button onClick={onCancel} variant="contained" disabled={loading} sx={{ bgcolor: '#d32f2f' }}>
-                        Hủy phiếu
+                    <Button onClick={onCancel} variant="contained" disabled={loading}
+                        sx={{ textTransform: 'none', bgcolor: '#d32f2f', '&:hover': { bgcolor: '#b71c1c' } }}>
+                        ✕ Hủy phiếu
                     </Button>
                 )}
             </DialogActions>
@@ -234,7 +346,7 @@ const PurchaseOrderDetailDialog: React.FC<{
 };
 
 // ══════════════════════════════════════════════════════════════
-// CREATE ORDER DIALOG
+// CREATE ORDER DIALOG — với Batch/Lot Number
 // ══════════════════════════════════════════════════════════════
 const CreatePurchaseDialog: React.FC<{
     open: boolean;
@@ -267,7 +379,7 @@ const CreatePurchaseDialog: React.FC<{
         if (supplierId && open) {
             setLoadingSupplierProducts(true);
             productService.search({ size: 100, isActive: true })
-                .then(res => { setSupplierProducts(res.content.filter(p => p.supplierId === supplierId)); })
+                .then(res => setSupplierProducts(res.content.filter(p => p.supplierId === supplierId)))
                 .catch(() => setSupplierProducts([]))
                 .finally(() => setLoadingSupplierProducts(false));
         } else { setSupplierProducts([]); }
@@ -282,59 +394,76 @@ const CreatePurchaseDialog: React.FC<{
     }, [warehouseId, open]);
 
     useEffect(() => {
-        const delayDebounce = setTimeout(() => {
+        const t = setTimeout(() => {
             if (searchKeyword.trim().length >= 2 && open) {
                 setSearching(true);
                 productService.search({ keyword: searchKeyword, size: 10, isActive: true })
-                    .then(res => { setSearchResults(res.content.filter(p => !cartItems.some(item => item.productId === p.id))); })
+                    .then(res => setSearchResults(res.content.filter(p => !cartItems.some(i => i.productId === p.id))))
                     .catch(() => setSearchResults([]))
                     .finally(() => setSearching(false));
             } else { setSearchResults([]); }
         }, 400);
-        return () => clearTimeout(delayDebounce);
+        return () => clearTimeout(t);
     }, [searchKeyword, open, cartItems]);
 
     const addToCart = (product: ProductResponse) => {
         const inventory = inventoryMap.get(product.id);
         const currentStock = inventory?.quantity || 0;
         setCartItems(prev => {
-            const existing = prev.find(item => item.productId === product.id);
+            const existing = prev.find(i => i.productId === product.id);
             if (existing) {
-                return prev.map(item => item.productId === product.id
-                    ? { ...item, quantity: item.quantity + 1, subtotal: (item.quantity + 1) * item.importPrice } : item);
+                return prev.map(i => i.productId === product.id
+                    ? { ...i, quantity: i.quantity + 1, subtotal: (i.quantity + 1) * i.importPrice } : i);
             }
             const importPrice = product.wholesalePrice || product.macPrice || product.retailPrice * 0.7;
-            return [...prev, { productId: product.id, productName: product.name, isbnBarcode: product.isbnBarcode, quantity: 1, importPrice, subtotal: importPrice, imageUrl: product.imageUrl, sku: product.sku, currentStock }];
+            return [...prev, {
+                productId: product.id, productName: product.name, isbnBarcode: product.isbnBarcode,
+                quantity: 1, importPrice, subtotal: importPrice,
+                imageUrl: product.imageUrl, sku: product.sku, currentStock,
+                macPrice: product.macPrice,
+                showBatchFields: false,
+            }];
         });
         setSearchKeyword(''); setSearchResults([]);
     };
 
-    const updateQuantity = (productId: string, quantity: number) => {
-        if (quantity < 1) return;
-        setCartItems(prev => prev.map(item => item.productId === productId ? { ...item, quantity, subtotal: quantity * item.importPrice } : item));
+    const updateField = (productId: string, field: keyof CartItem, value: any) => {
+        setCartItems(prev => prev.map(item => {
+            if (item.productId !== productId) return item;
+            const updated = { ...item, [field]: value };
+            if (field === 'quantity') updated.subtotal = (value || 1) * item.importPrice;
+            if (field === 'importPrice') updated.subtotal = item.quantity * (value || 0);
+            return updated;
+        }));
     };
 
-    const updateImportPrice = (productId: string, importPrice: number) => {
-        if (importPrice < 0) return;
-        setCartItems(prev => prev.map(item => item.productId === productId ? { ...item, importPrice, subtotal: item.quantity * importPrice } : item));
-    };
+    const removeFromCart = (productId: string) => setCartItems(prev => prev.filter(i => i.productId !== productId));
 
-    const removeFromCart = (productId: string) => {
-        setCartItems(prev => prev.filter(item => item.productId !== productId));
-    };
-
-    const totalAmount = cartItems.reduce((sum, item) => sum + item.subtotal, 0);
-    const totalQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+    const totalAmount = cartItems.reduce((s, i) => s + i.subtotal, 0);
+    const totalQty = cartItems.reduce((s, i) => s + i.quantity, 0);
+    const priceWarnings = cartItems.filter(i => getPriceWarning(i.importPrice, i.macPrice)).length;
+    const expiryWarnings = cartItems.filter(i => {
+        const w = getExpiryWarning(i.expiryDate);
+        return w && (w.color === '#e65100' || w.color === '#d32f2f');
+    }).length;
 
     const handleCreate = async () => {
         if (!supplierId) { setSnack({ message: 'Vui lòng chọn nhà cung cấp', severity: 'error' }); return; }
         if (!warehouseId) { setSnack({ message: 'Vui lòng chọn kho nhập', severity: 'error' }); return; }
-        if (cartItems.length === 0) { setSnack({ message: 'Vui lòng thêm sản phẩm', severity: 'error' }); return; }
+        if (!cartItems.length) { setSnack({ message: 'Vui lòng thêm sản phẩm', severity: 'error' }); return; }
         setCreating(true);
         try {
             const payload: CreatePurchaseOrderRequest = {
                 supplierId, warehouseId,
-                items: cartItems.map(item => ({ productId: item.productId, quantity: item.quantity, importPrice: item.importPrice })),
+                items: cartItems.map(item => ({
+                    productId: item.productId,
+                    quantity: item.quantity,
+                    importPrice: item.importPrice,
+                    batchNumber: item.batchNumber || undefined,
+                    lotNumber: item.lotNumber || undefined,
+                    expiryDate: item.expiryDate || undefined,
+                    manufacturingDate: item.manufacturingDate || undefined,
+                })),
                 note: note || undefined,
             };
             await purchaseService.create(payload);
@@ -346,17 +475,29 @@ const CreatePurchaseDialog: React.FC<{
     };
 
     return (
-        <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth
-            PaperProps={{ sx: { borderRadius: 2.5, height: '85vh' } }}>
+        <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth PaperProps={{ sx: { borderRadius: 2.5, height: '90vh' } }}>
             <DialogTitle sx={{ pb: 0.5, pt: 2.5, px: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Box>
                     <Typography fontWeight={800} fontSize={16}>Tạo Phiếu Nhập Kho Mới</Typography>
-                    <Typography variant="caption" color="text.secondary">Quản lý nhập hàng từ Nhà cung cấp</Typography>
+                    <Typography variant="caption" color="text.secondary">Quản lý nhập hàng từ Nhà cung cấp · Hỗ trợ Batch/Lô số</Typography>
                 </Box>
-                <IconButton size="small" onClick={onClose}><Close sx={{ fontSize: 18 }} /></IconButton>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    {priceWarnings > 0 && (
+                        <Chip icon={<Warning sx={{ fontSize: 13 }} />}
+                            label={`${priceWarnings} giá thấp`} size="small"
+                            sx={{ height: 22, fontSize: 10, bgcolor: '#fff3e0', color: '#e65100', fontWeight: 700 }} />
+                    )}
+                    {expiryWarnings > 0 && (
+                        <Chip icon={<Warning sx={{ fontSize: 13 }} />}
+                            label={`${expiryWarnings} sắp hết hạn`} size="small"
+                            sx={{ height: 22, fontSize: 10, bgcolor: '#ffebee', color: '#d32f2f', fontWeight: 700 }} />
+                    )}
+                    <IconButton size="small" onClick={onClose}><Close sx={{ fontSize: 18 }} /></IconButton>
+                </Box>
             </DialogTitle>
             <Divider sx={{ mx: 3, mt: 1 }} />
             <DialogContent sx={{ px: 3, pt: 2 }}>
+                {/* NCC + Kho */}
                 <Grid container spacing={2} sx={{ mb: 2 }}>
                     <Grid size={{ xs: 12, sm: 6 }}>
                         <Typography variant="caption" fontWeight={700} color="#555" display="block" mb={0.75}>
@@ -386,13 +527,13 @@ const CreatePurchaseDialog: React.FC<{
 
                 {!supplierId ? (
                     <Box sx={{ p: 4, textAlign: 'center', bgcolor: '#fafafa', borderRadius: 1.5, mb: 2 }}>
-                        <Typography variant="body2" color="text.secondary">Vui lòng chọn Nhà cung cấp ở trên để xem danh sách sản phẩm.</Typography>
+                        <Typography variant="body2" color="text.secondary">Vui lòng chọn Nhà cung cấp để xem danh sách sản phẩm.</Typography>
                     </Box>
                 ) : loadingSupplierProducts ? (
                     <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress size={32} /></Box>
                 ) : (
                     <>
-                        <Paper elevation={0} sx={{ border: '1px solid #f0f0f0', borderRadius: 1.5, mb: 2, maxHeight: 250, overflowY: 'auto' }}>
+                        <Paper elevation={0} sx={{ border: '1px solid #f0f0f0', borderRadius: 1.5, mb: 2, maxHeight: 220, overflowY: 'auto' }}>
                             {supplierProducts.length === 0 ? (
                                 <Box sx={{ p: 3, textAlign: 'center' }}>
                                     <Typography variant="body2" color="text.secondary">Nhà cung cấp này chưa có sản phẩm nào.</Typography>
@@ -401,10 +542,9 @@ const CreatePurchaseDialog: React.FC<{
                                 <Table size="small">
                                     <TableHead>
                                         <TableRow sx={{ bgcolor: '#fafafa' }}>
-                                            <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>Sản phẩm</TableCell>
-                                            <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>Mã vạch</TableCell>
-                                            <TableCell align="right" sx={{ fontWeight: 700, fontSize: 11 }}>Giá bán</TableCell>
-                                            <TableCell align="center" sx={{ fontWeight: 700, fontSize: 11 }}>Thao tác</TableCell>
+                                            {['Sản phẩm', 'Mã vạch', 'Giá bán', 'Thao tác'].map(c => (
+                                                <TableCell key={c} sx={{ fontWeight: 700, fontSize: 11 }}>{c}</TableCell>
+                                            ))}
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
@@ -426,7 +566,11 @@ const CreatePurchaseDialog: React.FC<{
                                                     <Typography variant="body2" fontWeight={700} color="#1976d2">{fmtCurrency(product.retailPrice)}</Typography>
                                                 </TableCell>
                                                 <TableCell align="center">
-                                                    <Button size="small" variant="outlined" onClick={() => addToCart(product)}>Thêm</Button>
+                                                    <Button size="small" variant="outlined"
+                                                        disabled={cartItems.some(i => i.productId === product.id)}
+                                                        onClick={() => addToCart(product)}>
+                                                        {cartItems.some(i => i.productId === product.id) ? 'Đã thêm' : 'Thêm'}
+                                                    </Button>
                                                 </TableCell>
                                             </TableRow>
                                         ))}
@@ -434,7 +578,6 @@ const CreatePurchaseDialog: React.FC<{
                                 </Table>
                             )}
                         </Paper>
-
                         <TextField fullWidth size="small"
                             placeholder="Hoặc tìm thêm sản phẩm theo tên, ISBN, SKU..."
                             value={searchKeyword} onChange={e => setSearchKeyword(e.target.value)}
@@ -442,8 +585,7 @@ const CreatePurchaseDialog: React.FC<{
                                 startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 17, color: '#bbb' }} /></InputAdornment>,
                                 endAdornment: searching && <CircularProgress size={20} />,
                             }}
-                            sx={{ mb: 1.5 }}
-                        />
+                            sx={{ mb: 1.5 }} />
                         {searchResults.length > 0 && (
                             <Paper elevation={2} sx={{ mb: 2, maxHeight: 200, overflowY: 'auto', borderRadius: 1.5 }}>
                                 {searchResults.map(product => (
@@ -464,66 +606,154 @@ const CreatePurchaseDialog: React.FC<{
                     </>
                 )}
 
+                {/* Cart — với Batch fields */}
                 {cartItems.length > 0 && (
                     <>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, mb: 1.5 }}>
-                            <Typography variant="subtitle2" fontWeight={700}>Sản phẩm đã chọn ({cartItems.length})</Typography>
-                            <Typography variant="caption" color="text.secondary">Tổng số lượng: {totalQuantity}</Typography>
+                            <Typography variant="subtitle2" fontWeight={700}>
+                                Sản phẩm đã chọn ({cartItems.length})
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">Tổng số lượng: {totalQty}</Typography>
                         </Box>
-                        <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #f0f0f0', mb: 2, maxHeight: 300, overflowY: 'auto' }}>
+
+                        <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #f0f0f0', mb: 2, maxHeight: 400, overflowY: 'auto' }}>
                             <Table size="small" stickyHeader>
                                 <TableHead>
                                     <TableRow sx={{ bgcolor: '#fafafa' }}>
-                                        <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>Sản phẩm</TableCell>
-                                        <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>Mã vạch</TableCell>
-                                        <TableCell align="center" sx={{ fontWeight: 700, fontSize: 11 }}>Số lượng</TableCell>
-                                        <TableCell align="right" sx={{ fontWeight: 700, fontSize: 11 }}>Giá nhập</TableCell>
-                                        <TableCell align="right" sx={{ fontWeight: 700, fontSize: 11 }}>Thành tiền</TableCell>
-                                        <TableCell align="center"></TableCell>
+                                        {['Sản phẩm', 'Số lượng', 'Giá nhập', 'Thành tiền', 'Batch/Lô', ''].map(c => (
+                                            <TableCell key={c} sx={{ fontWeight: 700, fontSize: 11 }}>{c}</TableCell>
+                                        ))}
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
-                                    {cartItems.map(item => (
-                                        <TableRow key={item.productId}>
-                                            <TableCell sx={{ py: 1.25 }}>
-                                                <Typography variant="body2" fontWeight={600} fontSize={13}>{item.productName}</Typography>
-                                                {item.currentStock !== undefined && (
-                                                    <Typography variant="caption" color={item.currentStock === 0 ? '#d32f2f' : '#888'}>
-                                                        Tồn: {item.currentStock}
-                                                    </Typography>
-                                                )}
-                                            </TableCell>
-                                            <TableCell sx={{ py: 1.25 }}>
-                                                <Typography variant="caption" fontFamily="monospace" color="#888">{item.isbnBarcode}</Typography>
-                                            </TableCell>
-                                            <TableCell align="center" sx={{ py: 1.25 }}>
-                                                <TextField size="small" type="number" value={item.quantity}
-                                                    onChange={e => updateQuantity(item.productId, parseInt(e.target.value) || 1)}
-                                                    inputProps={{ min: 1, style: { width: 70, textAlign: 'center' } }} />
-                                            </TableCell>
-                                            <TableCell align="right" sx={{ py: 1.25 }}>
-                                                <TextField size="small" type="number" value={item.importPrice}
-                                                    onChange={e => updateImportPrice(item.productId, parseInt(e.target.value) || 0)}
-                                                    inputProps={{ min: 0, style: { width: 110, textAlign: 'right' } }}
-                                                    InputProps={{ endAdornment: <InputAdornment position="end">₫</InputAdornment> }} />
-                                            </TableCell>
-                                            <TableCell align="right" sx={{ py: 1.25 }}>
-                                                <Typography variant="body2" fontWeight={700} color="#1976d2">{fmtCurrency(item.subtotal)}</Typography>
-                                            </TableCell>
-                                            <TableCell align="center" sx={{ py: 1.25 }}>
-                                                <IconButton size="small" onClick={() => removeFromCart(item.productId)}>
-                                                    <Delete fontSize="small" sx={{ color: '#d32f2f' }} />
-                                                </IconButton>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
+                                    {cartItems.map(item => {
+                                        const priceWarn = getPriceWarning(item.importPrice, item.macPrice);
+                                        const expiryWarn = getExpiryWarning(item.expiryDate);
+                                        return (
+                                            <React.Fragment key={item.productId}>
+                                                <TableRow sx={{ bgcolor: priceWarn ? '#fff8f0' : 'inherit' }}>
+                                                    <TableCell sx={{ py: 1.25, minWidth: 180 }}>
+                                                        <Typography variant="body2" fontWeight={600} fontSize={13}>{item.productName}</Typography>
+                                                        {item.currentStock !== undefined && (
+                                                            <Typography variant="caption" color={item.currentStock === 0 ? '#d32f2f' : '#888'}>
+                                                                Tồn: {item.currentStock}
+                                                            </Typography>
+                                                        )}
+                                                        {priceWarn && (
+                                                            <Tooltip title={`Giá nhập thấp hơn giá vốn MAC (${fmtCurrency(item.macPrice)}) trên 10%`}>
+                                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.25 }}>
+                                                                    <Warning sx={{ fontSize: 12, color: '#e65100' }} />
+                                                                    <Typography variant="caption" color="#e65100" fontSize={10}>Giá thấp</Typography>
+                                                                </Box>
+                                                            </Tooltip>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell sx={{ py: 1.25 }}>
+                                                        <TextField size="small" type="number" value={item.quantity}
+                                                            onChange={e => updateField(item.productId, 'quantity', parseInt(e.target.value) || 1)}
+                                                            inputProps={{ min: 1, style: { width: 70, textAlign: 'center' } }} />
+                                                    </TableCell>
+                                                    <TableCell align="right" sx={{ py: 1.25 }}>
+                                                        <TextField size="small" type="number" value={item.importPrice}
+                                                            onChange={e => updateField(item.productId, 'importPrice', parseInt(e.target.value) || 0)}
+                                                            inputProps={{ min: 0, style: { width: 110, textAlign: 'right' } }}
+                                                            InputProps={{ endAdornment: <InputAdornment position="end">₫</InputAdornment> }}
+                                                            sx={{ '& .MuiOutlinedInput-root': { borderColor: priceWarn ? '#e65100' : undefined } }} />
+                                                    </TableCell>
+                                                    <TableCell align="right" sx={{ py: 1.25 }}>
+                                                        <Typography variant="body2" fontWeight={700} color="#1976d2">{fmtCurrency(item.subtotal)}</Typography>
+                                                    </TableCell>
+                                                    <TableCell sx={{ py: 1.25 }}>
+                                                        {/* Batch toggle */}
+                                                        <Button size="small" variant="text"
+                                                            startIcon={item.showBatchFields ? <ExpandLess sx={{ fontSize: 14 }} /> : <QrCode sx={{ fontSize: 14 }} />}
+                                                            onClick={() => updateField(item.productId, 'showBatchFields', !item.showBatchFields)}
+                                                            sx={{
+                                                                textTransform: 'none', fontSize: 11, py: 0.25,
+                                                                color: item.batchNumber || item.expiryDate ? '#1976d2' : '#888',
+                                                            }}>
+                                                            {item.showBatchFields ? 'Ẩn' : 'Lô/HSD'}
+                                                            {(item.batchNumber || item.expiryDate) && (
+                                                                <Chip label="✓" size="small"
+                                                                    sx={{ ml: 0.5, height: 16, fontSize: 9, bgcolor: '#e3f2fd', color: '#1565c0' }} />
+                                                            )}
+                                                        </Button>
+                                                        {expiryWarn && (
+                                                            <Typography variant="caption" display="block" color={expiryWarn.color} fontSize={10}>
+                                                                {expiryWarn.label}
+                                                            </Typography>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell align="center" sx={{ py: 1.25 }}>
+                                                        <IconButton size="small" onClick={() => removeFromCart(item.productId)}>
+                                                            <Delete fontSize="small" sx={{ color: '#d32f2f' }} />
+                                                        </IconButton>
+                                                    </TableCell>
+                                                </TableRow>
+
+                                                {/* ── Batch fields (expand) ── */}
+                                                <TableRow>
+                                                    <TableCell colSpan={6} sx={{ p: 0, border: 0 }}>
+                                                        <Collapse in={item.showBatchFields} unmountOnExit>
+                                                            <Box sx={{
+                                                                display: 'flex', gap: 1.5, p: 1.5, flexWrap: 'wrap',
+                                                                bgcolor: '#f0f7ff', borderBottom: '1px solid #e3f2fd',
+                                                            }}>
+                                                                <Box sx={{ flex: 1, minWidth: 140 }}>
+                                                                    <Typography variant="caption" fontWeight={700} color="#555" display="block" mb={0.5}>
+                                                                        Số lô (Batch)
+                                                                    </Typography>
+                                                                    <TextField size="small" fullWidth
+                                                                        placeholder="VD: LOT-2024-001"
+                                                                        value={item.batchNumber || ''}
+                                                                        onChange={e => updateField(item.productId, 'batchNumber', e.target.value)} />
+                                                                </Box>
+                                                                <Box sx={{ flex: 1, minWidth: 140 }}>
+                                                                    <Typography variant="caption" fontWeight={700} color="#555" display="block" mb={0.5}>
+                                                                        Mã lô (Lot)
+                                                                    </Typography>
+                                                                    <TextField size="small" fullWidth
+                                                                        placeholder="VD: L240815"
+                                                                        value={item.lotNumber || ''}
+                                                                        onChange={e => updateField(item.productId, 'lotNumber', e.target.value)} />
+                                                                </Box>
+                                                                <Box sx={{ flex: 1, minWidth: 150 }}>
+                                                                    <Typography variant="caption" fontWeight={700} color="#555" display="block" mb={0.5}>
+                                                                        Ngày sản xuất
+                                                                    </Typography>
+                                                                    <TextField size="small" fullWidth type="date"
+                                                                        value={item.manufacturingDate || ''}
+                                                                        onChange={e => updateField(item.productId, 'manufacturingDate', e.target.value)}
+                                                                        inputProps={{ max: new Date().toISOString().slice(0, 10) }} />
+                                                                </Box>
+                                                                <Box sx={{ flex: 1, minWidth: 150 }}>
+                                                                    <Typography variant="caption" fontWeight={700} color="#555" display="block" mb={0.5}>
+                                                                        Hạn sử dụng <span style={{ color: '#d32f2f' }}>*</span>
+                                                                    </Typography>
+                                                                    <TextField size="small" fullWidth type="date"
+                                                                        value={item.expiryDate || ''}
+                                                                        onChange={e => updateField(item.productId, 'expiryDate', e.target.value)}
+                                                                        inputProps={{ min: new Date().toISOString().slice(0, 10) }}
+                                                                        error={!!getExpiryWarning(item.expiryDate)}
+                                                                        helperText={getExpiryWarning(item.expiryDate)?.label}
+                                                                        FormHelperTextProps={{ sx: { color: getExpiryWarning(item.expiryDate)?.color } }} />
+                                                                </Box>
+                                                            </Box>
+                                                        </Collapse>
+                                                    </TableCell>
+                                                </TableRow>
+                                            </React.Fragment>
+                                        );
+                                    })}
                                 </TableBody>
                             </Table>
                         </TableContainer>
 
                         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
                             <Paper elevation={0} sx={{ p: 1.5, bgcolor: '#f5f5f5', borderRadius: 1.5 }}>
-                                <Typography variant="body2" fontWeight={700}>Tổng tiền: <strong style={{ color: '#d32f2f' }}>{fmtCurrency(totalAmount)}</strong></Typography>
+                                <Typography variant="body2" fontWeight={700}>
+                                    Tổng tiền: <strong style={{ color: '#d32f2f' }}>{fmtCurrency(totalAmount)}</strong>
+                                </Typography>
                             </Paper>
                         </Box>
                     </>
@@ -533,9 +763,11 @@ const CreatePurchaseDialog: React.FC<{
                 <TextField fullWidth size="small" multiline rows={2} placeholder="Ghi chú cho phiếu nhập kho..."
                     value={note} onChange={e => setNote(e.target.value)} />
             </DialogContent>
+
             <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
                 <Button onClick={onClose} variant="outlined">Đóng</Button>
-                <Button onClick={handleCreate} variant="contained" disabled={creating || !supplierId || !warehouseId || cartItems.length === 0}
+                <Button onClick={handleCreate} variant="contained"
+                    disabled={creating || !supplierId || !warehouseId || cartItems.length === 0}
                     sx={{ bgcolor: '#1976d2' }}>
                     {creating ? 'Đang tạo...' : 'Tạo phiếu nhập'}
                 </Button>
@@ -549,7 +781,7 @@ const CreatePurchaseDialog: React.FC<{
 };
 
 // ══════════════════════════════════════════════════════════════
-// MAIN PAGE
+// MAIN PAGE (không đổi logic, chỉ pass suppliers đúng type)
 // ══════════════════════════════════════════════════════════════
 const ImportPage: React.FC = () => {
     const [page, setPage] = useState(0);
@@ -568,7 +800,6 @@ const ImportPage: React.FC = () => {
         queryFn: () => purchaseService.getAll({ page, size: PAGE_SIZE, status: statusFilter || undefined }),
     });
 
-    // ← fixed: use getAllSimple() so result is Supplier[] not PageResponse<Supplier>
     const { data: suppliers = [] } = useQuery({
         queryKey: ['suppliers-simple'],
         queryFn: () => supplierService.getAllSimple(),
@@ -605,7 +836,6 @@ const ImportPage: React.FC = () => {
         } finally { setActionLoading(false); }
     };
 
-    // suppliers is now Supplier[] (from getAllSimple), so .forEach works
     const supplierMap = React.useMemo(() => {
         const map = new Map<string, Supplier>();
         suppliers.forEach(s => map.set(s.id, s));
@@ -627,7 +857,7 @@ const ImportPage: React.FC = () => {
                 <Box>
                     <Typography variant="caption" color="#aaa" fontSize={11}>Kho / <strong>Nhập kho</strong></Typography>
                     <Typography variant="h5" fontWeight={800} color="#1a1a2e" mt={0.5}>Phiếu nhập kho</Typography>
-                    <Typography variant="body2" color="text.secondary" fontSize={12}>Quản lý nhập hàng từ Nhà cung cấp</Typography>
+                    <Typography variant="body2" color="text.secondary" fontSize={12}>Quản lý nhập hàng từ Nhà cung cấp · Hỗ trợ Batch/Lô số</Typography>
                 </Box>
                 <Button variant="contained" startIcon={<Add />} onClick={() => setCreateOpen(true)} sx={{ bgcolor: '#1976d2' }}>
                     Tạo phiếu nhập
@@ -666,36 +896,35 @@ const ImportPage: React.FC = () => {
                                 ))
                             ) : orders.length === 0 ? (
                                 <TableRow><TableCell colSpan={8} align="center" sx={{ py: 6 }}>Chưa có phiếu nhập kho nào</TableCell></TableRow>
-                            ) : (
-                                orders.map(order => {
-                                    const statusInfo = STATUS_COLORS[order.status];
-                                    const supplier = supplierMap.get(order.supplierId);
-                                    const warehouse = warehouseMap.get(order.warehouseId);
-                                    const totalQty = order.items.reduce((s, i) => s + i.quantity, 0);
-                                    return (
-                                        <TableRow key={order.id} hover sx={{ cursor: 'pointer' }} onClick={() => { setSelectedOrder(order); setDetailOpen(true); }}>
-                                            <TableCell><Typography fontWeight={600} fontFamily="monospace">{order.code}</Typography></TableCell>
-                                            <TableCell><Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><Business sx={{ fontSize: 14 }} />{supplier?.name || order.supplierId.slice(0, 8)}</Box></TableCell>
-                                            <TableCell><Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><LocalShipping sx={{ fontSize: 14 }} />{warehouse?.name || order.warehouseId.slice(0, 8)}</Box></TableCell>
-                                            <TableCell>{totalQty}</TableCell>
-                                            <TableCell><Typography fontWeight={700} color="#1976d2">{fmtCurrency(order.totalAmount)}</Typography></TableCell>
-                                            <TableCell><Chip label={statusInfo.label} size="small" sx={{ bgcolor: statusInfo.bg, color: statusInfo.color }} /></TableCell>
-                                            <TableCell>{order.createdAt ? new Date(order.createdAt).toLocaleDateString('vi-VN') : '—'}</TableCell>
-                                            <TableCell onClick={e => e.stopPropagation()}>
-                                                <Box sx={{ display: 'flex', gap: 0.5 }}>
-                                                    <IconButton size="small" onClick={() => { setSelectedOrder(order); setDetailOpen(true); }}><Visibility /></IconButton>
-                                                    {order.status === 'PENDING' && (
-                                                        <IconButton size="small" onClick={() => { setSelectedOrder(order); handleApprove(); }} sx={{ color: '#2e7d32' }}><CheckCircle /></IconButton>
-                                                    )}
-                                                    {(order.status === 'DRAFT' || order.status === 'PENDING') && (
-                                                        <IconButton size="small" onClick={() => { setSelectedOrder(order); setCancelOpen(true); }} sx={{ color: '#d32f2f' }}><Cancel /></IconButton>
-                                                    )}
-                                                </Box>
-                                            </TableCell>
-                                        </TableRow>
-                                    );
-                                })
-                            )}
+                            ) : orders.map(order => {
+                                const statusInfo = STATUS_COLORS[order.status];
+                                const supplier = supplierMap.get(order.supplierId);
+                                const warehouse = warehouseMap.get(order.warehouseId);
+                                const totalQty = order.items.reduce((s, i) => s + i.quantity, 0);
+                                return (
+                                    <TableRow key={order.id} hover sx={{ cursor: 'pointer' }}
+                                        onClick={() => { setSelectedOrder(order); setDetailOpen(true); }}>
+                                        <TableCell><Typography fontWeight={600} fontFamily="monospace">{order.code}</Typography></TableCell>
+                                        <TableCell><Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><Business sx={{ fontSize: 14 }} />{supplier?.name || order.supplierId.slice(0, 8)}</Box></TableCell>
+                                        <TableCell><Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><LocalShipping sx={{ fontSize: 14 }} />{warehouse?.name || order.warehouseId.slice(0, 8)}</Box></TableCell>
+                                        <TableCell>{totalQty}</TableCell>
+                                        <TableCell><Typography fontWeight={700} color="#1976d2">{fmtCurrency(order.totalAmount)}</Typography></TableCell>
+                                        <TableCell><Chip label={statusInfo.label} size="small" sx={{ bgcolor: statusInfo.bg, color: statusInfo.color }} /></TableCell>
+                                        <TableCell>{order.createdAt ? new Date(order.createdAt).toLocaleDateString('vi-VN') : '—'}</TableCell>
+                                        <TableCell onClick={e => e.stopPropagation()}>
+                                            <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                                <IconButton size="small" onClick={() => { setSelectedOrder(order); setDetailOpen(true); }}><Visibility /></IconButton>
+                                                {order.status === 'PENDING' && (
+                                                    <IconButton size="small" onClick={() => { setSelectedOrder(order); handleApprove(); }} sx={{ color: '#2e7d32' }}><CheckCircle /></IconButton>
+                                                )}
+                                                {(order.status === 'DRAFT' || order.status === 'PENDING') && (
+                                                    <IconButton size="small" onClick={() => { setSelectedOrder(order); setCancelOpen(true); }} sx={{ color: '#d32f2f' }}><Cancel /></IconButton>
+                                                )}
+                                            </Box>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
                         </TableBody>
                     </Table>
                 </TableContainer>
@@ -721,7 +950,6 @@ const ImportPage: React.FC = () => {
                 </DialogActions>
             </Dialog>
 
-            {/* suppliers is now Supplier[] so we can pass it directly */}
             <CreatePurchaseDialog open={createOpen} onClose={() => setCreateOpen(false)}
                 onCreated={() => refetchOrders()} warehouses={warehouses} suppliers={suppliers} />
 

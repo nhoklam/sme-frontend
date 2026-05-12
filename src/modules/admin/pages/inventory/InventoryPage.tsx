@@ -1,56 +1,94 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Tabs, Tab } from '@mui/material';
-import { Inventory2Outlined, Warning } from '@mui/icons-material';
+import { useLocation } from 'react-router-dom';
+import {
+    Box, Typography,
+} from '@mui/material';
+import {
+    Inventory2, Assignment, Warning as WarningIcon, TrendingDown,
+} from '@mui/icons-material';
 import warehouseService from '../../../../services/warehouseService';
-import { Warehouse } from '../../../../types';
+import { Warehouse as WarehouseType } from '../../../../types';
 import InventoryListTab from './tabs/InventoryListTab';
 import LowStockTab from './tabs/LowStockTab';
-
-const TabPanel: React.FC<{ value: number; index: number; children: React.ReactNode }> = ({ value, index, children }) =>
-    value === index ? <Box>{children}</Box> : null;
+import StockCountTab from './tabs/StockCountTab';
+import DeadStockTab from './tabs/DeadStockTab';
 
 const InventoryPage: React.FC = () => {
-    const [tab, setTab] = useState(0);
-    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+    const location = useLocation();
+
+    // Đọc tab mặc định từ router state (từ redirect của StockAlertPage)
+    const initialTab = (location.state as any)?.tab ?? 0;
+    const [tab, setTab] = useState<number>(initialTab);
+    const [warehouses, setWarehouses] = useState<WarehouseType[]>([]);
+
+    // Cập nhật tab nếu navigate lại với state khác
+    useEffect(() => {
+        const stateTab = (location.state as any)?.tab;
+        if (stateTab !== undefined) setTab(stateTab);
+    }, [location.state]);
 
     useEffect(() => {
         warehouseService.getAll().then(setWarehouses).catch(() => { });
     }, []);
 
+    const TAB_CONFIG = [
+        { label: 'Danh sách tồn kho', icon: <Inventory2 sx={{ fontSize: 16 }} />, desc: 'Xem & điều chỉnh tồn kho' },
+        { label: 'Sắp hết hàng', icon: <WarningIcon sx={{ fontSize: 16 }} />, desc: 'Cảnh báo tồn kho thấp' },
+        { label: 'Kiểm kê kho', icon: <Assignment sx={{ fontSize: 16 }} />, desc: 'So sánh tồn kho thực tế' },
+        { label: 'Hàng tồn đọng', icon: <TrendingDown sx={{ fontSize: 16 }} />, desc: 'Không bán được lâu ngày' },
+    ];
+
+    const tabComponents = [
+        <InventoryListTab warehouses={warehouses} />,
+        <LowStockTab warehouses={warehouses} />,
+        <StockCountTab warehouses={warehouses} />,
+        <DeadStockTab warehouses={warehouses} />,
+    ];
+
     return (
-        <Box sx={{ p: 3, bgcolor: '#f8f9fb', minHeight: '100vh' }}>
-            {/* Header */}
-            <Box sx={{ mb: 2.5 }}>
-                <Typography variant="caption" color="#aaa" fontSize={11}>
-                    Dashboard / <strong style={{ color: '#555' }}>Kho</strong>
+        <Box sx={{ p: 3, bgcolor: '#f9fafb', minHeight: '100vh' }}>
+            <Box sx={{ mb: 3 }}>
+                <Typography variant="caption" color="#9ca3af" fontSize={11}>
+                    Dashboard /{' '}
+                    <strong style={{ color: '#6b7280' }}>Quản lý tồn kho</strong>
                 </Typography>
-                <Typography variant="h5" fontWeight={800} color="#1a1a2e" mt={0.5}>
+                <Typography variant="h5" fontWeight={800} color="#111" mt={0.5} letterSpacing="-0.5px">
                     Quản lý Tồn kho
                 </Typography>
-                <Typography variant="body2" color="text.secondary" fontSize={12}>
-                    Xem, điều chỉnh tồn kho và nhận cảnh báo hàng tồn thấp
+                <Typography variant="body2" color="#6b7280" fontSize={12}>
+                    Xem tồn kho, cảnh báo sắp hết và kiểm kê thực tế
                 </Typography>
             </Box>
 
-            {/* Tabs */}
-            <Box sx={{ borderBottom: '1px solid #eee', mb: 3 }}>
-                <Tabs value={tab} onChange={(_, v) => setTab(v)}
-                    sx={{
-                        '& .MuiTab-root': { textTransform: 'none', fontWeight: 600, fontSize: 13, minWidth: 0, px: 2.5, color: '#888' },
-                        '& .Mui-selected': { color: '#1976d2 !important', fontWeight: 700 },
-                        '& .MuiTabs-indicator': { bgcolor: '#1976d2', height: 2 },
-                    }}>
-                    <Tab icon={<Inventory2Outlined sx={{ fontSize: 16 }} />} iconPosition="start" label="Tồn kho" />
-                    <Tab icon={<Warning sx={{ fontSize: 16 }} />} iconPosition="start" label="Cảnh báo tồn thấp" />
-                </Tabs>
+            {/* Tab nav */}
+            <Box sx={{ display: 'flex', gap: 1.5, mb: 3, flexWrap: 'wrap' }}>
+                {TAB_CONFIG.map((t, i) => (
+                    <Box
+                        key={i}
+                        onClick={() => setTab(i)}
+                        sx={{
+                            display: 'flex', alignItems: 'center', gap: 1.25,
+                            px: 2, py: 1.25, borderRadius: 2, cursor: 'pointer',
+                            border: `1.5px solid ${tab === i ? '#1d4ed8' : '#e5e7eb'}`,
+                            bgcolor: tab === i ? '#eff6ff' : '#fff',
+                            transition: 'all 0.15s',
+                            '&:hover': { borderColor: '#1d4ed8', bgcolor: '#eff6ff' },
+                        }}
+                    >
+                        <Box sx={{ color: tab === i ? '#1d4ed8' : '#6b7280' }}>{t.icon}</Box>
+                        <Box>
+                            <Typography fontSize={13} fontWeight={700} color={tab === i ? '#1d4ed8' : '#374151'}>
+                                {t.label}
+                            </Typography>
+                            <Typography variant="caption" color="#9ca3af" fontSize={10.5}>
+                                {t.desc}
+                            </Typography>
+                        </Box>
+                    </Box>
+                ))}
             </Box>
 
-            <TabPanel value={tab} index={0}>
-                <InventoryListTab warehouses={warehouses} />
-            </TabPanel>
-            <TabPanel value={tab} index={1}>
-                <LowStockTab warehouses={warehouses} />
-            </TabPanel>
+            {tabComponents[tab]}
         </Box>
     );
 };

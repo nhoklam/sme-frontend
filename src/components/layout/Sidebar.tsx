@@ -7,7 +7,7 @@ import {
     Dashboard, Inventory, ShoppingCart, People, Assessment, Settings,
     PointOfSale, Category, Warehouse, SwapHoriz, LocalShipping, ExpandLess,
     ExpandMore, AttachMoney, Warning, History, ManageAccounts, Notifications,
-    Security, TrendingUp, Business, Assignment, Logout
+    Security, TrendingUp, Business, Assignment, Logout, LocalOffer
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import authService from '../../services/authService';
@@ -24,15 +24,9 @@ const menuSections = [
         items: [
             { text: 'Tổng quan', icon: <Dashboard />, path: '/admin/dashboard' },
             { text: 'Đơn hàng', icon: <ShoppingCart />, path: '/admin/orders' },
-            {
-                text: 'Sản phẩm', icon: <Inventory />, path: '/admin/products',
-                children: [
-                    { text: 'Danh sách sản phẩm', path: '/admin/products' },
-                    { text: 'Thêm sản phẩm', path: '/admin/products/create' },
-                    { text: 'Danh mục', path: '/admin/categories' },
-                ]
-            },
+            { text: 'Sản phẩm', icon: <Inventory />, path: '/admin/products' },
             { text: 'Danh mục', icon: <Category />, path: '/admin/categories' },
+            { text: 'Khuyến mãi', icon: <LocalOffer />, path: '/admin/promotions' },
         ]
     },
     {
@@ -58,12 +52,14 @@ const menuSections = [
             { text: 'Sổ quỹ & Công nợ', icon: <AttachMoney />, path: '/admin/finance' },
             { text: 'Báo cáo', icon: <Assessment />, path: '/admin/reports' },
             { text: 'Doanh thu', icon: <TrendingUp />, path: '/admin/reports/revenue' },
+            { text: 'Phân tích khách hàng', icon: <People />, path: '/admin/reports/customers' },
         ]
     },
     {
         section: 'HỆ THỐNG',
         items: [
             { text: 'Quản lý người dùng', icon: <ManageAccounts />, path: '/admin/users' },
+            { text: 'Quản lý kho/Chi nhánh', icon: <Warehouse />, path: '/admin/warehouses' },
             { text: 'Phân quyền', icon: <Security />, path: '/admin/users/roles' },
             { text: 'Thông báo', icon: <Notifications />, path: '/admin/notifications' },
             { text: 'Nhật ký hệ thống', icon: <Assignment />, path: '/admin/audit-logs' },
@@ -98,7 +94,7 @@ const Sidebar: React.FC = () => {
             return !restricted.some(r => path.startsWith(r));
         }
         if (userRole === 'ROLE_CASHIER') {
-            const allowed = ['/admin/pos', '/admin/dashboard'];
+            const allowed = ['/admin/pos'];
             return allowed.some(a => path.startsWith(a));
         }
         return false;

@@ -1,92 +1,108 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    Box, Typography, Button, IconButton, Chip, Rating,
+    Box, Typography, Button, IconButton,
 } from '@mui/material';
-import { ShoppingCart, FavoriteBorder, Favorite, Visibility } from '@mui/icons-material';
+import { ShoppingCart, FavoriteBorder, Favorite } from '@mui/icons-material';
 import { fmt, calcDiscount } from '../../../../utils/constants';
+import { useCartContext } from '../../../../store/CartContext';
 
-const BADGE_COLOR = {
-    Hot: '#d32f2f',
-    Bestseller: '#f57c00',
-    Mới: '#388e3c',
+const BADGE_STYLE: Record<string, { bg: string; color: string }> = {
+    Hot: { bg: '#e8401c', color: '#fff' },
+    Bestseller: { bg: '#f57c00', color: '#fff' },
+    Mới: { bg: '#2e7d32', color: '#fff' },
+    'Sale': { bg: '#c62828', color: '#fff' },
 };
 
-const CARD_W = 200;
-const IMG_H = 200;
-const CARD_H = 390;
+const CARD_W = 185;
+const IMG_H = 185;
 
-const ProductCard = ({ product }) => {
+const ProductCard = memo(({ product }: { product: any }) => {
     const [fav, setFav] = useState(false);
     const [imgError, setImgError] = useState(false);
+    const [hovered, setHovered] = useState(false);
     const navigate = useNavigate();
+    const { addToCart, openCart } = useCartContext();
 
     const thumbSrc = product.images?.[0] ?? product.img ?? '';
     const title = product.title ?? product.name ?? '';
     const discount = product.oldPrice ? calcDiscount(product.oldPrice, product.price) : 0;
-    const fallback = `https://placehold.co/${CARD_W}x${IMG_H}/f5f5f5/bbb?text=${encodeURIComponent(title)}`;
+    const fallback = `https://placehold.co/${CARD_W}x${IMG_H}/f5f5f5/bbb?text=${encodeURIComponent(title.slice(0, 12))}`;
 
-    const goToDetail = () => navigate(`/product/${product.id}`);
+    const goToDetail = useCallback(() => navigate(`/product/${product.id}`), [navigate, product.id]);
+
+    const handleAddToCart = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        addToCart(product);
+        openCart();
+    }, [addToCart, openCart, product]);
 
     return (
-        <Box sx={{
-            width: CARD_W,
-            height: CARD_H,
-            flexShrink: 0,
-
-            display: 'flex',
-            flexDirection: 'column',
-            position: 'relative',
-
-            bgcolor: '#fff',
-            borderRadius: 2,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-            overflow: 'hidden',
-            transition: 'all 0.22s ease',
-            cursor: 'default',
-            '&:hover': {
-                boxShadow: '0 8px 24px rgba(0,0,0,0.14)',
-                transform: 'translateY(-4px)',
-            },
-        }}>
-
+        <Box
+            sx={{
+                width: CARD_W,
+                flexShrink: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                position: 'relative',
+                bgcolor: '#fff',
+                borderRadius: 1.5,
+                border: '1px solid #ececec',
+                overflow: 'hidden',
+                transition: 'all 0.2s ease',
+                cursor: 'default',
+                '&:hover': {
+                    borderColor: '#e8401c',
+                    boxShadow: '0 4px 16px rgba(232,64,28,0.13)',
+                    transform: 'translateY(-3px)',
+                },
+            }}
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
+        >
+            {/* Badge */}
             {product.badge && (
                 <Box sx={{
                     position: 'absolute', top: 8, left: 8, zIndex: 3,
-                    bgcolor: BADGE_COLOR[product.badge] ?? '#757575',
-                    color: '#fff', fontWeight: 800, fontSize: 10,
-                    px: 0.9, py: 0.15, borderRadius: 1, lineHeight: 1.6,
-                    whiteSpace: 'nowrap',
+                    bgcolor: BADGE_STYLE[product.badge]?.bg ?? '#757575',
+                    color: BADGE_STYLE[product.badge]?.color ?? '#fff',
+                    fontWeight: 700, fontSize: 10,
+                    px: 0.9, py: 0.2, borderRadius: 0.75,
+                    lineHeight: 1.5, whiteSpace: 'nowrap',
+                    fontFamily: '"Segoe UI", sans-serif',
                 }}>
                     {product.badge}
                 </Box>
             )}
 
+            {/* Discount badge */}
             {discount > 0 && (
                 <Box sx={{
                     position: 'absolute', top: 8, right: 8, zIndex: 3,
-                    bgcolor: '#d32f2f', color: '#fff',
+                    bgcolor: '#e8401c', color: '#fff',
                     fontWeight: 800, fontSize: 10,
-                    px: 0.9, py: 0.15, borderRadius: 1, lineHeight: 1.6,
+                    px: 0.9, py: 0.2, borderRadius: 0.75, lineHeight: 1.5,
+                    fontFamily: '"Segoe UI", sans-serif',
                 }}>
                     -{discount}%
                 </Box>
             )}
 
+            {/* Image area */}
             <Box
                 onClick={goToDetail}
                 sx={{
                     width: CARD_W,
                     height: IMG_H,
                     flexShrink: 0,
-                    bgcolor: '#f9f9f9',
+                    bgcolor: '#f8f8f8',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     position: 'relative',
                     overflow: 'hidden',
                     cursor: 'pointer',
-                    '&:hover .hover-overlay': { opacity: 1 },
+                    borderBottom: '1px solid #f0f0f0',
                 }}
             >
                 <Box
@@ -98,134 +114,136 @@ const ProductCard = ({ product }) => {
                         width: '100%',
                         height: '100%',
                         objectFit: 'contain',
-                        display: 'block',
+                        padding: '8px',
+                        transition: 'transform 0.25s ease',
+                        transform: hovered ? 'scale(1.04)' : 'scale(1)',
                     }}
                 />
 
-                <Box className="hover-overlay" sx={{
-                    position: 'absolute', inset: 0,
-                    bgcolor: 'rgba(0,0,0,0.38)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    opacity: 0, transition: 'opacity 0.2s',
-                }}>
-                    <Button size="small" variant="contained"
-                        startIcon={<Visibility sx={{ fontSize: 13 }} />}
-                        sx={{
-                            bgcolor: '#fff', color: '#222',
-                            textTransform: 'none', fontWeight: 700, fontSize: 12,
-                            py: 0.5, px: 1.5, borderRadius: 1.5,
-                            '&:hover': { bgcolor: '#f0f0f0' },
-                        }}>
-                        Xem chi tiết
-                    </Button>
-                </Box>
-
-                <IconButton size="small"
+                {/* Fav button */}
+                <IconButton
+                    size="small"
                     onClick={e => { e.stopPropagation(); setFav(v => !v); }}
                     sx={{
                         position: 'absolute', bottom: 6, right: 6,
-                        width: 28, height: 28,
-                        bgcolor: 'rgba(255,255,255,0.95)',
-                        boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
-                        '&:hover': { bgcolor: '#fff' },
-                    }}>
+                        width: 26, height: 26,
+                        bgcolor: 'rgba(255,255,255,0.92)',
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
+                        '&:hover': { bgcolor: '#fff3f0' },
+                    }}
+                >
                     {fav
-                        ? <Favorite sx={{ fontSize: 15, color: '#d32f2f' }} />
-                        : <FavoriteBorder sx={{ fontSize: 15, color: '#999' }} />}
+                        ? <Favorite sx={{ fontSize: 14, color: '#e8401c' }} />
+                        : <FavoriteBorder sx={{ fontSize: 14, color: '#aaa' }} />
+                    }
                 </IconButton>
             </Box>
 
-            <Box sx={{
-                px: 1.5,
-                pt: 1.25,
-                pb: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                flexGrow: 1,
-                overflow: 'hidden',
-            }}>
-
-                <Typography sx={{
-                    fontSize: 11,
-                    color: '#888',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    lineHeight: '18px',
-                    height: 18,
-                    flexShrink: 0,
-                    mb: 0.5,
-                }}>
-                    {product.author}
-                </Typography>
-                <Box sx={{
-                    flexShrink: 0,
-                    height: 40,
-                    overflow: 'hidden',
-                    mb: 0.75,
-                    cursor: 'pointer',
-                    '&:hover .book-title': { color: '#d32f2f' },
-                }}
-                    onClick={goToDetail}>
-                    <Typography className="book-title" sx={{
-                        fontSize: 13,
-                        fontWeight: 700,
-                        lineHeight: 1.4,
-                        color: '#1a1a2e',
-                        transition: 'color 0.15s',
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
+            {/* Info */}
+            <Box sx={{ px: 1.5, pt: 1.25, pb: 0.75, display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
+                {/* Author */}
+                {product.author && (
+                    <Typography sx={{
+                        fontSize: 11,
+                        color: '#999',
+                        whiteSpace: 'nowrap',
                         overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        lineHeight: '16px',
+                        mb: 0.4,
+                        fontFamily: '"Segoe UI", sans-serif',
                     }}>
+                        {product.author}
+                    </Typography>
+                )}
+
+                {/* Title */}
+                <Box
+                    onClick={goToDetail}
+                    sx={{
+                        flexShrink: 0,
+                        height: 38,
+                        overflow: 'hidden',
+                        mb: 0.75,
+                        cursor: 'pointer',
+                        '&:hover .book-title': { color: '#e8401c' },
+                    }}
+                >
+                    <Typography
+                        className="book-title"
+                        sx={{
+                            fontSize: 12.5,
+                            fontWeight: 700,
+                            lineHeight: 1.45,
+                            color: '#1a1a1a',
+                            transition: 'color 0.15s',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            fontFamily: '"Segoe UI", sans-serif',
+                        }}
+                    >
                         {title}
                     </Typography>
                 </Box>
 
-                <Box sx={{
-                    display: 'flex', alignItems: 'center', gap: 0.5,
-                    height: 22, flexShrink: 0, mb: 0.5,
-                }}>
-                    <Rating value={product.rating ?? 0} readOnly size="small" precision={0.1} sx={{ fontSize: 13 }} />
-                    <Typography sx={{ fontSize: 11, color: '#999' }}>
-                        ({(product.sold ?? 0).toLocaleString()})
-                    </Typography>
-                </Box>
-
-                <Box sx={{
-                    display: 'flex', alignItems: 'baseline', gap: 0.75,
-                    height: 24, flexShrink: 0,
-                }}>
-                    <Typography sx={{ fontSize: 15, fontWeight: 900, color: '#d32f2f', lineHeight: 1 }}>
+                {/* Price */}
+                <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75, mb: 0.75 }}>
+                    <Typography sx={{
+                        fontSize: 15,
+                        fontWeight: 800,
+                        color: '#e8401c',
+                        lineHeight: 1,
+                        fontFamily: '"Segoe UI", sans-serif',
+                    }}>
                         {fmt(product.price)}
                     </Typography>
-                    {product.oldPrice && (
-                        <Typography sx={{ fontSize: 11, color: '#bbb', textDecoration: 'line-through', lineHeight: 1 }}>
+                    {product.oldPrice > 0 && (
+                        <Typography sx={{
+                            fontSize: 11,
+                            color: '#bbb',
+                            textDecoration: 'line-through',
+                            lineHeight: 1,
+                            fontFamily: '"Segoe UI", sans-serif',
+                        }}>
                             {fmt(product.oldPrice)}
                         </Typography>
                     )}
                 </Box>
             </Box>
 
-            <Box sx={{ px: 1.5, pb: 1.5, pt: 0.75, flexShrink: 0 }}>
+            {/* Add to cart button */}
+            <Box sx={{ px: 1.5, pb: 1.5, flexShrink: 0 }}>
                 <Button
-                    fullWidth variant="contained" size="small"
-                    startIcon={<ShoppingCart sx={{ fontSize: 15 }} />}
+                    fullWidth
+                    variant="outlined"
+                    size="small"
+                    startIcon={<ShoppingCart sx={{ fontSize: 14 }} />}
+                    onClick={handleAddToCart}
                     sx={{
-                        bgcolor: '#d32f2f',
-                        '&:hover': { bgcolor: '#b71c1c' },
+                        borderColor: '#e8401c',
+                        color: '#e8401c',
+                        bgcolor: 'transparent',
+                        '&:hover': {
+                            bgcolor: '#e8401c',
+                            color: '#fff',
+                            borderColor: '#e8401c',
+                        },
                         textTransform: 'none',
                         fontWeight: 700,
-                        fontSize: 13,
-                        borderRadius: 1.5,
-                        py: 0.75,
-                        width: '100%',
-                    }}>
+                        fontSize: 12,
+                        borderRadius: 1,
+                        py: 0.6,
+                        fontFamily: '"Segoe UI", sans-serif',
+                        transition: 'all 0.18s ease',
+                    }}
+                >
                     Thêm vào giỏ
                 </Button>
             </Box>
         </Box>
     );
-};
+});
 
 export default ProductCard;

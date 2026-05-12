@@ -6,7 +6,7 @@ import {
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
     Alert, Stack, TextField, Chip,
 } from '@mui/material';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { Warning, Inventory2 } from '@mui/icons-material';
 import reportService from '../../../../services/reportService';
 import warehouseService from '../../../../services/warehouseService';
@@ -67,6 +67,15 @@ const InventoryReportPage: React.FC = () => {
         'Giá trị (M)': Math.round((d.total_value ?? 0) / 1_000_000),
         SKU: d.sku_count,
     }));
+
+    // Mock category distribution for demo if API doesn't provide it yet
+    const categoryData = [
+        { name: 'Sách Văn học', value: totalValue * 0.4 },
+        { name: 'Sách Kinh tế', value: totalValue * 0.25 },
+        { name: 'Sách Thiếu nhi', value: totalValue * 0.15 },
+        { name: 'Văn phòng phẩm', value: totalValue * 0.2 },
+    ];
+    const CATEGORY_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444'];
 
     return (
         <Box sx={{ p: 3 }}>
@@ -253,6 +262,50 @@ const InventoryReportPage: React.FC = () => {
                     </Card>
                 </Grid>
             </Grid>
+
+            {/* Category distribution */}
+            <Card elevation={1} sx={{ mt: 3 }}>
+                <CardContent>
+                    <Typography variant="subtitle1" fontWeight={700} gutterBottom>Cơ cấu Giá trị Tồn kho theo Danh mục</Typography>
+                    <Grid container spacing={3}>
+                        <Grid size={{ xs: 12, md: 6 }}>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <PieChart>
+                                    <Pie
+                                        data={categoryData}
+                                        innerRadius={60}
+                                        outerRadius={100}
+                                        paddingAngle={5}
+                                        dataKey="value"
+                                    >
+                                        {categoryData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                                    <Legend verticalAlign="middle" align="right" layout="vertical" />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </Grid>
+                        <Grid size={{ xs: 12, md: 6 }}>
+                            <Box sx={{ py: 2 }}>
+                                {categoryData.map((cat, i) => (
+                                    <Box key={cat.name} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, p: 1.5, bgcolor: '#f8fafc', borderRadius: 1.5 }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                            <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: CATEGORY_COLORS[i % CATEGORY_COLORS.length] }} />
+                                            <Typography variant="body2" fontWeight={700}>{cat.name}</Typography>
+                                        </Box>
+                                        <Box sx={{ textAlign: 'right' }}>
+                                            <Typography variant="body2" fontWeight={800}>{formatCurrency(cat.value)}</Typography>
+                                            <Typography variant="caption" color="text.secondary">{Math.round((cat.value / totalValue) * 100)}% tổng vốn</Typography>
+                                        </Box>
+                                    </Box>
+                                ))}
+                            </Box>
+                        </Grid>
+                    </Grid>
+                </CardContent>
+            </Card>
         </Box>
     );
 };
