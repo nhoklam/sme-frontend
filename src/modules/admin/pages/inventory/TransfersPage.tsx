@@ -488,7 +488,7 @@ const CreateTransferDialog: React.FC<{
                 <Button onClick={onClose} variant="outlined">Đóng</Button>
                 <Button onClick={handleCreate} variant="contained"
                     disabled={creating || !fromWid || !toWid || !cart.length}
-                    sx={{ bgcolor: '#1976d2' }}>
+                    sx={{ textTransform: 'none', fontWeight: 700, bgcolor: '#2563eb', '&:hover': { bgcolor: '#1d4ed8' } }}>
                     {creating ? <><CircularProgress size={16} sx={{ color: '#fff', mr: 1 }} />Đang tạo...</> : 'Tạo phiếu chuyển'}
                 </Button>
             </DialogActions>
@@ -626,7 +626,7 @@ const TransfersPage: React.FC = () => {
                         Excel
                     </Button>
                     <Button variant="contained" startIcon={<Add />} onClick={() => setCreateOpen(true)}
-                        sx={{ bgcolor: '#1976d2', textTransform: 'none', fontWeight: 700 }}>
+                        sx={{ bgcolor: '#2563eb', textTransform: 'none', fontWeight: 700, '&:hover': { bgcolor: '#1d4ed8' } }}>
                         Tạo phiếu chuyển
                     </Button>
                 </Box>
@@ -716,7 +716,7 @@ const TransfersPage: React.FC = () => {
                                             </Typography>
                                         </TableCell>
                                         <TableCell onClick={e => e.stopPropagation()}>
-                                            <IconButton size="small" onClick={() => { setSelected(t); setDetailOpen(true); }}>
+                                            <IconButton size="small" onClick={() => { setSelected(t); setDetailOpen(true); }} sx={{ color: '#3b82f6', '&:hover': { bgcolor: '#eff6ff' } }}>
                                                 <Visibility sx={{ fontSize: 16 }} />
                                             </IconButton>
                                         </TableCell>

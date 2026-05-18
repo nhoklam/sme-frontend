@@ -10,7 +10,7 @@ import {
 } from '@mui/material';
 import {
     Close, TrendingUp, ReceiptLong, Inventory2,
-    AttachMoney, DateRange, Refresh, FilterList,
+    AttachMoney, DateRange, Refresh, FilterList, Print
 } from '@mui/icons-material';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -33,9 +33,10 @@ interface Props {
     open: boolean;
     onClose: () => void;
     warehouseId?: string;
+    onPrintInvoice?: (invoice: any) => void;
 }
 
-type TabMode = 'overview' | 'shift' | 'products';
+type TabMode = 'overview' | 'products';
 
 const PERIOD_OPTIONS: { value: ReportPeriod | string; label: string; }[] = [
     { value: 'today', label: 'Hôm nay' },
@@ -67,11 +68,13 @@ const PAYMENT_MAP: Record<string, string> = {
     'VNPAY': 'VNPay'
 };
 
-const RevenueReportDialog: React.FC<Props> = ({ open, onClose, warehouseId }) => {
+const RevenueReportDialog: React.FC<Props> = ({ open, onClose, warehouseId, onPrintInvoice }) => {
     const [tab, setTab] = useState<TabMode>('overview');
-    const [period, setPeriod] = useState<ReportPeriod | string>('today');
-    const [dateFrom, setDateFrom] = useState('');
-    const [dateTo, setDateTo] = useState('');
+    const [period, setPeriod] = useState<ReportPeriod | string>('this_month');
+    const today = new Date();
+    const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const [dateFrom, setDateFrom] = useState(firstOfMonth.toISOString().split('T')[0]);
+    const [dateTo, setDateTo] = useState(today.toISOString().split('T')[0]);
     const [useCustomDate, setUseCustomDate] = useState(false);
     const [loading, setLoading] = useState(false);
     const [revenueData, setRevenueData] = useState<RevenueDataPoint[]>([]);
@@ -145,18 +148,18 @@ const RevenueReportDialog: React.FC<Props> = ({ open, onClose, warehouseId }) =>
             // Load detailed invoices
             setLoadingInvoices(true);
             try {
-                const invData = await reportService.getInvoices({ 
-                    from, 
-                    to, 
-                    warehouseId, 
+                const invData = await reportService.getInvoices({
+                    from,
+                    to,
+                    warehouseId,
                     paymentMethod: paymentMethod || undefined,
                     page,
                     size: 10
                 });
                 setInvoices(invData.content || []);
                 setTotalElements(invData.totalElements || 0);
-            } catch { 
-                setInvoices([]); 
+            } catch {
+                setInvoices([]);
                 setTotalElements(0);
             }
             finally { setLoadingInvoices(false); }
@@ -199,12 +202,19 @@ const RevenueReportDialog: React.FC<Props> = ({ open, onClose, warehouseId }) =>
         if (open) {
             if (tab === 'overview') loadRevenue();
             if (tab === 'products') loadTopProducts();
-            if (tab === 'shift') loadShifts();
         }
     }, [open, tab, period, useCustomDate, dateFrom, dateTo]);
 
     useEffect(() => {
-        if (!open) { setTab('overview'); setPeriod('today'); setUseCustomDate(false); setDateFrom(''); setDateTo(''); }
+        if (!open) {
+            setTab('overview');
+            setPeriod('this_month');
+            setUseCustomDate(false);
+            const t = new Date();
+            const f = new Date(t.getFullYear(), t.getMonth(), 1);
+            setDateFrom(f.toISOString().split('T')[0]);
+            setDateTo(t.toISOString().split('T')[0]);
+        }
     }, [open]);
 
     // Computed stats
@@ -213,6 +223,8 @@ const RevenueReportDialog: React.FC<Props> = ({ open, onClose, warehouseId }) =>
     const totalCOGS = revenueData.reduce((s, d) => s + (d.cogs ?? 0), 0);
     const totalInvoices = revenueData.reduce((s, d) => s + (d.invoice_count ?? 0), 0);
     const marginPct = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(1) : '0';
+
+    const voidCount = invoices.filter(inv => inv.type === 'VOIDED').length;
 
     const chartData = revenueData.map(d => ({
         name: (() => {
@@ -223,8 +235,8 @@ const RevenueReportDialog: React.FC<Props> = ({ open, onClose, warehouseId }) =>
                 return dt.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
             } catch { return d.period ?? ''; }
         })(),
-        'Doanh thu': Math.round((d.revenue ?? 0) / 1_000_000),
-        'Lợi nhuận': Math.round((d.gross_profit ?? 0) / 1_000_000),
+        'Doanh thu': Number(((d.revenue ?? 0) / 1_000_000).toFixed(3)),
+        'Lợi nhuận': Number(((d.gross_profit ?? 0) / 1_000_000).toFixed(3)),
         'Hóa đơn': d.invoice_count ?? 0,
     }));
 
@@ -268,7 +280,6 @@ const RevenueReportDialog: React.FC<Props> = ({ open, onClose, warehouseId }) =>
                     }}>
                     <Tab value="overview" label="Tổng quan doanh thu" icon={<TrendingUp sx={{ fontSize: 15 }} />} iconPosition="start" />
                     <Tab value="products" label="Top sản phẩm" icon={<Inventory2 sx={{ fontSize: 15 }} />} iconPosition="start" />
-                    <Tab value="shift" label="Lịch sử ca" icon={<ReceiptLong sx={{ fontSize: 15 }} />} iconPosition="start" />
                 </Tabs>
             </Box>
 
@@ -300,10 +311,10 @@ const RevenueReportDialog: React.FC<Props> = ({ open, onClose, warehouseId }) =>
                                 <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75, mb: 2 }}>
                                     {PERIOD_OPTIONS.map(opt => (
                                         <Button key={opt.value} size="small" fullWidth
-                                            onClick={() => { 
-                                                setPeriod(opt.value as ReportPeriod); 
-                                                setUseCustomDate(false); 
-                                                setFilterAnchor(null); 
+                                            onClick={() => {
+                                                setPeriod(opt.value as ReportPeriod);
+                                                setUseCustomDate(false);
+                                                setFilterAnchor(null);
                                                 setPage(0);
                                             }}
                                             variant={!useCustomDate && period === opt.value ? 'contained' : 'outlined'}
@@ -323,7 +334,7 @@ const RevenueReportDialog: React.FC<Props> = ({ open, onClose, warehouseId }) =>
                                 <FormControl fullWidth size="small" sx={{ mb: 2 }}>
                                     <Select
                                         value={paymentMethod}
-                                        onChange={e => { 
+                                        onChange={e => {
                                             setPaymentMethodState(e.target.value);
                                             setPage(0);
                                         }}
@@ -348,8 +359,8 @@ const RevenueReportDialog: React.FC<Props> = ({ open, onClose, warehouseId }) =>
                                         sx={{ flex: 1, '& .MuiOutlinedInput-root': { fontSize: 12 } }} />
                                 </Box>
                                 {(useCustomDate || paymentMethod !== '') && (
-                                <Button size="small" variant="contained" fullWidth onClick={() => { setPage(0); loadRevenue(); setFilterAnchor(null); }}
-                                        sx={{ mt: 1.5, textTransform: 'none', fontSize: 12, bgcolor: '#1d4ed8', fontWeight: 700, borderRadius: 1.5 }}>
+                                    <Button size="small" variant="contained" fullWidth onClick={() => { setPage(0); loadRevenue(); setFilterAnchor(null); }}
+                                        sx={{ mt: 1.5, textTransform: 'none', fontSize: 12, bgcolor: '#2563eb', fontWeight: 700, borderRadius: 1.5, '&:hover': { bgcolor: '#1d4ed8' } }}>
                                         Áp dụng
                                     </Button>
                                 )}
@@ -363,10 +374,8 @@ const RevenueReportDialog: React.FC<Props> = ({ open, onClose, warehouseId }) =>
                         {/* Stat cards */}
                         <Box sx={{ display: 'flex', gap: 1.5, mb: 2.5, flexWrap: 'wrap' }}>
                             <StatCard label="DOANH THU" value={fmt(totalRevenue)} sub={`${totalInvoices.toLocaleString()} hóa đơn`} color="#1d4ed8" bg="#eff6ff" />
-                            {/* Ẩn LỢI NHUẬN và GIÁ VỐN cho nhân viên */}
-                            {/* <StatCard label="LỢI NHUẬN GỘP" value={fmt(totalProfit)} sub={`Biên LN: ${marginPct}%`} color="#059669" bg="#f0fdf4" />
-                            <StatCard label="GIÁ VỐN" value={fmt(totalCOGS)} color="#d97706" bg="#fffbeb" /> */}
                             <StatCard label="SỐ HÓA ĐƠN" value={totalInvoices.toLocaleString()} sub={`TB: ${fmt(totalRevenue / Math.max(1, totalInvoices))}/HĐ`} color="#7c3aed" bg="#faf5ff" />
+                            <StatCard label="ĐƠN HỦY" value={voidCount.toLocaleString()} sub="Hóa đơn đã hủy" color="#dc2626" bg="#fef2f2" />
                         </Box>
 
                         {/* Chart */}
@@ -380,30 +389,19 @@ const RevenueReportDialog: React.FC<Props> = ({ open, onClose, warehouseId }) =>
                                     </Box>
                                 ) : (
                                     <ResponsiveContainer width="100%" height={240}>
-                                        <AreaChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
-                                            <defs>
-                                                <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="5%" stopColor="#1d4ed8" stopOpacity={0.15} />
-                                                    <stop offset="95%" stopColor="#1d4ed8" stopOpacity={0} />
-                                                </linearGradient>
-                                                <linearGradient id="profGrad" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="5%" stopColor="#059669" stopOpacity={0.15} />
-                                                    <stop offset="95%" stopColor="#059669" stopOpacity={0} />
-                                                </linearGradient>
-                                            </defs>
+                                        <BarChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
                                             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                                             <XAxis dataKey="name" tick={{ fontSize: 10.5, fill: '#94a3b8' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
                                             <YAxis tickFormatter={v => fmtShort(v * 1_000_000)} tick={{ fontSize: 10.5, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
                                             <Tooltip
+                                                cursor={false}
                                                 formatter={(v: any, name: string) => [
                                                     name === 'Hóa đơn' ? v : `${(v as number).toLocaleString('vi-VN')}M đ`,
                                                     name,
                                                 ]}
                                                 contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12 }} />
-                                            <Area type="monotone" dataKey="Doanh thu" stroke="#1d4ed8" strokeWidth={2} fill="url(#revGrad)" dot={false} />
-                                            {/* Ẩn dòng lợi nhuận cho nhân viên */}
-                                            {/* <Area type="monotone" dataKey="Lợi nhuận" stroke="#059669" strokeWidth={2} fill="url(#profGrad)" dot={false} /> */}
-                                        </AreaChart>
+                                            <Bar dataKey="Doanh thu" fill="#0851efff" radius={[4, 4, 0, 0]} barSize={24} />
+                                        </BarChart>
                                     </ResponsiveContainer>
                                 )}
                         </Paper>
@@ -438,11 +436,11 @@ const RevenueReportDialog: React.FC<Props> = ({ open, onClose, warehouseId }) =>
                                                     <TableCell sx={{ fontSize: 11.5 }}>{inv.customerName || 'Khách lẻ'}</TableCell>
                                                     <TableCell>
                                                         {inv.payments?.map((p: any, i: number) => (
-                                                            <Chip key={i} label={PAYMENT_MAP[p.method] || p.method} size="small" 
+                                                            <Chip key={i} label={PAYMENT_MAP[p.method] || p.method} size="small"
                                                                 sx={{ height: 20, fontSize: 10, fontWeight: 700, mr: 0.5, bgcolor: '#f1f5f9', color: '#475569' }} />
                                                         ))}
                                                     </TableCell>
-                                                    <TableCell align="right" sx={{ fontWeight: 800, fontSize: 12.5, color: inv.type === 'RETURN' ? '#dc2626' : '#1e293b' }}>
+                                                    <TableCell align="right" sx={{ fontWeight: 800, fontSize: 12.5, color: inv.type === 'RETURN' ? '#dc2626' : inv.type === 'VOIDED' ? '#94a3b8' : '#1e293b', textDecoration: inv.type === 'VOIDED' ? 'line-through' : 'none' }}>
                                                         {inv.type === 'RETURN' ? '-' : ''}{fmt(inv.finalAmount)}
                                                     </TableCell>
                                                 </TableRow>
@@ -540,62 +538,7 @@ const RevenueReportDialog: React.FC<Props> = ({ open, onClose, warehouseId }) =>
                     </Box>
                 )}
 
-                {/* SHIFT HISTORY TAB */}
-                {tab === 'shift' && (
-                    <Box sx={{ flex: 1, overflowY: 'auto', p: 2.5, '&::-webkit-scrollbar': { width: 4 }, '&::-webkit-scrollbar-thumb': { bgcolor: '#e2e8f0' } }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                            <Typography variant="subtitle2" fontWeight={700} color="#1e293b">Lịch sử ca làm việc</Typography>
-                            <Button size="small" startIcon={<Refresh sx={{ fontSize: 14 }} />} onClick={loadShifts}
-                                sx={{ textTransform: 'none', fontSize: 12, color: '#64748b' }}>Làm mới</Button>
-                        </Box>
 
-                        {loadingShifts ? (
-                            [1, 2, 3].map(i => <Skeleton key={i} height={72} sx={{ mb: 1, borderRadius: 1.5 }} />)
-                        ) : shifts.length === 0 ? (
-                            <Box sx={{ textAlign: 'center', py: 8 }}>
-                                <ReceiptLong sx={{ fontSize: 52, color: '#e2e8f0', mb: 1.5 }} />
-                                <Typography color="#94a3b8" fontSize={13}>Chưa có ca làm việc</Typography>
-                            </Box>
-                        ) : (
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
-                                {shifts.map((shift: any, idx: number) => {
-                                    const statusInfo = shift.status === 'OPEN' ? { label: 'Đang mở', color: '#22c55e', bg: '#dcfce7' } :
-                                        shift.status === 'CLOSED' ? { label: 'Đã đóng', color: '#64748b', bg: '#f1f5f9' } :
-                                            { label: 'Đã duyệt', color: '#1d4ed8', bg: '#dbeafe' };
-                                    return (
-                                        <Box key={shift.id} sx={{ p: 2, borderRadius: 2, border: '1px solid #e2e8f0', bgcolor: '#fff', '&:hover': { borderColor: '#2563eb', bgcolor: '#f8fafc' }, transition: 'all 0.12s' }}>
-                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                                <Box>
-                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                                                        <Typography fontFamily="monospace" fontWeight={700} color="#1d4ed8" fontSize={12.5}>Ca #{shift.id?.slice(0, 8).toUpperCase()}</Typography>
-                                                        <Chip label={statusInfo.label} size="small"
-                                                            sx={{ height: 18, fontSize: 10, fontWeight: 700, bgcolor: statusInfo.bg, color: statusInfo.color }} />
-                                                    </Box>
-                                                    <Typography variant="caption" color="#64748b" fontSize={11}>
-                                                        {shift.openedAt ? new Date(shift.openedAt).toLocaleString('vi-VN') : ''}
-                                                        {shift.closedAt ? ` → ${new Date(shift.closedAt).toLocaleString('vi-VN')}` : ''}
-                                                    </Typography>
-                                                    <Typography variant="caption" color="#94a3b8" display="block" fontSize={10.5}>
-                                                        Tiền đầu ca: {fmt(shift.startingCash)}
-                                                        {shift.reportedCash ? ` · Kết ca: ${fmt(shift.reportedCash)}` : ''}
-                                                    </Typography>
-                                                </Box>
-                                                <Box sx={{ textAlign: 'right' }}>
-                                                    {shift.totalRevenue != null && (
-                                                        <>
-                                                            <Typography fontWeight={800} color="#15803d" fontSize={14}>{fmt(shift.totalRevenue)}</Typography>
-                                                            <Typography variant="caption" color="#94a3b8" fontSize={10.5}>{shift.invoiceCount || 0} hóa đơn</Typography>
-                                                        </>
-                                                    )}
-                                                </Box>
-                                            </Box>
-                                        </Box>
-                                    );
-                                })}
-                            </Box>
-                        )}
-                    </Box>
-                )}
             </DialogContent>
         </Dialog>
     );

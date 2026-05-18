@@ -1,17 +1,4 @@
 // src/modules/admin/pages/inventory/StockAlertPage.tsx
-//
-// ── Giải thích thay đổi ────────────────────────────────────────
-// File này trước đây render lại LowStockTab, trùng lặp hoàn toàn
-// với tab "Sắp hết hàng" trong InventoryPage.
-//
-// Giải pháp: Redirect người dùng về InventoryPage với tab=1 (Sắp hết hàng).
-// Mọi link/menu dẫn đến /admin/inventory/alerts sẽ tự động chuyển đến
-// đúng tab, tránh duy trì 2 bản code giống nhau.
-//
-// Nếu bạn muốn GIỮ trang độc lập (ví dụ: nhúng trong email cảnh báo),
-// hãy uncomment phần <StandaloneAlertPage> bên dưới thay vì dùng redirect.
-// ──────────────────────────────────────────────────────────────
-
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, CircularProgress, Typography } from '@mui/material';

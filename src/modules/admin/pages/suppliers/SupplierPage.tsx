@@ -62,7 +62,7 @@ const fmtCurrency = (n?: number) => {
 // ─── Field Label ──────────────────────────────────────────────
 const FieldLabel: React.FC<{ label: string; required?: boolean }> = ({ label, required }) => (
     <Typography variant="caption" fontWeight={700} color="#555" display="block" mb={0.75}>
-        {label} {required && <span style={{ color: '#d32f2f' }}>*</span>}
+        {label} {required && <span style={{ color: '#ef4444' }}>*</span>}
     </Typography>
 );
 
@@ -274,7 +274,7 @@ const SupplierDetailDialog: React.FC<{
                 </Button>
                 <Button onClick={() => { onEdit(supplier); onClose(); }} variant="contained"
                     startIcon={<Edit sx={{ fontSize: 15 }} />}
-                    sx={{ textTransform: 'none', fontWeight: 700, bgcolor: '#1976d2', '&:hover': { bgcolor: '#1565c0' } }}>
+                    sx={{ textTransform: 'none', fontWeight: 700, bgcolor: '#2563eb', '&:hover': { bgcolor: '#1d4ed8' } }}>
                     Chỉnh sửa
                 </Button>
             </DialogActions>
@@ -552,8 +552,8 @@ const SupplierFormDialog: React.FC<{
                     disabled={saving}
                     sx={{
                         textTransform: 'none', fontWeight: 700, px: 4,
-                        bgcolor: isEdit ? '#f57c00' : '#1976d2',
-                        '&:hover': { bgcolor: isEdit ? '#e65100' : '#1565c0' },
+                        bgcolor: isEdit ? '#f59e0b' : '#2563eb',
+                        '&:hover': { bgcolor: isEdit ? '#d97706' : '#1d4ed8' },
                     }}
                 >
                     {saving ? 'Đang lưu...' : isEdit ? 'Cập nhật' : 'Thêm mới'}
@@ -711,7 +711,7 @@ const SupplierPage: React.FC = () => {
                         <input type="file" hidden accept=".xlsx, .xls" onChange={handleImportExcel} />
                     </Button>
                     <Button variant="contained" startIcon={<Add />} onClick={openCreate}
-                        sx={{ bgcolor: '#1976d2', textTransform: 'none', fontWeight: 700, borderRadius: 2, '&:hover': { bgcolor: '#1565c0' }, boxShadow: '0 4px 12px rgba(25,118,210,0.2)' }}>
+                        sx={{ bgcolor: '#2563eb', textTransform: 'none', fontWeight: 700, borderRadius: 2, '&:hover': { bgcolor: '#1d4ed8' }, boxShadow: '0 4px 12px rgba(25,118,210,0.2)' }}>
                         Thêm nhà cung cấp
                     </Button>
                 </Box>
@@ -770,7 +770,7 @@ const SupplierPage: React.FC = () => {
                         }}
                     />
                     <Button variant="contained" onClick={handleSearch}
-                        sx={{ textTransform: 'none', fontWeight: 600, bgcolor: '#1976d2', whiteSpace: 'nowrap' }}>
+                        sx={{ textTransform: 'none', fontWeight: 600, bgcolor: '#2563eb', whiteSpace: 'nowrap', '&:hover': { bgcolor: '#1d4ed8' } }}>
                         Tìm kiếm
                     </Button>
                     <Tooltip title="Làm mới">
@@ -878,13 +878,13 @@ const SupplierPage: React.FC = () => {
                                             <Box sx={{ display: 'flex', gap: 0.25 }}>
                                                 <Tooltip title="Xem chi tiết">
                                                     <IconButton size="small" onClick={() => openDetail(s)}
-                                                        sx={{ '&:hover': { color: '#1976d2', bgcolor: '#e3f2fd' } }}>
+                                                        sx={{ color: '#2563eb', '&:hover': { bgcolor: '#eff6ff' } }}>
                                                         <Info sx={{ fontSize: 16 }} />
                                                     </IconButton>
                                                 </Tooltip>
                                                 <Tooltip title="Chỉnh sửa">
                                                     <IconButton size="small" onClick={() => openEdit(s)}
-                                                        sx={{ '&:hover': { color: '#f57c00', bgcolor: '#fff3e0' } }}>
+                                                        sx={{ color: '#f59e0b', '&:hover': { bgcolor: '#fef3c7' } }}>
                                                         <Edit sx={{ fontSize: 16 }} />
                                                     </IconButton>
                                                 </Tooltip>
@@ -892,7 +892,7 @@ const SupplierPage: React.FC = () => {
                                                     <IconButton size="small" onClick={() => handleToggle(s)}
                                                         sx={{ '&:hover': { color: s.isActive ? '#d32f2f' : '#2e7d32' } }}>
                                                         {s.isActive
-                                                            ? <ToggleOn fontSize="small" sx={{ color: '#4caf50' }} />
+                                                            ? <ToggleOn fontSize="small" sx={{ color: '#16a34a' }} />
                                                             : <ToggleOff fontSize="small" sx={{ color: '#bbb' }} />}
                                                     </IconButton>
                                                 </Tooltip>

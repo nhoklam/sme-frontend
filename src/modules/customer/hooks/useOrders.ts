@@ -15,21 +15,20 @@ interface UseMyOrdersParams {
  */
 export const useMyOrders = (params: UseMyOrdersParams) => {
     const { data, isLoading, isError, error } = useQuery({
-        queryKey: ['myOrders', params],
-        queryFn: () => orderService.getOrders({
-            keyword: params.keyword,
-            status: params.status,
-            page: params.page ?? 0,
-            size: params.size ?? 10,
-        }),
+        queryKey: ['myHistory', params.page, params.size],
+        queryFn: () => orderService.getMyHistory(params.page, params.size),
         staleTime: 1 * 60 * 1000,
     });
 
+    // Gom cả orders và invoices lại để hiển thị
+    const allHistory = [
+        ...(data?.orders || []),
+        ...(data?.invoices || [])
+    ].sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
     return {
-        orders: data?.content ?? [],
-        totalElements: data?.totalElements ?? 0,
-        totalPages: data?.totalPages ?? 0,
-        currentPage: data?.page ?? 0,
+        orders: allHistory,
+        totalPages: 1, // API history hiện tại không trả về totalPages cho tổng hợp, giả định 1 trang cho đơn giản
         isLoading,
         isError,
         error: error as Error | null,

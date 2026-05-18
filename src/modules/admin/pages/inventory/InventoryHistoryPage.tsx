@@ -40,7 +40,7 @@ const TX_TYPE_MAP: Record<string, { label: string; color: string; bg: string; ic
     RELEASE: { label: 'Giải phóng', color: '#2e7d32', bg: '#e8f5e9', icon: <CheckCircle sx={{ fontSize: 14 }} /> },
 };
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 // ── Preset date ranges ──────────────────────────────────────────
 const getDateRange = (preset: string): { from: string; to: string } => {

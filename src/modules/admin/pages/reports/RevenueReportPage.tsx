@@ -4,7 +4,7 @@ import {
     Box, Typography, Grid, Card, CardContent, Button, ButtonGroup,
     Select, MenuItem, FormControl, Skeleton, Chip,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-    Alert, Stack, Paper, Tabs, Tab,
+    Alert, Stack, Paper, Tabs, Tab, CircularProgress,
 } from '@mui/material';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -14,7 +14,7 @@ import {
 import {
     TrendingUp, Inventory2, AttachMoney,
     Assessment, ShowChart, BarChart as BarChartIcon,
-    StorefrontOutlined,
+    StorefrontOutlined, Refresh,
 } from '@mui/icons-material';
 import reportService from '../../../../services/reportService';
 import warehouseService from '../../../../services/warehouseService';
@@ -39,7 +39,9 @@ const fmtPeriod = (period: string, type: ReportPeriod) => {
     }
 };
 
-const getRangeDefault = (period: ReportPeriod): { from: Date; to: Date } => {
+const toISO = (d: Date) => d.toISOString();
+
+const getRangeDefault = (period: string): { from: Date; to: Date } => {
     const to = new Date();
     const from = new Date();
     if (period === 'day') from.setDate(to.getDate() - 29);
@@ -49,7 +51,32 @@ const getRangeDefault = (period: ReportPeriod): { from: Date; to: Date } => {
     return { from, to };
 };
 
-const toISO = (d: Date) => d.toISOString();
+const getDateRange = (filter: string) => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    let from: Date;
+    let to = new Date();
+    switch (filter) {
+        case 'today':
+            from = today; break;
+        case 'yesterday':
+            from = new Date(today.getTime() - 86400000);
+            to = today; break;
+        case 'last7days': case '7days':
+            from = new Date(today.getTime() - 7 * 86400000); break;
+        case '30days':
+            from = new Date(today.getTime() - 30 * 86400000); break;
+        case '90days':
+            from = new Date(today.getTime() - 90 * 86400000); break;
+        case 'thisMonth':
+            from = new Date(now.getFullYear(), now.getMonth(), 1); break;
+        case 'thisYear': case '1year':
+            from = new Date(now.getFullYear(), 0, 1); break;
+        default:
+            from = new Date(now.getFullYear(), now.getMonth(), 1);
+    }
+    return { from, to };
+};
 
 const COLORS = ['#1976d2', '#2e7d32', '#ed6c02', '#9c27b0', '#0288d1', '#d32f2f', '#388e3c', '#f57c00'];
 
@@ -65,8 +92,8 @@ interface SummaryCardProps {
 }
 
 const SummaryCard: React.FC<SummaryCardProps> = ({ title, value, icon, color, loading, sub, bgColor }) => (
-    <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid #f0f0f0', bgcolor: bgColor || '#fff' }}>
-        <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+    <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid #f0f0f0', bgcolor: bgColor || '#fff', height: '100%' }}>
+        <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 }, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 1.5 }}>
                 <Box sx={{
                     width: 44, height: 44, borderRadius: 2,
@@ -82,19 +109,17 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ title, value, icon, color, lo
                     <Skeleton width={80} height={18} />
                 </>
             ) : (
-                <>
-                    <Typography variant="h5" fontWeight={800} color={color} mb={0.25}>
+                <Box>
+                    <Typography variant="h5" fontWeight={800} color={color} mb={0.25} sx={{ fontSize: { xs: '1.2rem', md: '1.5rem' } }}>
                         {value}
                     </Typography>
                     <Typography variant="caption" color="text.secondary" fontSize={12} fontWeight={600} display="block">
                         {title}
                     </Typography>
-                    {sub && (
-                        <Typography variant="caption" color="text.secondary" fontSize={11}>
-                            {sub}
-                        </Typography>
-                    )}
-                </>
+                    <Typography variant="caption" color="text.secondary" fontSize={11} sx={{ minHeight: 16, display: 'block' }}>
+                        {sub || '\u00A0'}
+                    </Typography>
+                </Box>
             )}
         </CardContent>
     </Card>
@@ -423,137 +448,141 @@ const DeadStockTab: React.FC<{ warehouseId: string }> = ({ warehouseId }) => {
     );
 };
 
-// ─── Top Products Tab ───────────────────────────────────────────
-const TopProductsTab: React.FC<{ warehouseId: string }> = ({ warehouseId }) => {
+// ─── Merchandise Tab (Hàng hóa) ─────────────────────────────────
+const MerchandiseTab: React.FC<{ warehouseId: string }> = ({ warehouseId }) => {
+    const [inventoryValue, setInventoryValue] = useState<InventoryValueReport[]>([]);
     const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
+    const [lowStockItems, setLowStockItems] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
-    const [period, setPeriod] = useState<ReportPeriod>('month');
 
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
-            const { from, to } = getRangeDefault(period);
-            const data = await reportService.getTopProducts({
-                from: toISO(from), to: toISO(to),
-                limit: 20,
-                ...(warehouseId ? { warehouseId } : {}),
-            });
-            setTopProducts(data);
+            const now = new Date();
+            const from = new Date(now.getFullYear(), now.getMonth(), 1);
+            const [invData, topData, lowData] = await Promise.all([
+                reportService.getInventoryValue(warehouseId || undefined),
+                reportService.getTopProducts({ from: toISO(from), to: toISO(now), limit: 10, ...(warehouseId ? { warehouseId } : {}) }),
+                (async () => { try { const { default: inventoryService } = await import('../../../../services/inventoryService'); return await inventoryService.getLowStock(warehouseId || undefined); } catch { return []; } })(),
+            ]);
+            setInventoryValue(invData);
+            setTopProducts(topData);
+            setLowStockItems(lowData);
         } catch { /* silent */ }
         finally { setLoading(false); }
-    }, [period, warehouseId]);
+    }, [warehouseId]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
-    const maxSold = topProducts[0]?.total_sold ?? 1;
+    const totalValue = inventoryValue.reduce((s, d) => s + (d.total_value ?? 0), 0);
+    const totalQty = inventoryValue.reduce((s, d) => s + (d.total_qty ?? 0), 0);
+    const totalSku = inventoryValue.reduce((s, d) => s + (d.sku_count ?? 0), 0);
+    const outOfStock = lowStockItems.filter((i: any) => (i.quantity ?? 0) === 0).length;
+    const nearOutOfStock = lowStockItems.filter((i: any) => (i.quantity ?? 0) > 0).length;
 
     return (
         <Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Typography variant="subtitle1" fontWeight={700}>Top sản phẩm bán chạy</Typography>
-                <ButtonGroup size="small" variant="outlined">
-                    {(['day', 'week', 'month', 'year'] as ReportPeriod[]).map(p => (
-                        <Button key={p} variant={period === p ? 'contained' : 'outlined'}
-                            onClick={() => setPeriod(p)}
-                            sx={{ textTransform: 'none', fontSize: 12 }}>
-                            {{ day: 'Ngày', week: 'Tuần', month: 'Tháng', year: 'Năm' }[p]}
-                        </Button>
-                    ))}
-                </ButtonGroup>
-            </Box>
+            {/* Summary cards */}
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid size={{ xs: 6, md: 3 }}>
+                    <SummaryCard title="Tổng vốn tồn kho" value={formatCurrency(totalValue)} icon={<AttachMoney />} color="#1976d2" loading={loading} sub={`• ${totalSku.toLocaleString()} mặt hàng`} bgColor="#f0f7ff" />
+                </Grid>
+                <Grid size={{ xs: 6, md: 3 }}>
+                    <SummaryCard title="Tổng số lượng tồn" value={totalQty.toLocaleString('vi-VN')} icon={<Inventory2 />} color="#2e7d32" loading={loading} bgColor="#f0fff4" />
+                </Grid>
+                <Grid size={{ xs: 6, md: 3 }}>
+                    <SummaryCard title="SP sắp hết hàng" value={String(nearOutOfStock)} icon={<ShowChart />} color="#ed6c02" loading={loading} sub={`${outOfStock} hết hàng`} bgColor="#fff7ed" />
+                </Grid>
+                <Grid size={{ xs: 6, md: 3 }}>
+                    <SummaryCard title="Cần nhập hàng" value={String(outOfStock + nearOutOfStock)} icon={<Assessment />} color="#d32f2f" loading={loading} bgColor="#fef2f2" />
+                </Grid>
+            </Grid>
 
             {loading ? (
-                [1, 2, 3, 4, 5].map(i => <Skeleton key={i} height={52} sx={{ mb: 1, borderRadius: 2 }} />)
-            ) : topProducts.length === 0 ? (
-                <Box sx={{ textAlign: 'center', py: 6 }}>
-                    <TrendingUp sx={{ fontSize: 48, color: '#e0e0e0', mb: 1 }} />
-                    <Typography color="text.secondary">Không có dữ liệu bán hàng</Typography>
-                </Box>
+                <Skeleton variant="rectangular" height={360} sx={{ borderRadius: 2 }} />
             ) : (
-                <Grid container spacing={3}>
-                    <Grid size={{ xs: 12, md: 7 }}>
-                        <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid #f0f0f0', overflow: 'hidden' }}>
-                            <TableContainer>
-                                <Table size="small">
-                                    <TableHead>
-                                        <TableRow sx={{ bgcolor: '#fafafa' }}>
-                                            <TableCell sx={{ fontWeight: 700, fontSize: 11, color: '#888', width: 40 }}>#</TableCell>
-                                            <TableCell sx={{ fontWeight: 700, fontSize: 11, color: '#888' }}>SẢN PHẨM</TableCell>
-                                            <TableCell align="right" sx={{ fontWeight: 700, fontSize: 11, color: '#888' }}>ĐÃ BÁN</TableCell>
-                                            <TableCell sx={{ width: 120 }}></TableCell>
+                <>
+                    {/* Charts row */}
+                    <Grid container spacing={3} sx={{ mb: 3 }}>
+                        <Grid size={{ xs: 12, md: 6 }}>
+                            <Paper elevation={0} sx={{ p: 2.5, borderRadius: 2, border: '1px solid #f0f0f0' }}>
+                                <Typography variant="subtitle2" fontWeight={700} mb={2}>Cơ cấu vốn theo chi nhánh</Typography>
+                                {inventoryValue.length > 0 ? (
+                                    <ResponsiveContainer width="100%" height={280}>
+                                        <BarChart layout="vertical" data={inventoryValue.map(d => ({ name: d.warehouse_name, value: d.total_value ?? 0 }))} margin={{ left: 8, right: 60 }}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                            <XAxis type="number" tickFormatter={val => `${(val / 1000000).toFixed(0)}tr`} tick={{ fontSize: 11 }} />
+                                            <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 11, fontWeight: 600 }} />
+                                            <Tooltip formatter={(val: number) => [formatCurrency(val), 'Giá trị']} contentStyle={{ borderRadius: 8 }} />
+                                            <Bar dataKey="value" name="Giá trị tồn kho" fill="#1976d2" radius={[0, 4, 4, 0]} barSize={24} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                ) : <Box sx={{ height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Typography color="text.secondary">Không có dữ liệu</Typography></Box>}
+                            </Paper>
+                        </Grid>
+                        <Grid size={{ xs: 12, md: 6 }}>
+                            <Paper elevation={0} sx={{ p: 2.5, borderRadius: 2, border: '1px solid #f0f0f0' }}>
+                                <Typography variant="subtitle2" fontWeight={700} mb={2}>Top 10 sản phẩm bán chạy (tháng này)</Typography>
+                                {topProducts.length > 0 ? (
+                                    <ResponsiveContainer width="100%" height={280}>
+                                        <BarChart data={topProducts.slice(0, 10).map(p => ({ name: p.name.length > 12 ? p.name.slice(0, 12) + '...' : p.name, sold: p.total_sold }))} margin={{ top: 10, right: 10, bottom: 30 }}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                                            <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#64748b' }} angle={-25} textAnchor="end" interval={0} />
+                                            <YAxis tick={{ fontSize: 11 }} />
+                                            <Tooltip contentStyle={{ borderRadius: 8 }} />
+                                            <Bar dataKey="sold" name="Đã bán" radius={[4, 4, 0, 0]}>
+                                                {topProducts.slice(0, 10).map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                ) : <Box sx={{ height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Typography color="text.secondary">Không có dữ liệu</Typography></Box>}
+                            </Paper>
+                        </Grid>
+                    </Grid>
+
+                    {/* Detail table */}
+                    <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid #f0f0f0', overflow: 'hidden' }}>
+                        <Box sx={{ p: 2, borderBottom: '1px solid #f0f0f0' }}>
+                            <Typography variant="subtitle2" fontWeight={700}>Chi tiết Định mức & Giá trị kho</Typography>
+                        </Box>
+                        <TableContainer>
+                            <Table size="small">
+                                <TableHead>
+                                    <TableRow sx={{ bgcolor: '#fafafa' }}>
+                                        <TableCell sx={{ fontWeight: 700, fontSize: 11, color: '#888' }}>SẢN PHẨM</TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 700, fontSize: 11, color: '#888' }}>TỒN KHO</TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 700, fontSize: 11, color: '#888' }}>ĐÃ BÁN</TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 700, fontSize: 11, color: '#888' }}>DOANH THU</TableCell>
+                                        <TableCell align="center" sx={{ fontWeight: 700, fontSize: 11, color: '#888' }}>TRẠNG THÁI</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {topProducts.length > 0 ? topProducts.map((p, idx) => (
+                                        <TableRow key={p.id ?? idx} hover>
+                                            <TableCell>
+                                                <Typography fontSize={13} fontWeight={600} noWrap sx={{ maxWidth: 280 }}>{p.name}</Typography>
+                                            </TableCell>
+                                            <TableCell align="right">
+                                                <Typography fontSize={13} fontWeight={600}>{(p as any).stock ?? '-'}</Typography>
+                                            </TableCell>
+                                            <TableCell align="right">
+                                                <Typography fontSize={13} fontWeight={700} color="#1976d2">{p.total_sold.toLocaleString('vi-VN')}</Typography>
+                                            </TableCell>
+                                            <TableCell align="right">
+                                                <Typography fontSize={13} fontWeight={700} color="#2e7d32">{formatCurrency((p as any).total_revenue ?? p.total_sold * 100000)}</Typography>
+                                            </TableCell>
+                                            <TableCell align="center">
+                                                <Chip size="small" label="Bán chạy" sx={{ height: 22, fontSize: 10, fontWeight: 700, bgcolor: idx < 3 ? '#dcfce7' : '#f0f0f0', color: idx < 3 ? '#16a34a' : '#666', borderRadius: 1 }} />
+                                            </TableCell>
                                         </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                        {topProducts.map((p, idx) => {
-                                            const pct = Math.round((p.total_sold / maxSold) * 100);
-                                            return (
-                                                <TableRow key={p.id ?? idx} hover sx={{ '&:hover': { bgcolor: '#f5f9ff' } }}>
-                                                    <TableCell>
-                                                        <Box sx={{
-                                                            width: 28, height: 28, borderRadius: '50%',
-                                                            bgcolor: idx < 3 ? COLORS[idx] : '#f5f5f5',
-                                                            color: idx < 3 ? '#fff' : '#888',
-                                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                            fontWeight: 700, fontSize: 12,
-                                                        }}>
-                                                            {idx + 1}
-                                                        </Box>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Typography variant="body2" fontWeight={600} fontSize={13} noWrap sx={{ maxWidth: 260 }}>
-                                                            {p.name}
-                                                        </Typography>
-                                                    </TableCell>
-                                                    <TableCell align="right">
-                                                        <Typography variant="body2" fontWeight={700}>
-                                                            {p.total_sold.toLocaleString('vi-VN')}
-                                                        </Typography>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Box sx={{ height: 6, bgcolor: '#f0f0f0', borderRadius: 3, overflow: 'hidden' }}>
-                                                            <Box sx={{
-                                                                height: '100%', width: `${pct}%`,
-                                                                bgcolor: COLORS[idx % COLORS.length],
-                                                                borderRadius: 3,
-                                                            }} />
-                                                        </Box>
-                                                    </TableCell>
-                                                </TableRow>
-                                            );
-                                        })}
-                                    </TableBody>
-                                </Table>
-                            </TableContainer>
-                        </Paper>
-                    </Grid>
-                    <Grid size={{ xs: 12, md: 5 }}>
-                        <Paper elevation={0} sx={{ p: 2.5, borderRadius: 2, border: '1px solid #f0f0f0' }}>
-                            <Typography variant="subtitle2" fontWeight={700} mb={1.5}>
-                                Top 10 biểu đồ cột
-                            </Typography>
-                            <ResponsiveContainer width="100%" height={300}>
-                                <BarChart
-                                    layout="vertical"
-                                    data={topProducts.slice(0, 10).map(p => ({
-                                        name: p.name.length > 18 ? p.name.slice(0, 18) + '...' : p.name,
-                                        sold: p.total_sold,
-                                    }))}
-                                    margin={{ left: 8, right: 16 }}
-                                >
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                                    <XAxis type="number" tick={{ fontSize: 11 }} />
-                                    <YAxis type="category" dataKey="name" width={130} tick={{ fontSize: 10 }} />
-                                    <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }} />
-                                    <Bar dataKey="sold" name="Đã bán" radius={[0, 4, 4, 0]}>
-                                        {topProducts.slice(0, 10).map((_, i) => (
-                                            <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                                        ))}
-                                    </Bar>
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </Paper>
-                    </Grid>
-                </Grid>
+                                    )) : (
+                                        <TableRow><TableCell colSpan={5} align="center" sx={{ py: 4 }}><Typography color="text.secondary">Không có dữ liệu</Typography></TableCell></TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    </Paper>
+                </>
             )}
         </Box>
     );
@@ -562,9 +591,14 @@ const TopProductsTab: React.FC<{ warehouseId: string }> = ({ warehouseId }) => {
 // ─── Main Component ────────────────────────────────────────────
 const RevenueReportPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState(0);
-    const [period, setPeriod] = useState<ReportPeriod>('day');
     const [warehouseId, setWarehouseId] = useState<string>('');
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+
+    const [chartPeriod, setChartPeriod] = useState<'hour' | 'day' | 'dayOfWeek' | 'month' | 'year'>('day');
+    const [quickFilter, setQuickFilter] = useState<string>('thisMonth');
+    const [customFrom, setCustomFrom] = useState<string>('');
+    const [customTo, setCustomTo] = useState<string>('');
+    const [paymentMethod, setPaymentMethod] = useState<string>('');
 
     const [revenueData, setRevenueData] = useState<RevenueDataPoint[]>([]);
     const [loadingRevenue, setLoadingRevenue] = useState(false);
@@ -574,14 +608,25 @@ const RevenueReportPage: React.FC = () => {
         warehouseService.getAll().then(setWarehouses).catch(() => { });
     }, []);
 
-    const fetchRevenue = useCallback(async () => {
+    const fetchRevenue = useCallback(async (filter = quickFilter, forcedPeriod = chartPeriod) => {
         setLoadingRevenue(true);
         setError('');
         try {
-            const { from, to } = getRangeDefault(period);
+            let from: Date, to: Date;
+            if (filter === 'custom' && customFrom && customTo) {
+                from = new Date(customFrom);
+                to = new Date(customTo + 'T23:59:59');
+            } else {
+                const range = getDateRange(filter);
+                from = range.from;
+                to = range.to;
+            }
+            const apiPeriod = forcedPeriod === 'dayOfWeek' ? 'day' : forcedPeriod;
+            
             const data = await reportService.getRevenue({
-                from: toISO(from), to: toISO(to), period,
+                from: toISO(from), to: toISO(to), period: apiPeriod as any,
                 ...(warehouseId ? { warehouseId } : {}),
+                ...(paymentMethod ? { paymentMethod } : {}),
             });
             setRevenueData(data);
         } catch {
@@ -589,9 +634,21 @@ const RevenueReportPage: React.FC = () => {
         } finally {
             setLoadingRevenue(false);
         }
-    }, [period, warehouseId]);
+    }, [warehouseId, quickFilter, chartPeriod, customFrom, customTo, paymentMethod]);
 
     useEffect(() => { fetchRevenue(); }, [fetchRevenue]);
+
+    const handleQuickFilterChange = (filter: any, forcedPeriod?: any) => {
+        setQuickFilter(filter);
+        let p = forcedPeriod || chartPeriod;
+        if (!forcedPeriod) {
+            if (filter === 'today' || filter === 'yesterday') p = 'hour';
+            else if (filter === 'thisYear' || filter === '90days') p = 'month';
+            else p = 'day';
+        }
+        setChartPeriod(p);
+        fetchRevenue(filter, p);
+    };
 
     const totalRevenue = revenueData.reduce((s, d) => s + (d.revenue ?? 0), 0);
     const totalCOGS = revenueData.reduce((s, d) => s + (d.cogs ?? 0), 0);
@@ -599,260 +656,289 @@ const RevenueReportPage: React.FC = () => {
     const totalInvoices = revenueData.reduce((s, d) => s + (d.invoice_count ?? 0), 0);
     const marginPct = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(1) : '0.0';
 
-    const chartData = revenueData.map(d => ({
-        name: fmtPeriod(d.period, period),
-        'Doanh thu': Math.round((d.revenue ?? 0) / 1_000_000),
-        'Giá vốn': Math.round((d.cogs ?? 0) / 1_000_000),
-        'Lợi nhuận': Math.round((d.gross_profit ?? 0) / 1_000_000),
-        'Số HĐ': d.invoice_count ?? 0,
-    }));
+    const chartData = (() => {
+        if (chartPeriod === 'hour') {
+            const result = Array.from({ length: 24 }, (_, i) => ({
+                name: `${i.toString().padStart(2, '0')}:00`,
+                'Doanh thu': 0, 'Giá vốn': 0, 'Lợi nhuận': 0, 'Số HĐ': 0
+            }));
+            revenueData.forEach(d => {
+                const date = new Date(d.period || '');
+                if (!isNaN(date.getTime())) {
+                    const hour = date.getHours();
+                    result[hour]['Doanh thu'] += (d.revenue ?? 0);
+                    result[hour]['Giá vốn'] += (d.cogs ?? 0);
+                    result[hour]['Lợi nhuận'] += (d.gross_profit ?? 0);
+                    result[hour]['Số HĐ'] += (d.invoice_count ?? 0);
+                }
+            });
+            return result.map(r => ({
+                ...r,
+                'Doanh thu': r['Doanh thu'],
+                'Giá vốn': r['Giá vốn'],
+                'Lợi nhuận': r['Lợi nhuận'],
+            }));
+        }
+        if (chartPeriod === 'dayOfWeek') {
+            const days = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "CN"];
+            const result = days.map(d => ({ name: d, 'Doanh thu': 0, 'Giá vốn': 0, 'Lợi nhuận': 0, 'Số HĐ': 0 }));
+            revenueData.forEach(d => {
+                const date = new Date(d.period || '');
+                if (!isNaN(date.getTime())) {
+                    const dow = date.getDay(); // 0: CN, 1: T2...
+                    const index = dow === 0 ? 6 : dow - 1;
+                    result[index]['Doanh thu'] += (d.revenue ?? 0);
+                    result[index]['Giá vốn'] += (d.cogs ?? 0);
+                    result[index]['Lợi nhuận'] += (d.gross_profit ?? 0);
+                    result[index]['Số HĐ'] += (d.invoice_count ?? 0);
+                }
+            });
+            return result.map(r => ({
+                ...r,
+                'Doanh thu': r['Doanh thu'],
+                'Giá vốn': r['Giá vốn'],
+                'Lợi nhuận': r['Lợi nhuận'],
+            }));
+        }
 
-    const PERIOD_OPTIONS = [
-        { label: '30 ngày qua', value: 'day' as ReportPeriod },
-        { label: '12 tuần', value: 'week' as ReportPeriod },
-        { label: '12 tháng', value: 'month' as ReportPeriod },
-        { label: 'Các năm', value: 'year' as ReportPeriod },
-    ];
+        const sorted = [...revenueData].sort((a, b) => new Date(a.period || '').getTime() - new Date(b.period || '').getTime());
+        return sorted.map(d => ({
+            name: fmtPeriod(d.period, chartPeriod as any),
+            'Doanh thu': d.revenue ?? 0,
+            'Giá vốn': d.cogs ?? 0,
+            'Lợi nhuận': d.gross_profit ?? 0,
+            'Số HĐ': d.invoice_count ?? 0,
+        }));
+    })();
 
-    const TAB_LABELS = [
-        { label: 'Tổng quan', icon: <Assessment sx={{ fontSize: 16 }} /> },
-        { label: 'Giá trị tồn kho', icon: <Inventory2 sx={{ fontSize: 16 }} /> },
-        { label: 'Hàng tồn động', icon: <BarChartIcon sx={{ fontSize: 16 }} /> },
-        { label: 'Sản phẩm bán chạy', icon: <TrendingUp sx={{ fontSize: 16 }} /> },
+    const SIDEBAR_TABS = [
+        { label: 'Doanh thu', desc: 'Biến động doanh số', icon: <Assessment sx={{ fontSize: 18 }} /> },
+        { label: 'Giá trị tồn kho', desc: 'Phân bổ theo kho', icon: <Inventory2 sx={{ fontSize: 18 }} /> },
+        { label: 'Hàng tồn động', desc: 'Kiểm soát tồn kho', icon: <BarChartIcon sx={{ fontSize: 18 }} /> },
+        { label: 'Hàng hóa', desc: 'Giá trị & Định mức', icon: <TrendingUp sx={{ fontSize: 18 }} /> },
     ];
 
     return (
-        <Box sx={{ p: 3, bgcolor: '#f8f9fb', minHeight: '100vh' }}>
+        <Box sx={{ bgcolor: '#f8f9fa', minHeight: '100vh', p: '20px 24px' }}>
             {/* Header */}
-            <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Box>
-                    <Typography variant="caption" color="#aaa" fontSize={11}>
-                        Dashboard / <strong style={{ color: '#555' }}>Báo cáo</strong>
-                    </Typography>
-                    <Typography variant="h5" fontWeight={800} color="#1a1a2e" mt={0.5}>
-                        Báo cáo & Phân tích
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" fontSize={12}>
-                        Theo dõi các chỉ số kinh doanh và tồn kho theo thời gian thực
-                    </Typography>
+                    <Typography variant="h6" fontWeight={700} sx={{ m: 0 }}>Hệ thống Báo cáo</Typography>
+                    <Typography variant="body2" color="#8c8c8c" fontSize={13}>Phân tích chuyên sâu dữ liệu kinh doanh đa chiều</Typography>
                 </Box>
-                <Stack direction="row" spacing={2} alignItems="center">
-                    <FormControl size="small" sx={{ minWidth: 220 }}>
-                        <Select
-                            value={warehouseId}
-                            onChange={e => setWarehouseId(e.target.value)}
-                            displayEmpty
-                            sx={{ fontSize: 13 }}
-                        >
-                            <MenuItem value="">Toàn hệ thống (Tất cả chi nhánh)</MenuItem>
-                            {warehouses.map(w => (
-                                <MenuItem key={w.id} value={w.id} sx={{ fontSize: 13 }}>
-                                    {w.name}
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-                </Stack>
             </Box>
 
             {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
 
-            {/* Tabs */}
-            <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid #f0f0f0', overflow: 'hidden' }}>
-                <Box sx={{ borderBottom: '1px solid #f0f0f0', px: 2 }}>
-                    <Tabs
-                        value={activeTab}
-                        onChange={(_, v) => setActiveTab(v)}
-                        sx={{
-                            '& .MuiTab-root': {
-                                textTransform: 'none', fontWeight: 600, fontSize: 13,
-                                minHeight: 48, px: 2,
-                            },
-                            '& .MuiTabs-indicator': { bgcolor: '#1976d2', height: 2 },
-                            '& .Mui-selected': { color: '#1976d2 !important' },
-                        }}
-                    >
-                        {TAB_LABELS.map((t, i) => (
-                            <Tab key={i} icon={t.icon} iconPosition="start" label={t.label} />
-                        ))}
-                    </Tabs>
-                </Box>
-
-                <Box sx={{ p: 3 }}>
-                    {/* ── TAB 0: Tổng quan ── */}
-                    <TabPanel value={activeTab} index={0}>
-                        {/* Period selector */}
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                            <Typography variant="subtitle1" fontWeight={700}>Biến động Doanh thu</Typography>
-                            <Box sx={{ display: 'flex', gap: 1 }}>
-                                {PERIOD_OPTIONS.map(opt => (
-                                    <Button key={opt.value} size="small"
-                                        onClick={() => setPeriod(opt.value)}
-                                        sx={{
-                                            textTransform: 'none', fontSize: 12, fontWeight: 600,
-                                            px: 1.5, borderRadius: 1.5,
-                                            bgcolor: period === opt.value ? '#1976d2' : 'transparent',
-                                            color: period === opt.value ? '#fff' : '#555',
-                                            border: '1px solid',
-                                            borderColor: period === opt.value ? '#1976d2' : '#e0e0e0',
-                                            '&:hover': { bgcolor: period === opt.value ? '#1565c0' : '#f5f5f5' },
-                                        }}>
-                                        {opt.label}
-                                    </Button>
+            <Grid container spacing={3} sx={{ alignItems: 'flex-start' }}>
+                {/* ── LEFT SIDEBAR ── */}
+                <Grid size={{ xs: 12, md: 3 }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        {/* Report Types */}
+                        <Paper elevation={0} sx={{ borderRadius: 2, p: 2, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                            <Typography fontWeight={700} fontSize={13} color="#8c8c8c" textTransform="uppercase" mb={2}>Loại báo cáo</Typography>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                {SIDEBAR_TABS.map((t, i) => (
+                                    <Box key={i} onClick={() => setActiveTab(i)} sx={{
+                                        p: '12px 16px', borderRadius: 1.5, cursor: 'pointer', transition: '0.2s',
+                                        display: 'flex', alignItems: 'center', gap: 1.5,
+                                        bgcolor: activeTab === i ? '#f0f2f5' : 'transparent',
+                                        borderLeft: `4px solid ${activeTab === i ? '#1a2e85' : 'transparent'}`,
+                                        '&:hover': { bgcolor: '#f0f2f5' },
+                                    }}>
+                                        <Box sx={{ color: activeTab === i ? '#1a2e85' : '#8c8c8c' }}>{t.icon}</Box>
+                                        <Box>
+                                            <Typography fontSize={14} fontWeight={activeTab === i ? 700 : 400} color={activeTab === i ? '#1a2e85' : '#262626'} display="block">{t.label}</Typography>
+                                            <Typography fontSize={11} color="#8c8c8c">{t.desc}</Typography>
+                                        </Box>
+                                    </Box>
                                 ))}
                             </Box>
-                        </Box>
+                        </Paper>
 
-                        {/* Summary stats */}
-                        <Grid container spacing={2} sx={{ mb: 3 }}>
-                            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                                <SummaryCard
-                                    title="Tổng doanh thu"
-                                    value={formatCurrency(totalRevenue)}
-                                    icon={<AttachMoney />}
-                                    color="#1976d2"
-                                    loading={loadingRevenue}
-                                />
-                            </Grid>
-                            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                                <SummaryCard
-                                    title="Lợi nhuận gộp"
-                                    value={formatCurrency(totalProfit)}
-                                    icon={<TrendingUp />}
-                                    color="#2e7d32"
-                                    loading={loadingRevenue}
-                                />
-                            </Grid>
-                            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                                <SummaryCard
-                                    title="Biên lợi nhuận"
-                                    value={`${marginPct}%`}
-                                    icon={<ShowChart />}
-                                    color="#9c27b0"
-                                    loading={loadingRevenue}
-                                    sub={`Giá vốn: ${formatCurrency(totalCOGS)}`}
-                                />
-                            </Grid>
-                            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                                <SummaryCard
-                                    title="Tổng hóa đơn"
-                                    value={totalInvoices.toLocaleString('vi-VN')}
-                                    icon={<Assessment />}
-                                    color="#ed6c02"
-                                    loading={loadingRevenue}
-                                />
-                            </Grid>
-                        </Grid>
+                        {/* Filters */}
+                        <Paper elevation={0} sx={{ borderRadius: 2, p: 2.5, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                            <Typography fontWeight={700} fontSize={13} color="#8c8c8c" textTransform="uppercase" mb={2}>Bộ lọc dữ liệu</Typography>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+                                <Box>
+                                    <Typography variant="body2" color="#8c8c8c" fontSize={12} mb={1}>Chi nhánh / Kho</Typography>
+                                    <FormControl size="small" fullWidth>
+                                        <Select value={warehouseId} onChange={e => setWarehouseId(e.target.value)} displayEmpty sx={{ fontSize: 13 }}>
+                                            <MenuItem value="">Tất cả chi nhánh</MenuItem>
+                                            {warehouses.map(w => <MenuItem key={w.id} value={w.id} sx={{ fontSize: 13 }}>{w.name}</MenuItem>)}
+                                        </Select>
+                                    </FormControl>
+                                </Box>
+                                <Box>
+                                    <Typography variant="body2" color="#8c8c8c" fontSize={12} mb={1}>Thời gian báo cáo</Typography>
+                                    <FormControl size="small" fullWidth>
+                                        <Select value={quickFilter} onChange={e => handleQuickFilterChange(e.target.value as any)} sx={{ fontSize: 13 }}>
+                                            <MenuItem value="today">Hôm nay</MenuItem>
+                                            <MenuItem value="yesterday">Hôm qua</MenuItem>
+                                            <MenuItem value="last7days">7 ngày qua</MenuItem>
+                                            <MenuItem value="30days">30 ngày</MenuItem>
+                                            <MenuItem value="thisMonth">Tháng này</MenuItem>
+                                            <MenuItem value="90days">3 tháng</MenuItem>
+                                            <MenuItem value="thisYear">Năm nay</MenuItem>
+                                            <MenuItem value="custom">Tùy chỉnh</MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                    {quickFilter === 'custom' ? (
+                                        <Box sx={{ display: 'flex', gap: 1, mt: 1.5, alignItems: 'center' }}>
+                                            <input
+                                                type="date"
+                                                value={customFrom}
+                                                onChange={e => { setCustomFrom(e.target.value); if (customTo && e.target.value) { setQuickFilter('custom'); fetchRevenue('custom', chartPeriod); } }}
+                                                style={{ flex: 1, padding: '8px 10px', borderRadius: '8px', border: '1px solid #e0e0e0', fontSize: '12px', fontWeight: 600, color: '#333', outline: 'none' }}
+                                            />
+                                            <Typography fontSize={12} color="#999">→</Typography>
+                                            <input
+                                                type="date"
+                                                value={customTo}
+                                                onChange={e => { setCustomTo(e.target.value); if (customFrom && e.target.value) { setQuickFilter('custom'); fetchRevenue('custom', chartPeriod); } }}
+                                                style={{ flex: 1, padding: '8px 10px', borderRadius: '8px', border: '1px solid #e0e0e0', fontSize: '12px', fontWeight: 600, color: '#333', outline: 'none' }}
+                                            />
+                                        </Box>
+                                    ) : (
+                                        <Box sx={{ border: '1px solid #e0e0e0', borderRadius: 1.5, p: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#fff', mt: 1.5 }}>
+                                            <Typography variant="body2" color="#666" fontSize={12}>
+                                                {(() => { const { from, to } = getDateRange(quickFilter); return `${from.toLocaleDateString('vi-VN')} → ${to.toLocaleDateString('vi-VN')}`; })()}
+                                            </Typography>
+                                        </Box>
+                                    )}
+                                </Box>
+                                <Box>
+                                    <Typography variant="body2" color="#8c8c8c" fontSize={12} mb={1}>Phương thức thanh toán</Typography>
+                                    <FormControl size="small" fullWidth>
+                                        <Select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} displayEmpty sx={{ fontSize: 13 }}>
+                                            <MenuItem value="">Tất cả phương thức</MenuItem>
+                                            <MenuItem value="CASH">Tiền mặt</MenuItem>
+                                            <MenuItem value="CARD">Thẻ ngân hàng</MenuItem>
+                                            <MenuItem value="MOMO">Ví MoMo</MenuItem>
+                                            <MenuItem value="VNPAY">VNPay</MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                </Box>
+                                <Button
+                                    variant="outlined"
+                                    fullWidth
+                                    startIcon={<Refresh />}
+                                    onClick={() => { setQuickFilter('thisMonth'); setChartPeriod('day'); setWarehouseId(''); setCustomFrom(''); setCustomTo(''); setPaymentMethod(''); }}
+                                    sx={{ color: '#666', borderColor: '#e0e0e0', textTransform: 'none', borderRadius: 1.5, mt: 0.5 }}
+                                >
+                                    Xóa bộ lọc
+                                </Button>
+                            </Box>
+                        </Paper>
+                    </Box>
+                </Grid>
 
-                        {/* Chart */}
-                        {loadingRevenue ? (
-                            <Skeleton variant="rectangular" height={320} sx={{ borderRadius: 2 }} />
-                        ) : chartData.length === 0 ? (
-                            <Box sx={{ height: 320, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#fafafa', borderRadius: 2 }}>
-                                <Box sx={{ textAlign: 'center' }}>
-                                    <Assessment sx={{ fontSize: 48, color: '#e0e0e0', mb: 1 }} />
-                                    <Typography color="text.secondary">Chưa có dữ liệu doanh thu</Typography>
+                {/* ── RIGHT CONTENT ── */}
+                <Grid size={{ xs: 12, md: 9 }}>
+                    <Paper elevation={0} sx={{ borderRadius: 2, p: 3, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                        {/* ── TAB 0: Tổng quan doanh thu ── */}
+                        {activeTab === 0 && (
+                            <Box>
+                                {/* Summary cards */}
+                                <Grid container spacing={2} sx={{ mb: 4 }}>
+                                    <Grid size={{ xs: 6, md: 3 }}><SummaryCard title="Tổng doanh thu" value={formatCurrency(totalRevenue)} icon={<AttachMoney />} color="#1976d2" loading={false} /></Grid>
+                                    <Grid size={{ xs: 6, md: 3 }}><SummaryCard title="Lợi nhuận gộp" value={formatCurrency(totalProfit)} icon={<TrendingUp />} color="#2e7d32" loading={false} /></Grid>
+                                    <Grid size={{ xs: 6, md: 3 }}><SummaryCard title="Biên lợi nhuận" value={`${marginPct}%`} icon={<ShowChart />} color="#9c27b0" loading={false} sub={`Giá vốn: ${formatCurrency(totalCOGS)}`} /></Grid>
+                                    <Grid size={{ xs: 6, md: 3 }}><SummaryCard title="Tổng hóa đơn" value={totalInvoices.toLocaleString('vi-VN')} icon={<Assessment />} color="#ed6c02" loading={false} /></Grid>
+                                </Grid>
+
+                                <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
+                                        <Box>
+                                            <Typography variant="h6" fontWeight={700} sx={{ m: 0 }}>Biểu đồ doanh thu</Typography>
+                                            <Typography variant="body2" color="#8c8c8c">Phân tích tăng trưởng và biến động doanh số</Typography>
+                                        </Box>
+                                        <Box sx={{ ml: 1, pl: 2, borderLeft: '1px solid #e0e0e0' }}>
+                                            <Typography variant="body2" color="#8c8c8c" fontSize={12}>Tổng doanh thu</Typography>
+                                            <Typography fontWeight={700} fontSize={20} color="#3f8600">{formatCurrency(totalRevenue)}</Typography>
+                                        </Box>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', gap: 0.5, bgcolor: '#f1f5f9', p: 0.5, borderRadius: 2 }}>
+                                        {[
+                                            { id: 'hour', label: 'Theo giờ' },
+                                            { id: 'day', label: 'Theo ngày' },
+                                            { id: 'dayOfWeek', label: 'Theo thứ' },
+                                            { id: 'month', label: 'Theo tháng' },
+                                            { id: 'year', label: 'Theo năm' }
+                                        ].map(p => (
+                                            <Button
+                                                key={p.id}
+                                                size="small"
+                                                onClick={() => handleQuickFilterChange(quickFilter, p.id)}
+                                                sx={{
+                                                    textTransform: 'none', fontSize: 11, borderRadius: 1.5,
+                                                    fontWeight: 700, px: 1.5, minWidth: 0,
+                                                    color: chartPeriod === p.id ? '#2563eb' : '#64748b',
+                                                    bgcolor: chartPeriod === p.id ? '#fff' : 'transparent',
+                                                    boxShadow: chartPeriod === p.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                                                    '&:hover': { bgcolor: chartPeriod === p.id ? '#fff' : 'rgba(0,0,0,0.04)' }
+                                                }}
+                                            >
+                                                {p.label}
+                                            </Button>
+                                        ))}
+                                    </Box>
+                                </Box>
+
+                                {/* Chart */}
+                                <Box sx={{ height: 400, position: 'relative' }}>
+                                    {loadingRevenue && (
+                                        <Box sx={{ position: 'absolute', inset: 0, bgcolor: 'rgba(255,255,255,0.6)', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 2 }}>
+                                            <CircularProgress size={36} />
+                                        </Box>
+                                    )}
+                                    {chartData.length === 0 && !loadingRevenue ? (
+                                        <Box sx={{ height: 380, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#fafafa', borderRadius: 2 }}>
+                                            <Box sx={{ textAlign: 'center' }}>
+                                                <Assessment sx={{ fontSize: 48, color: '#e0e0e0', mb: 1 }} />
+                                                <Typography color="text.secondary">Chưa có dữ liệu doanh thu</Typography>
+                                            </Box>
+                                        </Box>
+                                    ) : (
+                                        <>
+                                            <Typography variant="caption" color="text.secondary" display="block" mb={1.5}>Đơn vị: VNĐ</Typography>
+                                            <ResponsiveContainer width="100%" height={360}>
+                                                <BarChart data={chartData} margin={{ top: 10, right: 50, left: 0, bottom: 0 }}>
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b', fontWeight: 600 }} />
+                                                    <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} tickFormatter={val => `${(val / 1000).toLocaleString('vi-VN')}k`} />
+                                                    <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#0891b2', fontWeight: 600 }} />
+                                                    <Tooltip
+                                                        cursor={{ fill: '#f1f5f9' }}
+                                                        contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)', padding: '12px 16px' }}
+                                                        formatter={(val: number, name: string) => [
+                                                            name === 'Số HĐ' ? val : formatCurrency(val),
+                                                            name
+                                                        ]}
+                                                        labelStyle={{ fontWeight: 800, color: '#1e293b', marginBottom: 8 }}
+                                                    />
+                                                    <Legend align="center" verticalAlign="bottom" iconType="rect" wrapperStyle={{ paddingTop: 20, fontSize: 13, fontWeight: 700 }} />
+                                                    <Bar yAxisId="left" name="Doanh thu" dataKey="Doanh thu" fill="#16a34a" radius={[4, 4, 0, 0]} maxBarSize={80} />
+                                                    <Bar yAxisId="right" name="Số HĐ" dataKey="Số HĐ" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={80} />
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        </>
+                                    )}
                                 </Box>
                             </Box>
-                        ) : (
-                            <Paper elevation={0} sx={{ p: 2.5, borderRadius: 2, border: '1px solid #f0f0f0' }}>
-                                <Typography variant="caption" color="text.secondary" display="block" mb={1.5}>
-                                    Đơn vị: Triệu VNĐ (M)
-                                </Typography>
-                                <ResponsiveContainer width="100%" height={300}>
-                                    <ComposedChart data={chartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                                        <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#888' }} tickLine={false} axisLine={false} />
-                                        <YAxis yAxisId="left" tick={{ fontSize: 11, fill: '#888' }} tickLine={false} axisLine={false} />
-                                        <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: '#888' }} tickLine={false} axisLine={false} />
-                                        <Tooltip
-                                            formatter={(v: number, name: string) => {
-                                                if (name === 'Số HĐ') return [v, name];
-                                                return [`${v.toLocaleString('vi-VN')}M đ`, name];
-                                            }}
-                                            contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 12 }}
-                                        />
-                                        <Legend />
-                                        <Area yAxisId="left" type="monotone" dataKey="Doanh thu" fill="#e3f2fd" stroke="#1976d2" strokeWidth={2} dot={false} />
-                                        <Area yAxisId="left" type="monotone" dataKey="Lợi nhuận" fill="#e8f5e9" stroke="#2e7d32" strokeWidth={2} dot={false} />
-                                        <Line yAxisId="right" type="monotone" dataKey="Số HĐ" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} strokeDasharray="5 5" />
-                                    </ComposedChart>
-                                </ResponsiveContainer>
-                            </Paper>
                         )}
 
-                        {/* Revenue table */}
-                        {!loadingRevenue && chartData.length > 0 && (
-                            <Paper elevation={0} sx={{ mt: 2, borderRadius: 2, border: '1px solid #f0f0f0', overflow: 'hidden' }}>
-                                <Box sx={{ px: 2.5, py: 1.75, bgcolor: '#fafafa', borderBottom: '1px solid #f0f0f0' }}>
-                                    <Typography variant="caption" fontWeight={700} color="#555">CHI TIẾT THEO KỲ</Typography>
-                                </Box>
-                                <TableContainer sx={{ maxHeight: 280, overflow: 'auto' }}>
-                                    <Table size="small" stickyHeader>
-                                        <TableHead>
-                                            <TableRow sx={{ bgcolor: '#fafafa' }}>
-                                                {['Kỳ', 'Doanh thu', 'Giá vốn', 'Lợi nhuận gộp', 'Biên LN', 'Số HĐ'].map(c => (
-                                                    <TableCell key={c} sx={{ fontWeight: 700, fontSize: 11, color: '#888', bgcolor: '#fafafa' }}>
-                                                        {c}
-                                                    </TableCell>
-                                                ))}
-                                            </TableRow>
-                                        </TableHead>
-                                        <TableBody>
-                                            {revenueData.map((d, idx) => {
-                                                const margin = d.revenue > 0 ? ((d.gross_profit / d.revenue) * 100).toFixed(1) : '0';
-                                                return (
-                                                    <TableRow key={idx} hover sx={{ bgcolor: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
-                                                        <TableCell sx={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 600 }}>
-                                                            {fmtPeriod(d.period, period)}
-                                                        </TableCell>
-                                                        <TableCell sx={{ color: '#1976d2', fontWeight: 600, fontSize: 12 }}>
-                                                            {formatCurrency(d.revenue)}
-                                                        </TableCell>
-                                                        <TableCell sx={{ fontSize: 12 }}>{formatCurrency(d.cogs)}</TableCell>
-                                                        <TableCell sx={{ color: '#2e7d32', fontWeight: 600, fontSize: 12 }}>
-                                                            {formatCurrency(d.gross_profit)}
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <Chip
-                                                                label={`${margin}%`}
-                                                                size="small"
-                                                                sx={{
-                                                                    height: 20, fontSize: 10, fontWeight: 700,
-                                                                    bgcolor: Number(margin) >= 20 ? '#e8f5e9' : '#fff8e1',
-                                                                    color: Number(margin) >= 20 ? '#2e7d32' : '#e65100',
-                                                                }}
-                                                            />
-                                                        </TableCell>
-                                                        <TableCell sx={{ fontSize: 12, fontWeight: 600 }}>
-                                                            {d.invoice_count}
-                                                        </TableCell>
-                                                    </TableRow>
-                                                );
-                                            })}
-                                        </TableBody>
-                                    </Table>
-                                </TableContainer>
-                            </Paper>
-                        )}
-                    </TabPanel>
+                        {/* ── TAB 1: Giá trị tồn kho ── */}
+                        {activeTab === 1 && <InventoryValueTab warehouseId={warehouseId} />}
 
-                    {/* ── TAB 1: Giá trị tồn kho ── */}
-                    <TabPanel value={activeTab} index={1}>
-                        <InventoryValueTab warehouseId={warehouseId} />
-                    </TabPanel>
+                        {/* ── TAB 2: Hàng tồn động ── */}
+                        {activeTab === 2 && <DeadStockTab warehouseId={warehouseId} />}
 
-                    {/* ── TAB 2: Hàng tồn động ── */}
-                    <TabPanel value={activeTab} index={2}>
-                        <DeadStockTab warehouseId={warehouseId} />
-                    </TabPanel>
-
-                    {/* ── TAB 3: Sản phẩm bán chạy ── */}
-                    <TabPanel value={activeTab} index={3}>
-                        <TopProductsTab warehouseId={warehouseId} />
-                    </TabPanel>
-                </Box>
-            </Paper>
+                        {/* ── TAB 3: Hàng hóa ── */}
+                        {activeTab === 3 && <MerchandiseTab warehouseId={warehouseId} />}
+                    </Paper>
+                </Grid>
+            </Grid>
         </Box>
     );
 };

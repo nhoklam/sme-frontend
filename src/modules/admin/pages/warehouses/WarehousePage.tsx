@@ -129,7 +129,7 @@ const WarehousePage: React.FC = () => {
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                     <Box sx={{ width: 42, height: 42, borderRadius: 2, bgcolor: '#e3f2fd', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Storefront sx={{ color: '#1976d2', fontSize: 22 }} />
+                        <Storefront sx={{ color: '#2563eb', fontSize: 22 }} />
                     </Box>
                     <Box>
                         <Typography variant="h6" fontWeight={700} color="#1e293b">
@@ -144,7 +144,15 @@ const WarehousePage: React.FC = () => {
                     variant="contained"
                     startIcon={<Add />}
                     onClick={openCreate}
-                    sx={{ textTransform: 'none', borderRadius: 2, boxShadow: 'none', '&:hover': { boxShadow: 'none' } }}
+                    sx={{
+                        textTransform: 'none',
+                        borderRadius: 1.5,
+                        bgcolor: '#2563eb',
+                        fontWeight: 700,
+                        height: 40,
+                        boxShadow: 'none',
+                        '&:hover': { bgcolor: '#1d4ed8', boxShadow: 'none' }
+                    }}
                 >
                     Thêm kho mới
                 </Button>
@@ -185,14 +193,18 @@ const WarehousePage: React.FC = () => {
                                         <Chip
                                             label={w.isActive ? 'Đang hoạt động' : 'Ngừng hoạt động'}
                                             size="small"
-                                            color={w.isActive ? 'success' : 'default'}
-                                            sx={{ fontWeight: 600, fontSize: 11 }}
+                                            sx={{
+                                                fontWeight: 700,
+                                                fontSize: 11,
+                                                bgcolor: w.isActive ? '#dcfce7' : '#f1f5f9',
+                                                color: w.isActive ? '#16a34a' : '#64748b'
+                                            }}
                                         />
                                     </TableCell>
                                     <TableCell>
                                         <Box sx={{ display: 'flex', gap: 0.5 }}>
                                             <Tooltip title="Chỉnh sửa">
-                                                <IconButton size="small" onClick={() => openEdit(w)} sx={{ color: '#1976d2' }}>
+                                                <IconButton size="small" onClick={() => openEdit(w)} sx={{ color: '#f59e0b' }}>
                                                     <Edit fontSize="small" />
                                                 </IconButton>
                                             </Tooltip>
@@ -279,7 +291,15 @@ const WarehousePage: React.FC = () => {
                         onClick={handleSave}
                         disabled={saving}
                         startIcon={saving ? <CircularProgress size={14} /> : <Save />}
-                        sx={{ textTransform: 'none', boxShadow: 'none' }}
+                        sx={{
+                            textTransform: 'none',
+                            fontWeight: 700,
+                            bgcolor: '#2563eb',
+                            borderRadius: 1.5,
+                            height: 36,
+                            boxShadow: 'none',
+                            '&:hover': { bgcolor: '#1d4ed8', boxShadow: 'none' }
+                        }}
                     >
                         {editTarget ? 'Lưu thay đổi' : 'Tạo kho'}
                     </Button>

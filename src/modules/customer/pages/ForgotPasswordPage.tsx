@@ -48,12 +48,12 @@ export default function ForgotPasswordPage() {
 
     return (
         <Box sx={{
-            minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'linear-gradient(135deg, #1d4ed8 0%, #3b82f6 50%, #60a5fa 100%)',
-            p: 2,
+            minHeight: 'calc(100vh - 130px)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%)',
+            py: 4, p: 2,
         }}>
-            <Paper sx={{ width: '100%', maxWidth: 460, borderRadius: 4, overflow: 'hidden', boxShadow: '0 25px 50px rgba(0,0,0,0.15)' }}>
-                <Box sx={{ p: 4, pb: 3, background: 'linear-gradient(135deg, #1d4ed8, #3b82f6)', color: 'white', textAlign: 'center' }}>
+            <Paper sx={{ width: '100%', maxWidth: 460, borderRadius: 3, overflow: 'hidden', boxShadow: '0 16px 40px rgba(0,0,0,0.08)' }}>
+                <Box sx={{ p: 4, pb: 3, background: 'linear-gradient(135deg, #d32f2f, #b71c1c)', color: 'white', textAlign: 'center' }}>
                     <Box sx={{ width: 56, height: 56, bgcolor: 'rgba(255,255,255,0.2)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2 }}>
                         <LockReset sx={{ fontSize: 28 }} />
                     </Box>
@@ -105,7 +105,7 @@ export default function ForgotPasswordPage() {
                             <Button
                                 fullWidth variant="contained" size="large"
                                 onClick={handleSendEmail} disabled={loading}
-                                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, py: 1.5 }}
+                                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, py: 1.5, bgcolor: '#d32f2f', '&:hover': { bgcolor: '#b71c1c' } }}
                             >
                                 {loading ? 'Đang gửi...' : 'Gửi email xác nhận'}
                             </Button>
@@ -123,7 +123,7 @@ export default function ForgotPasswordPage() {
                             <Button
                                 fullWidth variant="contained" size="large"
                                 onClick={handleVerify} disabled={loading}
-                                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, py: 1.5 }}
+                                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, py: 1.5, bgcolor: '#d32f2f', '&:hover': { bgcolor: '#b71c1c' } }}
                             >
                                 {loading ? 'Đang xác nhận...' : 'Xác nhận (Demo)'}
                             </Button>
@@ -163,7 +163,7 @@ export default function ForgotPasswordPage() {
                             <Button
                                 fullWidth variant="contained" size="large"
                                 onClick={handleReset} disabled={loading}
-                                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, py: 1.5 }}
+                                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, py: 1.5, bgcolor: '#d32f2f', '&:hover': { bgcolor: '#b71c1c' } }}
                             >
                                 {loading ? 'Đang đặt lại...' : 'Đặt lại mật khẩu'}
                             </Button>
@@ -181,7 +181,7 @@ export default function ForgotPasswordPage() {
                             </Typography>
                             <Button
                                 fullWidth variant="contained" size="large" component={Link} to="/login"
-                                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, py: 1.5 }}
+                                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, py: 1.5, bgcolor: '#d32f2f', '&:hover': { bgcolor: '#b71c1c' } }}
                             >
                                 Đăng nhập ngay
                             </Button>

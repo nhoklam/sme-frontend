@@ -7,7 +7,7 @@ import {
 } from '@mui/material';
 import {
     ArrowBack, DeleteOutline, LocalShipping,
-    ConfirmationNumber, ArrowForward,
+    ConfirmationNumber, ArrowForward, Lock
 } from '@mui/icons-material';
 import CartItem from '../components/cart/CartItem';
 import { useCartContext } from '../../../store/CartContext';
@@ -15,7 +15,6 @@ import { fmt } from '../../../utils/constants';
 import ProductCard from '../components/products/ProductCard';
 import { useProducts } from '../hooks/useProducts';
 import promotionService from '../../../services/promotionService';
-import { Promotion } from '../../../types';
 
 const FREE_SHIP = 150000;
 
@@ -47,7 +46,7 @@ const CartPage = () => {
     const shipFee = totalPrice >= FREE_SHIP ? 0 : 30000;
     const finalPrice = totalPrice - discount + shipFee;
 
-    // Load suggested products from API (not from mock PRODUCTS constant)
+    // Load suggested products from API
     const { products: allProducts } = useProducts({ size: 8, page: 0 });
     const cartItemIds = new Set(items.map((i: any) => i.id));
     const suggested = allProducts.filter(p => !cartItemIds.has(p.id)).slice(0, 4);
@@ -69,25 +68,30 @@ const CartPage = () => {
 
     if (items.length === 0) {
         return (
-            <Box sx={{ bgcolor: '#f7f7f8', minHeight: '80vh' }}>
+            <Box sx={{ bgcolor: '#fafafb', minHeight: '80vh', display: 'flex', alignItems: 'center' }}>
                 <Container maxWidth="lg" sx={{ py: 6 }}>
-                    <Box sx={{ textAlign: 'center', py: 8 }}>
-                        <Typography fontSize={80} mb={2}>🛒</Typography>
-                        <Typography variant="h5" fontWeight={700} mb={1}>Giỏ hàng trống</Typography>
-                        <Typography color="text.secondary" mb={4}>
-                            Bạn chưa có sản phẩm nào trong giỏ hàng
+                    <Box sx={{ textAlign: 'center', py: 8, maxWidth: 500, mx: 'auto' }}>
+                        <Typography fontSize={90} mb={3} sx={{ filter: 'drop-shadow(0 10px 20px rgba(26,26,46,0.12))' }}>🛒</Typography>
+                        <Typography variant="h4" sx={{ fontFamily: '"Playfair Display", serif', fontWeight: 800, color: '#1a1a2e', mb: 1.5 }}>
+                            Giỏ hàng của bạn đang trống
+                        </Typography>
+                        <Typography color="text.secondary" sx={{ mb: 4, fontSize: '0.95rem', lineHeight: 1.6 }}>
+                            Khám phá hàng ngàn tựa sách hấp dẫn tại Bookly để tìm kiếm những người bạn đồng hành mới trên hành trình tri thức!
                         </Typography>
                         <Button
                             variant="contained"
                             onClick={() => navigate('/shop')}
                             startIcon={<ArrowBack />}
                             sx={{
-                                bgcolor: '#d32f2f',
+                                bgcolor: '#1a1a2e',
+                                color: '#ffffff',
                                 textTransform: 'none',
                                 fontWeight: 700,
                                 px: 4,
-                                borderRadius: 2,
-                                '&:hover': { bgcolor: '#b71c1c' },
+                                py: 1.5,
+                                borderRadius: '10px',
+                                boxShadow: '0 4px 12px rgba(26,26,46,0.15)',
+                                '&:hover': { bgcolor: '#f5a623', color: '#1a1a2e' },
                             }}
                         >
                             Tiếp tục mua sắm
@@ -99,63 +103,74 @@ const CartPage = () => {
     }
 
     return (
-        <Box sx={{ bgcolor: '#f7f7f8', minHeight: '100vh' }}>
-            <Container maxWidth="lg" sx={{ py: 3 }}>
+        <Box sx={{ bgcolor: '#fafafb', minHeight: '100vh', py: 5 }}>
+            <Container maxWidth="lg">
+
                 {/* Header */}
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography variant="h5" fontWeight={800} sx={{ letterSpacing: '-0.3px' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 4 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Typography variant="h4" sx={{ fontFamily: '"Playfair Display", serif', fontWeight: 900, color: '#1a1a2e' }}>
                             Giỏ hàng của bạn
                         </Typography>
                         <Chip
                             label={`${totalItems} sản phẩm`}
-                            size="small"
-                            sx={{ bgcolor: '#d32f2f', color: '#fff', fontWeight: 700 }}
+                            size="medium"
+                            sx={{ bgcolor: '#f5a623', color: '#1a1a2e', fontWeight: 800, fontSize: '0.8rem' }}
                         />
                     </Box>
                     <Button
-                        size="small"
+                        size="medium"
                         startIcon={<ArrowBack />}
                         onClick={() => navigate('/shop')}
-                        sx={{ color: '#666', textTransform: 'none', fontWeight: 500 }}
+                        sx={{ color: '#1a1a2e', textTransform: 'none', fontWeight: 600, '&:hover': { color: '#f5a623' } }}
                     >
-                        Tiếp tục mua sắm
+                        Tiếp tục chọn sách
                     </Button>
                 </Box>
 
-                <Grid container spacing={3}>
-                    {/* ── LEFT: Items ── */}
+                <Grid container spacing={4}>
+
+                    {/* ── LEFT: Items List & Coupon ── */}
                     <Grid size={{ xs: 12, md: 8 }}>
-                        <Paper elevation={0} sx={{ borderRadius: 2.5, overflow: 'hidden', border: '1px solid #f0f0f0' }}>
+                        <Paper elevation={0} sx={{
+                            borderRadius: '12px',
+                            overflow: 'hidden',
+                            border: '1px solid #eef0f2',
+                            boxShadow: '0 4px 20px rgba(0,0,0,0.02)'
+                        }}>
                             {/* Column header */}
                             <Box sx={{
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
-                                px: 2.5,
-                                py: 1.5,
-                                bgcolor: '#fafafa',
-                                borderBottom: '1px solid #f0f0f0',
+                                px: 3,
+                                py: 2,
+                                bgcolor: '#f8f9fa',
+                                borderBottom: '1px solid #eef0f2',
                             }}>
-                                <Typography variant="body2" fontWeight={700} color="text.secondary" sx={{ fontSize: 11, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-                                    Sản phẩm
+                                <Typography variant="body2" sx={{ fontWeight: 800, color: '#1a1a2e', fontSize: '0.75rem', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
+                                    Danh sách sản phẩm
                                 </Typography>
                                 <Button
                                     size="small"
-                                    startIcon={<DeleteOutline sx={{ fontSize: 14 }} />}
+                                    startIcon={<DeleteOutline sx={{ fontSize: 16 }} />}
                                     onClick={clearCart}
                                     sx={{
-                                        color: '#999',
+                                        color: '#8c9ba5',
                                         textTransform: 'none',
-                                        fontSize: 12,
-                                        '&:hover': { color: '#d32f2f', bgcolor: '#ffebee' },
+                                        fontWeight: 600,
+                                        fontSize: '0.8rem',
+                                        px: 1.5,
+                                        py: 0.5,
+                                        borderRadius: '6px',
+                                        '&:hover': { color: '#ff4d4f', bgcolor: '#fff0f6' },
                                     }}
                                 >
                                     Xóa tất cả
                                 </Button>
                             </Box>
 
-                            <Box sx={{ px: 2.5 }}>
+                            <Box sx={{ px: 3, py: 1 }}>
                                 {items.map((item: any) => (
                                     <CartItem
                                         key={item.id}
@@ -167,146 +182,181 @@ const CartPage = () => {
                             </Box>
                         </Paper>
 
-                        {/* Coupon */}
-                        <Paper elevation={0} sx={{ borderRadius: 2.5, p: 2.5, mt: 2, border: '1px solid #f0f0f0' }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                                <ConfirmationNumber sx={{ color: '#d32f2f', fontSize: 20 }} />
-                                <Typography variant="body2" fontWeight={700}>Mã giảm giá</Typography>
+                        {/* Coupon - Promotion code section */}
+                        <Paper elevation={0} sx={{
+                            borderRadius: '12px',
+                            p: 3,
+                            mt: 3,
+                            border: '1px solid #eef0f2',
+                            boxShadow: '0 4px 20px rgba(0,0,0,0.02)'
+                        }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 2 }}>
+                                <ConfirmationNumber sx={{ color: '#1a1a2e', fontSize: 22 }} />
+                                <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#1a1a2e' }}>Ưu đãi & Mã giảm giá</Typography>
                                 {appliedPromotion && (
                                     <Chip
-                                        label={appliedPromotion.type === 'PERCENTAGE' ? `-${appliedPromotion.discountValue}%` : `-${fmt(appliedPromotion.discountValue)}`}
+                                        label={appliedPromotion.type === 'PERCENTAGE' ? `Giảm ${appliedPromotion.discountValue}%` : `Giảm ${fmt(appliedPromotion.discountValue)}`}
                                         size="small"
-                                        sx={{ bgcolor: '#e8f5e9', color: '#2e7d32', fontWeight: 700, fontSize: 11 }}
+                                        sx={{ bgcolor: '#e8f5e9', color: '#2e7d32', fontWeight: 800, fontSize: '0.75rem' }}
                                     />
                                 )}
                             </Box>
-                            <Box sx={{ display: 'flex', gap: 1 }}>
+                            <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
                                 <TextField
-                                    size="small"
+                                    size="medium"
                                     fullWidth
-                                    placeholder="Nhập mã giảm giá..."
+                                    placeholder="Nhập mã ưu đãi của bạn..."
                                     value={coupon}
                                     onChange={e => { setCoupon(e.target.value); setCouponErr(''); }}
                                     error={!!couponErr}
-                                    helperText={couponErr || (appliedPromotion ? `✅ Đã áp dụng: ${appliedPromotion.name}` : '')}
+                                    helperText={couponErr || (appliedPromotion ? `🎉 Đã áp dụng ưu đãi thành công: ${appliedPromotion.name}` : 'Mỗi đơn hàng có thể áp dụng 1 coupon giảm giá')}
                                     FormHelperTextProps={{
-                                        sx: { color: appliedPromotion ? '#2e7d32' : undefined },
+                                        sx: { color: appliedPromotion ? '#2e7d32' : 'text.secondary', fontWeight: appliedPromotion ? 600 : 400 },
                                     }}
                                     disabled={!!appliedPromotion || isValidating}
                                     sx={{
+                                        '& .MuiOutlinedInput-root': {
+                                            borderRadius: '8px',
+                                        },
                                         '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                            borderColor: '#d32f2f',
+                                            borderColor: '#f5a623',
                                         },
                                     }}
                                 />
                                 {appliedPromotion ? (
                                     <Button
                                         variant="outlined"
-                                        size="small"
+                                        size="large"
                                         onClick={() => { setAppliedPromotion(null); setCoupon(''); }}
                                         sx={{
-                                            borderColor: '#d32f2f',
-                                            color: '#d32f2f',
+                                            borderColor: '#ff4d4f',
+                                            color: '#ff4d4f',
                                             textTransform: 'none',
-                                            whiteSpace: 'nowrap',
-                                            minWidth: 80,
-                                            borderRadius: 2,
+                                            fontWeight: 700,
+                                            height: 56,
+                                            px: 3,
+                                            borderRadius: '8px',
+                                            '&:hover': { borderColor: '#d9363e', bgcolor: '#fff0f6' }
                                         }}
                                     >
-                                        Bỏ mã
+                                        Hủy mã
                                     </Button>
                                 ) : (
                                     <Button
                                         variant="contained"
-                                        size="small"
+                                        size="large"
                                         onClick={applyCoupon}
                                         disabled={isValidating || !coupon.trim()}
                                         sx={{
-                                            bgcolor: '#d32f2f',
+                                            bgcolor: '#1a1a2e',
+                                            color: '#ffffff',
                                             textTransform: 'none',
+                                            fontWeight: 700,
+                                            height: 56,
+                                            px: 3,
+                                            borderRadius: '8px',
+                                            boxShadow: 'none',
                                             whiteSpace: 'nowrap',
-                                            minWidth: 80,
-                                            borderRadius: 2,
-                                            '&:hover': { bgcolor: '#b71c1c' },
+                                            '&:hover': { bgcolor: '#f5a623', color: '#1a1a2e' },
+                                            '&:disabled': { bgcolor: '#f0f0f2', color: '#bbb' }
                                         }}
                                     >
-                                        {isValidating ? '...' : 'Áp dụng'}
+                                        {isValidating ? 'Đang xác thực...' : 'Áp dụng'}
                                     </Button>
                                 )}
                             </Box>
                         </Paper>
                     </Grid>
 
-                    {/* ── RIGHT: Summary ── */}
+                    {/* ── RIGHT: Summary Checkout Box ── */}
                     <Grid size={{ xs: 12, md: 4 }}>
-                        <Paper elevation={0} sx={{ borderRadius: 2.5, p: 2.5, position: 'sticky', top: 80, border: '1px solid #f0f0f0' }}>
-                            <Typography variant="h6" fontWeight={800} mb={2}>Tóm tắt đơn hàng</Typography>
+                        <Paper elevation={0} sx={{
+                            borderRadius: '12px',
+                            p: 3,
+                            position: 'sticky',
+                            top: 100,
+                            border: '1px solid #eef0f2',
+                            boxShadow: '0 8px 30px rgba(26,26,46,0.04)'
+                        }}>
+                            <Typography variant="h6" sx={{ fontFamily: '"Playfair Display", serif', fontWeight: 800, color: '#1a1a2e', mb: 2.5 }}>Tóm tắt đơn hàng</Typography>
 
-                            {/* Ship notice */}
+                            {/* Free ship indicator bar */}
                             <Box sx={{
-                                p: 1.5,
-                                borderRadius: 2,
+                                p: 1.8,
+                                borderRadius: '8px',
                                 mb: 2,
-                                bgcolor: shipFee === 0 ? '#e8f5e9' : '#fff8e1',
+                                bgcolor: shipFee === 0 ? 'rgba(46, 125, 50, 0.06)' : 'rgba(245, 166, 35, 0.08)',
                                 display: 'flex',
-                                gap: 1,
+                                gap: 1.2,
                                 alignItems: 'flex-start',
                             }}>
                                 <LocalShipping sx={{
-                                    fontSize: 18,
-                                    color: shipFee === 0 ? '#2e7d32' : '#f57c00',
+                                    fontSize: 20,
+                                    color: shipFee === 0 ? '#2e7d32' : '#db941e',
                                     mt: 0.2,
                                 }} />
                                 <Typography
                                     variant="caption"
-                                    color={shipFee === 0 ? '#2e7d32' : '#f57c00'}
-                                    fontWeight={600}
-                                    lineHeight={1.5}
+                                    color={shipFee === 0 ? '#2e7d32' : '#db941e'}
+                                    sx={{ fontWeight: 700, lineHeight: 1.5, fontSize: '0.8rem' }}
                                 >
                                     {shipFee === 0
-                                        ? '🎉 Bạn được miễn phí vận chuyển!'
-                                        : `Mua thêm ${fmt(FREE_SHIP - totalPrice)} để miễn phí ship`}
+                                        ? 'Chúc mừng! Bạn đã nhận ưu đãi Miễn phí vận chuyển.'
+                                        : `Mua thêm ${fmt(FREE_SHIP - totalPrice)} để được Miễn phí vận chuyển.`}
                                 </Typography>
                             </Box>
 
                             {/* Progress bar */}
-                            <Box sx={{ height: 4, bgcolor: '#f0f0f0', borderRadius: 2, mb: 2, overflow: 'hidden' }}>
+                            <Box sx={{ height: 6, bgcolor: '#f0f0f2', borderRadius: 3, mb: 3, overflow: 'hidden' }}>
                                 <Box sx={{
                                     height: '100%',
                                     width: `${Math.min((totalPrice / FREE_SHIP) * 100, 100)}%`,
-                                    bgcolor: shipFee === 0 ? '#4caf50' : '#f57c00',
-                                    borderRadius: 2,
-                                    transition: 'width 0.4s ease',
+                                    bgcolor: shipFee === 0 ? '#2e7d32' : '#f5a623',
+                                    borderRadius: 3,
+                                    transition: 'width 0.4s ease-out',
                                 }} />
                             </Box>
 
-                            {/* Price breakdown */}
-                            {[
-                                { label: 'Tạm tính', value: fmt(totalPrice), color: 'text.primary', show: true },
-                                { label: 'Tiết kiệm', value: `-${fmt(totalSaved)}`, color: '#2e7d32', show: totalSaved > 0 },
-                                {
-                                    label: `Mã giảm giá ${appliedPromotion?.code ? `(${appliedPromotion.code})` : ''}`,
-                                    value: `-${fmt(discount)}`,
-                                    color: '#d32f2f',
-                                    show: !!appliedPromotion
-                                },
-                                { label: 'Phí vận chuyển', value: shipFee === 0 ? 'Miễn phí' : fmt(shipFee), color: shipFee === 0 ? '#2e7d32' : 'text.primary', show: true },
-                            ].filter(r => r.show).map(({ label, value, color }) => (
-                                <Box key={label} sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                                    <Typography variant="body2" color="text.secondary">{label}</Typography>
-                                    <Typography variant="body2" fontWeight={600} color={color}>{value}</Typography>
+                            {/* Pricing Details */}
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <Typography variant="body2" color="text.secondary">Tạm tính</Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#1a1a2e' }}>{fmt(totalPrice)}</Typography>
                                 </Box>
-                            ))}
 
-                            <Divider sx={{ my: 1.5 }} />
+                                {totalSaved > 0 && (
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <Typography variant="body2" color="text.secondary">Tiết kiệm trực tiếp</Typography>
+                                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#2e7d32' }}>-{fmt(totalSaved)}</Typography>
+                                    </Box>
+                                )}
 
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2.5 }}>
-                                <Typography variant="body1" fontWeight={700}>Tổng cộng</Typography>
-                                <Typography variant="h6" fontWeight={900} color="#d32f2f">
+                                {appliedPromotion && (
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <Typography variant="body2" color="text.secondary">Mã giảm giá ({appliedPromotion.code})</Typography>
+                                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#ff4d4f' }}>-{fmt(discount)}</Typography>
+                                    </Box>
+                                )}
+
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <Typography variant="body2" color="text.secondary">Phí vận chuyển</Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: 700, color: shipFee === 0 ? '#2e7d32' : '#1a1a2e' }}>
+                                        {shipFee === 0 ? 'Miễn phí' : fmt(shipFee)}
+                                    </Typography>
+                                </Box>
+                            </Box>
+
+                            <Divider sx={{ my: 2.5, borderColor: '#eef0f2' }} />
+
+                            {/* Total Final Price */}
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                                <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#1a1a2e' }}>Tổng cộng</Typography>
+                                <Typography variant="h5" sx={{ fontWeight: 900, color: '#1a1a2e' }}>
                                     {fmt(finalPrice)}
                                 </Typography>
                             </Box>
 
+                            {/* Proceed Checkout Button */}
                             <Button
                                 fullWidth
                                 variant="contained"
@@ -314,33 +364,40 @@ const CartPage = () => {
                                 endIcon={<ArrowForward />}
                                 onClick={() => navigate('/checkout')}
                                 sx={{
-                                    bgcolor: '#d32f2f',
+                                    bgcolor: '#1a1a2e',
+                                    color: '#ffffff',
                                     textTransform: 'none',
                                     fontWeight: 700,
-                                    py: 1.5,
-                                    fontSize: 15,
-                                    borderRadius: 2.5,
-                                    '&:hover': { bgcolor: '#b71c1c' },
+                                    py: 1.8,
+                                    fontSize: '0.95rem',
+                                    borderRadius: '8px',
+                                    boxShadow: '0 4px 12px rgba(26,26,46,0.15)',
+                                    '&:hover': { bgcolor: '#f5a623', color: '#1a1a2e' },
                                 }}
                             >
                                 Tiến hành thanh toán
                             </Button>
 
-                            <Typography variant="caption" color="text.secondary" display="block" textAlign="center" mt={1.5}>
-                                🔒 Thanh toán an toàn & bảo mật
-                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.8, mt: 2 }}>
+                                <Lock sx={{ fontSize: 14, color: '#8c9ba5' }} />
+                                <Typography variant="caption" sx={{ color: '#8c9ba5', fontWeight: 500 }}>
+                                    Thanh toán an toàn & bảo mật 256-bit SSL
+                                </Typography>
+                            </Box>
                         </Paper>
                     </Grid>
                 </Grid>
 
-                {/* Suggested products from API */}
+                {/* Suggested products */}
                 {suggested.length > 0 && (
-                    <Box sx={{ mt: 4 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                            <Box sx={{ width: 4, height: 24, bgcolor: '#d32f2f', borderRadius: 2 }} />
-                            <Typography variant="h6" fontWeight={800}>Có thể bạn cũng thích</Typography>
+                    <Box sx={{ mt: 7 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 3.5 }}>
+                            <Box sx={{ width: 5, height: 26, bgcolor: '#f5a623', borderRadius: 1 }} />
+                            <Typography variant="h5" sx={{ fontFamily: '"Playfair Display", serif', fontWeight: 900, color: '#1a1a2e' }}>
+                                Có thể bạn quan tâm
+                            </Typography>
                         </Box>
-                        <Grid container spacing={2}>
+                        <Grid container spacing={3}>
                             {suggested.map(p => (
                                 <Grid size={{ xs: 6, sm: 4, md: 3 }} key={p.id}>
                                     <ProductCard product={p} />

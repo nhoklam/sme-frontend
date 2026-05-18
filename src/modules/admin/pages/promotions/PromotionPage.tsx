@@ -5,8 +5,9 @@ import {
     Chip, IconButton, Select, MenuItem, FormControl, Tooltip,
     Pagination, Skeleton, Alert, Dialog, DialogTitle,
     DialogContent, DialogActions, Divider, Grid, Card, CardContent,
-    Switch, FormControlLabel, CircularProgress
+    Switch, FormControlLabel, CircularProgress, Slide
 } from '@mui/material';
+import { TransitionProps } from '@mui/material/transitions';
 import {
     Search, Add, Refresh, LocalOffer, Edit, Delete,
     Event, FilterList, CheckCircle, Info, ConfirmationNumber,
@@ -18,13 +19,23 @@ import promotionService from '../../../../services/promotionService';
 import { Promotion, PromotionType } from '../../../../types';
 
 const fmtCurrency = (n: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n);
-const fmtDate = (s: string) => new Date(s).toLocaleDateString('vi-VN');
+const fmtDate = (s: string) => {
+    const d = new Date(s);
+    return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
+};
 
 const TYPE_MAP: Record<PromotionType, { label: string; color: string; bg: string }> = {
     PERCENTAGE: { label: 'Phần trăm', color: '#1d4ed8', bg: '#eff6ff' },
     FIXED_AMOUNT: { label: 'Số tiền cố định', color: '#059669', bg: '#ecfdf5' },
-    BUY_X_GET_Y: { label: 'Mua X tặng Y', color: '#7c3aed', bg: '#f5f3ff' },
+    BUY_X_GET_Y: { label: 'Mua X tặng Y', color: '#9333ea', bg: '#faf5ff' }
 };
+
+const Transition = React.forwardRef(function Transition(
+    props: TransitionProps & { children: React.ReactElement<any, any> },
+    ref: React.Ref<unknown>,
+) {
+    return <Slide direction="up" ref={ref} {...props} />;
+});
 
 export default function PromotionPage() {
     const [page, setPage] = useState(0);
@@ -75,7 +86,7 @@ export default function PromotionPage() {
                 </Box>
                 <Button
                     variant="contained" startIcon={<Add />} onClick={() => setCreateOpen(true)}
-                    sx={{ bgcolor: '#1976d2', textTransform: 'none', fontWeight: 800, borderRadius: 2.5, px: 3, py: 1 }}
+                    sx={{ bgcolor: '#2563eb', textTransform: 'none', fontWeight: 800, borderRadius: 2.5, px: 3, py: 1, '&:hover': { bgcolor: '#1d4ed8' } }}
                 >
                     Tạo chương trình mới
                 </Button>
@@ -123,7 +134,7 @@ export default function PromotionPage() {
                     <Table>
                         <TableHead>
                             <TableRow sx={{ bgcolor: '#fafafa' }}>
-                                {['Chương trình', 'Loại', 'Mức giảm', 'Thời hạn', 'Đã dùng', 'Trạng thái', ''].map((h) => (
+                                {['Chương trình', 'Phân loại', 'Mức giảm', 'Thời hạn', 'Đã dùng', 'Trạng thái', 'Thao tác'].map((h) => (
                                     <TableCell key={h} sx={{ fontWeight: 800, fontSize: 11, color: '#888', py: 2 }}>{h.toUpperCase()}</TableCell>
                                 ))}
                             </TableRow>
@@ -152,7 +163,15 @@ export default function PromotionPage() {
                                                 </Typography>
                                             </TableCell>
                                             <TableCell>
-                                                <Chip label={type.label} size="small" sx={{ height: 20, fontSize: 10, fontWeight: 700, bgcolor: type.bg, color: type.color }} />
+                                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, alignItems: 'flex-start' }}>
+                                                    <Chip label={type.label} size="small" sx={{ height: 20, fontSize: 10, fontWeight: 700, bgcolor: type.bg, color: type.color }} />
+                                                    <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                                        <Chip label={p.promotionSlot === 'SHIPPING' ? 'Phí vận chuyển' : 'Đơn hàng'} size="small" variant="outlined" sx={{ height: 18, fontSize: 9, fontWeight: 700 }} />
+                                                        {p.triggerType === 'AUTO' && (
+                                                            <Chip label="Tự động" size="small" sx={{ height: 18, fontSize: 9, fontWeight: 700, bgcolor: '#fef2f2', color: '#ef4444' }} />
+                                                        )}
+                                                    </Box>
+                                                </Box>
                                             </TableCell>
                                             <TableCell>
                                                 <Typography variant="body2" fontWeight={800} color="#1e293b">
@@ -168,7 +187,7 @@ export default function PromotionPage() {
                                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: isExpired ? '#ef4444' : '#64748b' }}>
                                                     <CalendarToday sx={{ fontSize: 14 }} />
                                                     <Typography variant="caption" fontWeight={600}>
-                                                        {p.startDate ? new Date(p.startDate).toLocaleDateString('vi-VN') : '?'} - {p.endDate ? new Date(p.endDate).toLocaleDateString('vi-VN') : '?'}
+                                                        {p.startDate ? fmtDate(p.startDate) : '?'} - {p.endDate ? fmtDate(p.endDate) : '?'}
                                                     </Typography>
                                                 </Box>
                                             </TableCell>
@@ -185,8 +204,8 @@ export default function PromotionPage() {
                                                 />
                                             </TableCell>
                                             <TableCell align="right">
-                                                <IconButton size="small" onClick={() => handleEdit(p)} sx={{ color: '#6366f1' }}><Edit sx={{ fontSize: 18 }} /></IconButton>
-                                                <IconButton size="small" onClick={() => handleDelete(p.id)} sx={{ color: '#ef4444' }}><Delete sx={{ fontSize: 18 }} /></IconButton>
+                                                <IconButton size="small" onClick={() => handleEdit(p)} sx={{ color: '#f59e0b', '&:hover': { bgcolor: '#fef3c7' } }}><Edit sx={{ fontSize: 18 }} /></IconButton>
+                                                <IconButton size="small" onClick={() => handleDelete(p.id)} sx={{ color: '#ef4444', '&:hover': { bgcolor: '#fef2f2' } }}><Delete sx={{ fontSize: 18 }} /></IconButton>
                                             </TableCell>
                                         </TableRow>
                                     );
@@ -217,7 +236,8 @@ const PromotionDialog = ({ open, editing, onClose, onSuccess }: { open: boolean;
         name: '', code: '', discountType: 'PERCENTAGE', discountValue: 0,
         startDate: new Date().toISOString().split('T')[0],
         endDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
-        isActive: true, minOrderValue: 0, maxUsage: undefined, maxDiscountAmount: undefined
+        isActive: true, minOrderValue: 0, maxUsage: undefined, maxDiscountAmount: undefined,
+        promotionSlot: 'ORDER', applicableChannel: 'ALL', triggerType: 'MANUAL', conditionType: 'NULL', conditionValue: ''
     });
 
     useEffect(() => {
@@ -229,14 +249,20 @@ const PromotionDialog = ({ open, editing, onClose, onSuccess }: { open: boolean;
                 discountType: editing.discountType || editing.type || 'PERCENTAGE',
                 minOrderValue: editing.minOrderValue || editing.minOrderAmount || 0,
                 maxDiscountAmount: editing.maxDiscountAmount,
-                maxUsage: editing.maxUsage
+                maxUsage: editing.maxUsage,
+                promotionSlot: editing.promotionSlot || 'ORDER',
+                applicableChannel: editing.applicableChannel || 'ALL',
+                triggerType: editing.triggerType || 'MANUAL',
+                conditionType: editing.conditionType || 'NULL',
+                conditionValue: editing.conditionValue || ''
             });
         } else {
             setForm({
                 name: '', code: '', discountType: 'PERCENTAGE', discountValue: 0,
                 startDate: new Date().toISOString().split('T')[0],
                 endDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
-                isActive: true, minOrderValue: 0, maxUsage: undefined, maxDiscountAmount: undefined
+                isActive: true, minOrderValue: 0, maxUsage: undefined, maxDiscountAmount: undefined,
+                promotionSlot: 'ORDER', applicableChannel: 'ALL', triggerType: 'MANUAL', conditionType: 'NULL', conditionValue: ''
             });
         }
     }, [editing, open]);
@@ -259,7 +285,12 @@ const PromotionDialog = ({ open, editing, onClose, onSuccess }: { open: boolean;
                 maxUsage: form.maxUsage ? Number(form.maxUsage) : null,
                 startDate: new Date(form.startDate + 'T00:00:00Z').toISOString(),
                 endDate: new Date(form.endDate + 'T23:59:59Z').toISOString(),
-                isActive: form.isActive ?? true
+                isActive: form.isActive ?? true,
+                promotionSlot: form.promotionSlot,
+                applicableChannel: form.applicableChannel,
+                triggerType: form.triggerType,
+                conditionType: form.conditionType,
+                conditionValue: form.conditionValue
             };
             if (editing) {
                 await promotionService.update(editing.id, payload as any);
@@ -275,12 +306,26 @@ const PromotionDialog = ({ open, editing, onClose, onSuccess }: { open: boolean;
     };
 
     return (
-        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
-            <DialogTitle sx={{ fontWeight: 800, px: 3, pt: 3 }}>
+        <Dialog
+            open={open}
+            onClose={onClose}
+            maxWidth="md"
+            fullWidth
+            TransitionComponent={Transition}
+            PaperProps={{
+                sx: {
+                    borderRadius: 4,
+                    boxShadow: '0 24px 48px rgba(0,0,0,0.1)',
+                    maxHeight: '90vh'
+                }
+            }}
+        >
+            <DialogTitle sx={{ fontWeight: 800, px: 4, pt: 4, pb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <LocalOffer sx={{ color: '#2563eb' }} />
                 {editing ? 'Chỉnh sửa Khuyến mãi' : 'Tạo Khuyến mãi Mới'}
             </DialogTitle>
-            <DialogContent sx={{ px: 3 }}>
-                <Grid container spacing={2} sx={{ mt: 0.5 }}>
+            <DialogContent sx={{ px: 4, pb: 4, overflowY: 'auto' }}>
+                <Grid container spacing={2.5} sx={{ mt: 0.5 }}>
                     <Grid size={{ xs: 12, sm: 6 }}>
                         <Typography variant="caption" fontWeight={800} color="text.secondary">Mã ưu đãi *</Typography>
                         <TextField
@@ -340,28 +385,113 @@ const PromotionDialog = ({ open, editing, onClose, onSuccess }: { open: boolean;
                         />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
-                        <Typography variant="caption" fontWeight={800} color="text.secondary">Ngày bắt đầu</Typography>
+                        <Typography variant="caption" fontWeight={800} color="text.secondary">Ngày bắt đầu (DD/MM/YYYY)</Typography>
                         <TextField
-                            fullWidth size="small" type="date" sx={{ mt: 0.5 }} InputLabelProps={{ shrink: true }}
-                            value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })}
+                            fullWidth size="small" sx={{ mt: 0.5 }}
+                            placeholder="DD/MM/YYYY"
+                            value={form.startDate ? (() => { const parts = form.startDate.split('-'); return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : form.startDate; })() : ''}
+                            onChange={e => {
+                                const v = e.target.value.replace(/[^\d/]/g, '');
+                                // Auto-format: thêm / sau ngày và tháng
+                                let formatted = v;
+                                const digits = v.replace(/\//g, '');
+                                if (digits.length >= 2 && !v.includes('/')) formatted = digits.slice(0, 2) + '/' + digits.slice(2);
+                                if (digits.length >= 4 && v.split('/').length < 3) { formatted = digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4, 8); }
+                                // Parse DD/MM/YYYY -> YYYY-MM-DD
+                                const match = formatted.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+                                if (match) {
+                                    setForm({ ...form, startDate: `${match[3]}-${match[2]}-${match[1]}` });
+                                } else {
+                                    setForm({ ...form, startDate: formatted });
+                                }
+                            }}
+                            inputProps={{ maxLength: 10 }}
                         />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
-                        <Typography variant="caption" fontWeight={800} color="text.secondary">Ngày kết thúc</Typography>
+                        <Typography variant="caption" fontWeight={800} color="text.secondary">Ngày kết thúc (DD/MM/YYYY)</Typography>
                         <TextField
-                            fullWidth size="small" type="date" sx={{ mt: 0.5 }} InputLabelProps={{ shrink: true }}
-                            value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })}
+                            fullWidth size="small" sx={{ mt: 0.5 }}
+                            placeholder="DD/MM/YYYY"
+                            value={form.endDate ? (() => { const parts = form.endDate.split('-'); return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : form.endDate; })() : ''}
+                            onChange={e => {
+                                const v = e.target.value.replace(/[^\d/]/g, '');
+                                let formatted = v;
+                                const digits = v.replace(/\//g, '');
+                                if (digits.length >= 2 && !v.includes('/')) formatted = digits.slice(0, 2) + '/' + digits.slice(2);
+                                if (digits.length >= 4 && v.split('/').length < 3) { formatted = digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4, 8); }
+                                const match = formatted.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+                                if (match) {
+                                    setForm({ ...form, endDate: `${match[3]}-${match[2]}-${match[1]}` });
+                                } else {
+                                    setForm({ ...form, endDate: formatted });
+                                }
+                            }}
+                            inputProps={{ maxLength: 10 }}
                         />
                     </Grid>
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                        <Typography variant="caption" fontWeight={800} color="text.secondary">Loại khuyến mãi (Slot)</Typography>
+                        <Select
+                            fullWidth size="small" value={form.promotionSlot || 'ORDER'} sx={{ mt: 0.5 }}
+                            onChange={e => setForm({ ...form, promotionSlot: e.target.value as any })}
+                        >
+                            <MenuItem value="ORDER">Giảm giá Đơn hàng</MenuItem>
+                            <MenuItem value="SHIPPING">Giảm giá Vận chuyển</MenuItem>
+                        </Select>
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                        <Typography variant="caption" fontWeight={800} color="text.secondary">Kênh áp dụng</Typography>
+                        <Select
+                            fullWidth size="small" value={form.applicableChannel || 'ALL'} sx={{ mt: 0.5 }}
+                            onChange={e => setForm({ ...form, applicableChannel: e.target.value as any })}
+                        >
+                            <MenuItem value="ALL">Tất cả kênh (Online & POS)</MenuItem>
+                            <MenuItem value="ONLINE">Chỉ Online (App/Web)</MenuItem>
+                            <MenuItem value="POS">Chỉ tại quầy (POS)</MenuItem>
+                        </Select>
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                        <Typography variant="caption" fontWeight={800} color="text.secondary">Cơ chế áp dụng (Trigger)</Typography>
+                        <Select
+                            fullWidth size="small" value={form.triggerType || 'MANUAL'} sx={{ mt: 0.5 }}
+                            onChange={e => setForm({ ...form, triggerType: e.target.value as any })}
+                        >
+                            <MenuItem value="MANUAL">Thủ công (Nhập mã)</MenuItem>
+                            <MenuItem value="AUTO">Tự động (Hệ thống tự tính)</MenuItem>
+                        </Select>
+                    </Grid>
+                    {form.triggerType === 'AUTO' && (
+                        <>
+                            <Grid size={{ xs: 12, sm: 6 }}>
+                                <Typography variant="caption" fontWeight={800} color="text.secondary">Điều kiện áp dụng</Typography>
+                                <Select
+                                    fullWidth size="small" value={form.conditionType || 'NULL'} sx={{ mt: 0.5 }}
+                                    onChange={e => setForm({ ...form, conditionType: e.target.value as any })}
+                                >
+                                    <MenuItem value="NULL">Không cần điều kiện</MenuItem>
+                                    <MenuItem value="DAY_OF_WEEK">Theo thứ trong tuần</MenuItem>
+                                    <MenuItem value="CUSTOMER_TIER">Theo hạng thành viên</MenuItem>
+                                </Select>
+                            </Grid>
+                            <Grid size={{ xs: 12, sm: 6 }}>
+                                <Typography variant="caption" fontWeight={800} color="text.secondary">Giá trị điều kiện</Typography>
+                                <TextField
+                                    fullWidth size="small" placeholder={form.conditionType === 'DAY_OF_WEEK' ? "Vd: 1,3,5 (T2, T4, T6)" : "Vd: GOLD, VIP"} sx={{ mt: 0.5 }}
+                                    value={form.conditionValue || ''} onChange={e => setForm({ ...form, conditionValue: e.target.value })}
+                                />
+                            </Grid>
+                        </>
+                    )}
                 </Grid>
             </DialogContent>
-            <DialogActions sx={{ p: 3, pt: 1 }}>
-                <Button onClick={onClose} sx={{ textTransform: 'none', fontWeight: 700, color: '#64748b' }}>Hủy</Button>
+            <DialogActions sx={{ p: 3, px: 4, borderTop: '1px solid #f1f5f9', bgcolor: '#f8fafc' }}>
+                <Button onClick={onClose} sx={{ textTransform: 'none', fontWeight: 700, color: '#64748b' }}>Hủy bỏ</Button>
                 <Button
                     variant="contained" onClick={handleSave} disabled={loading}
-                    sx={{ textTransform: 'none', fontWeight: 800, borderRadius: 2, px: 4 }}
+                    sx={{ textTransform: 'none', fontWeight: 800, borderRadius: 2, px: 4, bgcolor: '#0f172a', '&:hover': { bgcolor: '#334155' }, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                 >
-                    {loading ? <CircularProgress size={20} /> : editing ? 'Cập nhật' : 'Lưu lại'}
+                    {loading ? <CircularProgress size={20} color="inherit" /> : editing ? 'Cập nhật' : 'Tạo mới'}
                 </Button>
             </DialogActions>
         </Dialog>

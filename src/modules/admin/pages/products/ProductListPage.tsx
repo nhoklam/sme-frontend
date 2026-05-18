@@ -10,10 +10,11 @@ import {
 } from '@mui/material';
 import {
     Search, Add, Visibility, Edit, ImageNotSupported,
-    Refresh, Print, FilterList
+    Refresh, Print, FilterList, QrCodeScanner
 } from '@mui/icons-material';
 import JsBarcode from 'jsbarcode';
 import BarcodePrintDialog, { BarcodePrintItem } from '../../../../components/common/BarcodePrintDialog';
+import ProductFormDialog from './ProductFormDialog';
 
 // ── Helpers ──────────────────────────────────────────────────
 const fmtCurrency = (n) =>
@@ -68,6 +69,10 @@ const ProductListPage = () => {
 
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [printItems, setPrintItems] = useState<BarcodePrintItem[]>([]);
+    
+    // ── Dialog state ──
+    const [formOpen, setFormOpen] = useState(false);
+    const [editingId, setEditingId] = useState<string | undefined>(undefined);
 
     const PAGE_SIZE = 15;
 
@@ -123,6 +128,34 @@ const ProductListPage = () => {
         }, 400);
         return () => clearTimeout(t);
     }, [search]);
+
+    useEffect(() => {
+        let buffer = '';
+        let lastTime = Date.now();
+
+        const handleGlobalKeydown = (e: KeyboardEvent) => {
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+                return;
+            }
+            const now = Date.now();
+            if (now - lastTime > 60) buffer = '';
+            lastTime = now;
+
+            if (e.key === 'Enter') {
+                if (buffer.length >= 3) {
+                    e.preventDefault();
+                    setSearch(buffer);
+                    setPage(0);
+                }
+                buffer = '';
+            } else if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                buffer += e.key;
+            }
+        };
+
+        window.addEventListener('keydown', handleGlobalKeydown);
+        return () => window.removeEventListener('keydown', handleGlobalKeydown);
+    }, []);
 
     useEffect(() => {
         loadProducts();
@@ -190,7 +223,7 @@ const ProductListPage = () => {
                                 size="small"
                                 variant="outlined"
                                 color="error"
-                                sx={{ textTransform: 'none', borderRadius: 2, height: 36, bgcolor: '#fff' }}
+                                sx={{ textTransform: 'none', borderRadius: 2, height: 36, bgcolor: '#fff', borderColor: '#ef4444', color: '#ef4444', '&:hover': { bgcolor: '#fef2f2', borderColor: '#dc2626' } }}
                             >
                                 Xóa ({selectedIds.length})
                             </Button>
@@ -224,8 +257,8 @@ const ProductListPage = () => {
                         Xuất file
                     </Button>
                     <Button variant="contained" startIcon={<Add />}
-                        onClick={() => navigate('/admin/products/create')}
-                        sx={{ bgcolor: '#1d4ed8', textTransform: 'none', fontWeight: 600, borderRadius: 2, '&:hover': { bgcolor: '#1e40af' }, height: 36 }}>
+                        onClick={() => { setEditingId(undefined); setFormOpen(true); }}
+                        sx={{ bgcolor: '#2563eb', textTransform: 'none', fontWeight: 600, borderRadius: 2, '&:hover': { bgcolor: '#1d4ed8' }, height: 36 }}>
                         Thêm hàng hóa
                     </Button>
                 </Box>
@@ -247,10 +280,19 @@ const ProductListPage = () => {
             <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid', borderColor: 'divider', mb: 2 }}>
                 <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
                     <TextField
-                        size="small" placeholder="Tìm theo tên, SKU, ISBN..."
+                        size="small" placeholder="Tìm theo tên, SKU, ISBN (Hoặc quét mã vạch)..."
                         value={search} onChange={e => setSearch(e.target.value)}
                         sx={{ flex: 1, minWidth: 240 }}
-                        InputProps={{ startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 17, color: '#9ca3af' }} /></InputAdornment> }}
+                        InputProps={{ 
+                            startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 17, color: '#9ca3af' }} /></InputAdornment>,
+                            endAdornment: (
+                                <InputAdornment position="end">
+                                    <Tooltip title="Sẵn sàng quét mã vạch">
+                                        <QrCodeScanner sx={{ fontSize: 18, color: '#10b981', cursor: 'pointer' }} />
+                                    </Tooltip>
+                                </InputAdornment>
+                            )
+                        }}
                     />
                     <Button
                         variant={showFilters ? 'contained' : 'outlined'}
@@ -421,20 +463,20 @@ const ProductListPage = () => {
                                             <Box sx={{ display: 'flex', gap: 0.5 }}>
                                                 <Tooltip title="Xem chi tiết">
                                                     <IconButton size="small" onClick={() => navigate(`/admin/products/${p.id}`)}
-                                                        sx={{ '&:hover': { color: '#3b82f6', bgcolor: '#eff6ff' } }}>
+                                                        sx={{ color: '#3b82f6', '&:hover': { bgcolor: '#eff6ff' } }}>
                                                         <Visibility sx={{ fontSize: 16 }} />
                                                     </IconButton>
                                                 </Tooltip>
                                                 <Tooltip title="Chỉnh sửa">
-                                                    <IconButton size="small" onClick={() => navigate(`/admin/products/${p.id}/edit`)}
-                                                        sx={{ '&:hover': { color: '#f59e0b', bgcolor: '#fef3c7' } }}>
+                                                    <IconButton size="small" onClick={() => { setEditingId(p.id); setFormOpen(true); }}
+                                                        sx={{ color: '#f59e0b', '&:hover': { bgcolor: '#fef3c7' } }}>
                                                         <Edit sx={{ fontSize: 16 }} />
                                                     </IconButton>
                                                 </Tooltip>
                                                 {p.isbnBarcode && (
                                                     <Tooltip title="In mã vạch">
                                                         <IconButton size="small" onClick={() => setPrintItems([{ id: p.id, name: p.name, sku: p.sku || '', barcode: p.isbnBarcode, price: p.retailPrice, imageUrl: p.imageUrl }])}
-                                                            sx={{ '&:hover': { color: '#10b981', bgcolor: '#e8f5e9' } }}>
+                                                            sx={{ color: '#10b981', '&:hover': { bgcolor: '#ecfdf5' } }}>
                                                             <Print sx={{ fontSize: 16 }} />
                                                         </IconButton>
                                                     </Tooltip>
@@ -468,6 +510,12 @@ const ProductListPage = () => {
             </Paper>
 
             <BarcodePrintDialog open={printItems.length > 0} onClose={() => setPrintItems([])} items={printItems} />
+            <ProductFormDialog 
+                open={formOpen} 
+                productId={editingId} 
+                onClose={() => setFormOpen(false)} 
+                onSuccess={loadProducts} 
+            />
         </Box>
     );
 };

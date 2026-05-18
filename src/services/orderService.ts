@@ -29,6 +29,12 @@ const orderService = {
         return res.data.data;
     },
 
+    // Lấy lịch sử mua hàng của khách hàng đang đăng nhập
+    getMyHistory: async (page: number = 0, size: number = 20): Promise<any> => {
+        const res = await axiosInstance.get(`/customers/me/history?page=${page}&size=${size}`);
+        return res.data.data;
+    },
+
     // Lấy chi tiết đơn hàng theo ID
     getById: async (id: string): Promise<OrderResponse> => {
         const res = await axiosInstance.get<ApiResponse<OrderResponse>>(`/orders/${id}`);

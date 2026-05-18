@@ -1,3 +1,4 @@
+// src/modules/admin/pages/customers/CustomerDetailPage.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
@@ -10,7 +11,7 @@ import {
     ArrowBack, Edit, ShoppingBag, History,
     Person, LocalPhone, Email, LocationOn,
     Star, WorkspacePremium, ReceiptLong,
-    TrendingUp, Event, Notes, Save
+    TrendingUp, Event, Notes, Save, Cancel
 } from '@mui/icons-material';
 import toast from 'react-hot-toast';
 import customerService from '../../../../services/customerService';
@@ -27,6 +28,18 @@ const TIER_CONFIG: Record<CustomerTier, { label: string; color: string; bg: stri
     STANDARD: { label: 'TIÊU CHUẨN', color: '#6b7280', bg: '#f3f4f6', icon: <Person sx={{ fontSize: 16 }} /> },
     SILVER: { label: 'THÀNH VIÊN BẠC', color: '#4b5563', bg: '#e5e7eb', icon: <Star sx={{ fontSize: 16 }} /> },
     GOLD: { label: 'THÀNH VIÊN VÀNG', color: '#b45309', bg: '#fef3c7', icon: <WorkspacePremium sx={{ fontSize: 16 }} /> },
+};
+
+const getStatusProps = (inv: any) => {
+    if (inv.source === 'ONLINE') {
+        if (inv.status === 'CANCELLED') return { label: 'Đã hủy', color: '#d32f2f', bg: '#ffebee' };
+        if (inv.status === 'RETURNED') return { label: 'Hoàn trả', color: '#d32f2f', bg: '#ffebee' };
+        if (inv.status === 'DELIVERED') return { label: 'Thành công', color: '#2e7d32', bg: '#e8f5e9' };
+        return { label: 'Đang xử lý', color: '#1976d2', bg: '#e3f2fd' };
+    }
+    if (inv.type === 'VOIDED') return { label: 'Đã hủy', color: '#d32f2f', bg: '#ffebee' };
+    if (inv.type === 'RETURN') return { label: 'Trả hàng', color: '#d32f2f', bg: '#ffebee' };
+    return { label: 'Thành công', color: '#2e7d32', bg: '#e8f5e9' };
 };
 
 interface TabPanelProps { children?: React.ReactNode; index: number; value: number }
@@ -107,6 +120,11 @@ export default function CustomerDetailPage() {
     if (!customer) return <Alert severity="error">Không tìm thấy khách hàng</Alert>;
 
     const tier = TIER_CONFIG[customer.customerTier] || TIER_CONFIG.STANDARD;
+    
+    const validOrders = history.orders.filter(o => o.status !== 'CANCELLED');
+    const validInvoices = history.invoices.filter(i => i.type !== 'VOIDED');
+    const totalValidTransactions = validOrders.length + validInvoices.length;
+    const cancelledCount = history.orders.filter(o => o.status === 'CANCELLED').length + history.invoices.filter(i => i.type === 'VOIDED').length;
 
     return (
         <Box sx={{ p: 3, bgcolor: '#f8f9fb', minHeight: '100vh' }}>
@@ -188,17 +206,18 @@ export default function CustomerDetailPage() {
                     <Grid container spacing={2} sx={{ mb: 3 }}>
                         {[
                             { label: 'TỔNG CHI TIÊU', value: fmtCurrency(customer.totalSpent), icon: <TrendingUp />, color: '#16a34a', bg: '#f0fdf4' },
-                            { label: 'TỔNG ĐƠN HÀNG', value: history.invoices.length + history.orders.length, icon: <ShoppingBag />, color: '#2563eb', bg: '#eff6ff' },
-                            { label: 'GIÁ TRỊ ĐƠN TB', value: fmtCurrency((history.invoices.length + history.orders.length) ? customer.totalSpent / (history.invoices.length + history.orders.length) : 0), icon: <ReceiptLong />, color: '#7c3aed', bg: '#f5f3ff' },
+                            { label: 'ĐƠN HOÀN THÀNH', value: totalValidTransactions, icon: <ShoppingBag />, color: '#2563eb', bg: '#eff6ff' },
+                            { label: 'ĐƠN BỊ HỦY', value: cancelledCount, icon: <Cancel />, color: '#d32f2f', bg: '#ffebee' },
+                            { label: 'GIÁ TRỊ ĐƠN TB', value: fmtCurrency(totalValidTransactions ? customer.totalSpent / totalValidTransactions : 0), icon: <ReceiptLong />, color: '#7c3aed', bg: '#f5f3ff' },
                         ].map((s, i) => (
-                            <Grid size={{ xs: 12, sm: 4 }} key={i}>
+                            <Grid size={{ xs: 12, sm: 6, md: 3 }} key={i}>
                                 <Card elevation={0} sx={{ borderRadius: 4, border: '1px solid #f0f0f0' }}>
-                                    <CardContent sx={{ p: 2.5 }}>
+                                    <CardContent sx={{ p: 2, pb: '16px !important' }}>
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
                                             <Box sx={{ p: 1, borderRadius: 2, bgcolor: s.bg, color: s.color, display: 'flex' }}>{s.icon}</Box>
-                                            <Typography variant="caption" fontWeight={800} color="text.secondary" letterSpacing={0.5}>{s.label}</Typography>
                                         </Box>
-                                        <Typography variant="h5" fontWeight={900} color="#1a1a2e">{s.value}</Typography>
+                                        <Typography variant="h6" fontWeight={900} color="#1a1a2e" sx={{ fontSize: s.value.toString().length > 10 ? 16 : 20 }}>{s.value}</Typography>
+                                        <Typography variant="caption" fontWeight={800} color="text.secondary" letterSpacing={0.5}>{s.label}</Typography>
                                     </CardContent>
                                 </Card>
                             </Grid>
@@ -237,22 +256,24 @@ export default function CustomerDetailPage() {
                                             ) : (
                                                 [...history.invoices.map(i => ({...i, source: 'POS'})), ...history.orders.map(o => ({...o, source: 'ONLINE'}))]
                                                     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                                                    .map((inv) => (
-                                                        <TableRow key={inv.id} hover sx={{ '& td': { borderBottom: '1px solid #f9fafb', py: 1.5 } }}>
+                                                    .map((inv) => {
+                                                        const status = getStatusProps(inv);
+                                                        return (
+                                                        <TableRow key={inv.id} hover sx={{ '& td': { borderBottom: '1px solid #f9fafb', py: 1.5, opacity: status.label === 'Đã hủy' ? 0.7 : 1 } }}>
                                                             <TableCell>
-                                                                <Typography variant="body2" fontWeight={700} fontFamily="monospace">{inv.code}</Typography>
+                                                                <Typography variant="body2" fontWeight={700} fontFamily="monospace" sx={{ textDecoration: status.label === 'Đã hủy' ? 'line-through' : 'none' }}>{inv.code}</Typography>
                                                                 <Chip label={inv.source} size="small" sx={{ height: 16, fontSize: 9, fontWeight: 800, mt: 0.5, bgcolor: inv.source === 'POS' ? '#f3f4f6' : '#e0f2fe' }} />
                                                             </TableCell>
                                                             <TableCell><Typography variant="caption" color="text.secondary">{fmtDate(inv.createdAt)}</Typography></TableCell>
-                                                            <TableCell align="right"><Typography variant="body2" fontWeight={700}>{fmtCurrency(inv.finalAmount)}</Typography></TableCell>
+                                                            <TableCell align="right"><Typography variant="body2" fontWeight={700} color={status.label === 'Đã hủy' ? 'text.secondary' : 'inherit'}>{fmtCurrency(inv.finalAmount)}</Typography></TableCell>
                                                             <TableCell align="center">
                                                                 <Chip 
-                                                                    label={inv.type === 'SALE' || inv.source === 'ONLINE' ? 'Thành công' : 'Trả hàng'} 
+                                                                    label={status.label} 
                                                                     size="small" 
                                                                     sx={{ 
                                                                         height: 20, fontSize: 10, fontWeight: 700, 
-                                                                        bgcolor: (inv.type === 'SALE' || inv.source === 'ONLINE') ? '#e8f5e9' : '#fff3e0', 
-                                                                        color: (inv.type === 'SALE' || inv.source === 'ONLINE') ? '#2e7d32' : '#e65100' 
+                                                                        bgcolor: status.bg, 
+                                                                        color: status.color 
                                                                     }} 
                                                                 />
                                                              </TableCell>
@@ -270,7 +291,7 @@ export default function CustomerDetailPage() {
                                                                 </Tooltip>
                                                             </TableCell>
                                                         </TableRow>
-                                                    ))
+                                                    )})
                                             )}
                                         </TableBody>
                                     </Table>

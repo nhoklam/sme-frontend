@@ -1,84 +1,55 @@
 import React from 'react';
-import { Box, Button, Typography, Chip } from '@mui/material';
-import { AccessTime, LocalOffer } from '@mui/icons-material';
+import { Box, Typography, Grid, Button } from '@mui/material';
 
-const PromotionBanner = () => (
-    <Box sx={{
-        background: 'linear-gradient(135deg, #e8401c 0%, #c62828 50%, #ad1457 100%)',
-        borderRadius: 1.5,
-        px: { xs: 2.5, md: 3.5 },
-        py: 2.25,
-        mb: 2.5,
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: 2,
-        position: 'relative',
-        overflow: 'hidden',
-        boxShadow: '0 3px 12px rgba(232,64,28,0.28)',
-    }}>
-        {/* Decorative circles */}
-        <Box sx={{ position: 'absolute', right: -35, top: -35, width: 130, height: 130, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.05)', pointerEvents: 'none' }} />
-        <Box sx={{ position: 'absolute', right: 110, bottom: -45, width: 100, height: 100, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
+const PromotionBanner = () => {
+    return (
+        <Box sx={{ mb: 6 }}>
+            <Grid container spacing={3}>
+                {/* Banner 1 */}
+                <Grid size={{ xs: 12, md: 6 }}>
+                    <Box sx={{ 
+                        bgcolor: 'var(--color-primary)', color: 'white',
+                        borderRadius: '16px', p: 4, display: 'flex', flexDirection: 'column', 
+                        justifyContent: 'center', minHeight: 200,
+                        position: 'relative', overflow: 'hidden'
+                    }}>
+                        {/* Decorative circle */}
+                        <Box sx={{ position: 'absolute', right: -30, top: -30, width: 150, height: 150, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.05)' }} />
+                        <Box sx={{ position: 'absolute', right: 50, bottom: -50, width: 100, height: 100, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.05)' }} />
+                        
+                        <Typography variant="h4" sx={{ fontWeight: 700, mb: 1, position: 'relative', zIndex: 1 }}>Mua 2 Tặng 1</Typography>
+                        <Typography variant="body1" sx={{ mb: 3, opacity: 0.8, position: 'relative', zIndex: 1 }}>Áp dụng cho toàn bộ sách Văn học trong tuần này.</Typography>
+                        <Button variant="contained" color="secondary" sx={{ alignSelf: 'flex-start', borderRadius: '24px', px: 4, position: 'relative', zIndex: 1 }}>
+                            Khám Phá Ngay
+                        </Button>
+                    </Box>
+                </Grid>
 
-        <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.75 }}>
-                <Chip
-                    icon={<AccessTime sx={{ fontSize: 12, color: '#fff !important' }} />}
-                    label="Mỗi ngày 12h & 20h"
-                    size="small"
-                    sx={{
-                        bgcolor: 'rgba(255,255,255,0.18)',
-                        color: '#fff',
-                        fontWeight: 700,
-                        fontSize: 10.5,
-                        height: 21,
-                        fontFamily: '"Segoe UI", sans-serif',
-                    }}
-                />
-            </Box>
-            <Typography fontWeight={900} color="#fff" sx={{
-                lineHeight: 1.2,
-                fontSize: { xs: 17, md: 20 },
-                fontFamily: '"Segoe UI", sans-serif',
-            }}>
-                🎉 Flash Sale — Giảm đến 70%
-            </Typography>
-            <Typography color="rgba(255,255,255,0.82)" sx={{
-                fontSize: 12.5, mt: 0.4,
-                fontFamily: '"Segoe UI", sans-serif',
-            }}>
-                Số lượng có hạn · Nhanh tay kẻo hết!
-            </Typography>
+                {/* Banner 2 */}
+                <Grid size={{ xs: 12, md: 6 }}>
+                    <Box sx={{ 
+                        bgcolor: '#e8f5e9', color: '#1b5e20',
+                        borderRadius: '16px', p: 4, display: 'flex', flexDirection: 'column', 
+                        justifyContent: 'center', minHeight: 200,
+                        position: 'relative', overflow: 'hidden'
+                    }}>
+                        {/* Decorative graphic */}
+                        <Box sx={{ position: 'absolute', right: -20, bottom: -20, opacity: 0.1 }}>
+                            <svg width="150" height="150" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
+                            </svg>
+                        </Box>
+                        
+                        <Typography variant="h4" sx={{ fontWeight: 700, mb: 1, position: 'relative', zIndex: 1, fontFamily: '"Playfair Display", serif' }}>Freeship Toàn Quốc</Typography>
+                        <Typography variant="body1" sx={{ mb: 3, opacity: 0.8, position: 'relative', zIndex: 1 }}>Giao hàng miễn phí cho mọi đơn hàng từ 150.000đ.</Typography>
+                        <Button variant="outlined" sx={{ alignSelf: 'flex-start', borderRadius: '24px', px: 4, borderColor: '#1b5e20', color: '#1b5e20', position: 'relative', zIndex: 1, '&:hover': { bgcolor: 'rgba(27,94,32,0.05)', borderColor: '#1b5e20' } }}>
+                            Tìm Hiểu Thêm
+                        </Button>
+                    </Box>
+                </Grid>
+            </Grid>
         </Box>
-
-        <Button
-            variant="contained"
-            startIcon={<LocalOffer sx={{ fontSize: 16 }} />}
-            sx={{
-                bgcolor: '#fff',
-                color: '#e8401c',
-                fontWeight: 800,
-                textTransform: 'none',
-                px: 3,
-                py: 1.1,
-                fontSize: 13.5,
-                borderRadius: 1.5,
-                boxShadow: 'none',
-                flexShrink: 0,
-                fontFamily: '"Segoe UI", sans-serif',
-                '&:hover': {
-                    bgcolor: '#fff3f0',
-                    transform: 'translateY(-1px)',
-                    boxShadow: '0 3px 12px rgba(0,0,0,0.14)',
-                },
-                transition: 'all 0.18s',
-            }}
-        >
-            Săn ngay
-        </Button>
-    </Box>
-);
+    );
+};
 
 export default PromotionBanner;

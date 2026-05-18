@@ -7,7 +7,7 @@ import AddressBook from '../components/account/AddressBook';
 import Wishlist from '../components/account/Wishlist';
 import { useCurrentUser } from '../hooks/useAccount';
 import { useNavigate } from 'react-router-dom';
-import authService from '../../../services/authService';
+import customerAuthService from '../../../services/customerAuthService';
 
 const AccountPage = () => {
     const [tabValue, setTabValue] = useState(0);
@@ -19,8 +19,9 @@ const AccountPage = () => {
     };
 
     const handleLogout = () => {
-        authService.logout();
-        navigate('/login');
+        customerAuthService.logout();
+        navigate('/');
+        window.location.reload();
     };
 
     const displayUser = user ?? { fullName: 'Khách', email: '', phone: '' };

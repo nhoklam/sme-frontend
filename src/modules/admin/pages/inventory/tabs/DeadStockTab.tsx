@@ -137,7 +137,7 @@ const DeadStockTab: React.FC<Props> = ({ warehouses }) => {
                 {[
                     { label: 'Mặt hàng tồn đọng', value: stats.total, color: '#d97706' },
                     { label: 'Tổng tồn kho', value: stats.totalQty.toLocaleString(), color: '#374151' },
-                    { label: 'Giá trị tồn đọng', value: fmtCurrency(stats.totalValue), color: '#d32f2f' },
+                    { label: 'Giá trị tồn đọng', value: fmtCurrency(stats.totalValue), color: '#ef4444' },
                 ].map(s => (
                     <Grid size={{ xs: 12, sm: 4 }} key={s.label}>
                         <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid #f0f0f0' }}>
@@ -157,7 +157,7 @@ const DeadStockTab: React.FC<Props> = ({ warehouses }) => {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
                     <Warning sx={{ fontSize: 15, color: '#d97706' }} />
                     <Typography variant="caption" fontWeight={700} color="#555" sx={{ minWidth: 180 }}>
-                        Không có GD trong <strong style={{ color: '#d97706' }}>{days} ngày</strong>
+                        Không có GD trong <strong style={{ color: '#f59e0b' }}>{days} ngày</strong>
                     </Typography>
                     <Slider
                         value={days}
@@ -171,7 +171,7 @@ const DeadStockTab: React.FC<Props> = ({ warehouses }) => {
                             { value: 180, label: '6t' },
                             { value: 365, label: '1 năm' },
                         ]}
-                        sx={{ flex: 1, minWidth: 200, color: '#d97706', '& .MuiSlider-markLabel': { fontSize: 10 } }}
+                        sx={{ flex: 1, minWidth: 200, color: '#f59e0b', '& .MuiSlider-markLabel': { fontSize: 10 } }}
                     />
                 </Box>
             </Paper>
@@ -206,11 +206,11 @@ const DeadStockTab: React.FC<Props> = ({ warehouses }) => {
                 </Button>
                 <Button size="small" variant="outlined" startIcon={<FileDownloadOutlined sx={{ fontSize: 15 }} />}
                     onClick={handleExport}
-                    sx={{ textTransform: 'none', borderColor: '#2e7d32', color: '#2e7d32' }}>
+                    sx={{ textTransform: 'none', borderColor: '#16a34a', color: '#16a34a', borderRadius: 1.5, height: 36 }}>
                     Excel ({filtered.length})
                 </Button>
                 {activeCount > 0 && (
-                    <Button size="small" onClick={clearFilters} sx={{ textTransform: 'none', color: '#d32f2f', fontSize: 12 }}>
+                    <Button size="small" onClick={clearFilters} sx={{ textTransform: 'none', color: '#ef4444', fontSize: 12, fontWeight: 600 }}>
                         Xóa bộ lọc ({activeCount})
                     </Button>
                 )}
@@ -261,7 +261,7 @@ const DeadStockTab: React.FC<Props> = ({ warehouses }) => {
                                                 ) : <Typography variant="caption" color="#bbb">—</Typography>}
                                             </TableCell>
                                             <TableCell>
-                                                <Typography variant="body2" fontWeight={700} color="#d97706">
+                                                <Typography variant="body2" fontWeight={700} color="#f59e0b">
                                                     {item.quantity.toLocaleString()}
                                                 </Typography>
                                             </TableCell>
@@ -273,7 +273,7 @@ const DeadStockTab: React.FC<Props> = ({ warehouses }) => {
                                             </TableCell>
                                             <TableCell>
                                                 <Typography variant="body2" fontWeight={700}
-                                                    color={urgency === 'high' ? '#d32f2f' : urgency === 'medium' ? '#e65100' : '#888'}>
+                                                    color={urgency === 'high' ? '#ef4444' : urgency === 'medium' ? '#f59e0b' : '#888'}>
                                                     {fmtCurrency(value)}
                                                 </Typography>
                                             </TableCell>
@@ -288,8 +288,8 @@ const DeadStockTab: React.FC<Props> = ({ warehouses }) => {
                                                         size="small"
                                                         sx={{
                                                             height: 20, fontSize: 10, fontWeight: 700,
-                                                            bgcolor: urgency === 'high' ? '#ffebee' : urgency === 'medium' ? '#fff3e0' : '#f5f5f5',
-                                                            color: urgency === 'high' ? '#d32f2f' : urgency === 'medium' ? '#e65100' : '#888',
+                                                            bgcolor: urgency === 'high' ? '#fee2e2' : urgency === 'medium' ? '#fef3c7' : '#f5f5f5',
+                                                            color: urgency === 'high' ? '#ef4444' : urgency === 'medium' ? '#f59e0b' : '#888',
                                                             cursor: 'help',
                                                         }}
                                                     />

@@ -236,7 +236,7 @@ const CustomerListPage: React.FC = () => {
                         Đang xem Top Chi tiêu
                     </Button>
                     <Button variant="contained" startIcon={<Add />}
-                        sx={{ bgcolor: '#1976d2', textTransform: 'none', fontWeight: 700, '&:hover': { bgcolor: '#1565c0' } }}>
+                        sx={{ bgcolor: '#2563eb', textTransform: 'none', fontWeight: 700, '&:hover': { bgcolor: '#1d4ed8' } }}>
                         + Thêm khách hàng
                     </Button>
                 </Box>
@@ -352,7 +352,7 @@ const CustomerListPage: React.FC = () => {
                                                         <IconButton size="small"
                                                             onClick={() => navigate(`/admin/customers/${customer.id}`)}
                                                             sx={{ '&:hover': { color: '#1976d2', bgcolor: '#e3f2fd' } }}>
-                                                            <Visibility sx={{ fontSize: 16 }} />
+                                                            <Visibility sx={{ fontSize: 16, color: '#2563eb' }} />
                                                         </IconButton>
                                                     </Tooltip>
                                                 </Box>

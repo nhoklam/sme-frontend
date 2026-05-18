@@ -29,11 +29,11 @@ const STATUS_MAP: Record<OrderStatus, { label: string; color: string; bg: string
     SHIPPING: { label: 'Đang giao', color: '#6a1b9a', bg: '#f3e5f5', step: 2 },
     DELIVERED: { label: 'Hoàn thành', color: '#2e7d32', bg: '#e8f5e9', step: 3 },
     CANCELLED: { label: 'Đã hủy', color: '#888', bg: '#f5f5f5', step: -1 },
-    RETURNED: { label: 'Hoàn trả', color: '#d32f2f', bg: '#ffebee', step: -1 },
+    RETURNED: { label: 'Hoàn trả', color: '#ef4444', bg: '#fef2f2', step: -1 },
 };
 
 const PAYMENT_STATUS_MAP: Record<PaymentStatus, { label: string; color: string }> = {
-    UNPAID: { label: 'Chưa thu', color: '#d32f2f' },
+    UNPAID: { label: 'Chưa thu', color: '#ef4444' },
     PAID: { label: 'Đã thu', color: '#2e7d32' },
     REFUNDED: { label: 'Đã hoàn', color: '#888' },
 };
@@ -122,7 +122,7 @@ const AssignWarehouseDialog: React.FC<{
                     variant="contained"
                     disabled={loading || !selected || fetching}
                     onClick={() => onConfirm(selected)}
-                    sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, bgcolor: '#1976d2' }}
+                    sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, bgcolor: '#2563eb', '&:hover': { bgcolor: '#1d4ed8' } }}
                 >
                     {loading ? 'Đang gán...' : 'Gán đơn hàng'}
                 </Button>
@@ -203,7 +203,7 @@ const UpdateStatusDialog: React.FC<{
                 {canCancel && (
                     <Button variant="outlined" disabled={loading}
                         onClick={() => onConfirm('CANCELLED', note, '', '')}
-                        sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, borderColor: '#d32f2f', color: '#d32f2f', '&:hover': { bgcolor: '#ffebee' } }}>
+                        sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, borderColor: '#ef4444', color: '#ef4444', '&:hover': { bgcolor: '#fef2f2' } }}>
                         Hủy đơn
                     </Button>
                 )}
@@ -307,7 +307,7 @@ const OrderDetailPage: React.FC = () => {
                     <Button variant="outlined" startIcon={<Refresh />} onClick={loadOrder}
                         sx={{ textTransform: 'none' }}>Thử lại</Button>
                     <Button variant="contained" onClick={() => navigate('/admin/orders')}
-                        sx={{ bgcolor: '#1976d2', textTransform: 'none' }}>Quay lại danh sách</Button>
+                        sx={{ bgcolor: '#2563eb', textTransform: 'none', '&:hover': { bgcolor: '#1d4ed8' } }}>Quay lại danh sách</Button>
                 </Box>
             </Box>
         );
@@ -355,7 +355,7 @@ const OrderDetailPage: React.FC = () => {
                     {!isCancelled && (
                         <Button size="small" variant="contained" startIcon={<Edit sx={{ fontSize: 15 }} />}
                             onClick={() => setUpdateDialogOpen(true)}
-                            sx={{ textTransform: 'none', fontWeight: 700, bgcolor: '#1976d2', '&:hover': { bgcolor: '#1565c0' } }}>
+                            sx={{ textTransform: 'none', fontWeight: 700, bgcolor: '#2563eb', '&:hover': { bgcolor: '#1d4ed8' } }}>
                             Cập nhật trạng thái
                         </Button>
                     )}
@@ -374,8 +374,8 @@ const OrderDetailPage: React.FC = () => {
                     </Stepper>
                 ) : (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Cancel sx={{ color: '#d32f2f', fontSize: 20 }} />
-                        <Typography variant="body2" fontWeight={700} color="#d32f2f">
+                        <Cancel sx={{ color: '#ef4444', fontSize: 20 }} />
+                        <Typography variant="body2" fontWeight={700} color="#ef4444">
                             Đơn hàng {order.status === 'CANCELLED' ? 'đã bị hủy' : 'đã hoàn trả'}
                             {order.cancelledReason ? ` — ${order.cancelledReason}` : ''}
                         </Typography>
@@ -397,6 +397,14 @@ const OrderDetailPage: React.FC = () => {
                             <Typography variant="caption" color="text.secondary">Cập nhật lần cuối</Typography>
                             <Typography variant="body2" fontWeight={600} fontSize={13}>
                                 {new Date(order.updatedAt).toLocaleString('vi-VN')}
+                            </Typography>
+                        </Box>
+                    )}
+                    {order.cashierName && (
+                        <Box>
+                            <Typography variant="caption" color="text.secondary">Thu ngân</Typography>
+                            <Typography variant="body2" fontWeight={700} fontSize={13} color="#8b5cf6">
+                                {order.cashierName}
                             </Typography>
                         </Box>
                     )}
@@ -449,7 +457,7 @@ const OrderDetailPage: React.FC = () => {
                             <FieldRow label="Giảm giá" value={`-${fmt(order.discountAmount)}`} color="#2e7d32" />
                         )}
                         <Divider sx={{ my: 0.75 }} />
-                        <FieldRow label="Tổng cộng" value={fmt(order.finalAmount)} color="#d32f2f" />
+                        <FieldRow label="Tổng cộng" value={fmt(order.finalAmount)} color="#ef4444" />
                     </InfoSection>
                 </Grid>
 
@@ -465,7 +473,7 @@ const OrderDetailPage: React.FC = () => {
                                 </IconButton>
                             )}
                         </Box>
-                        <Typography variant="body2" fontWeight={700} color={order.assignedWarehouseId ? '#333' : '#d32f2f'}>
+                        <Typography variant="body2" fontWeight={700} color={order.assignedWarehouseId ? '#333' : '#ef4444'}>
                             {order.assignedWarehouseName || 'Chưa gán'}
                         </Typography>
                         <Box sx={{ mt: 1 }}>
@@ -517,7 +525,7 @@ const OrderDetailPage: React.FC = () => {
                                         <Typography variant="body2" fontSize={12}>{fmt(item.unitPrice)}</Typography>
                                     </TableCell>
                                     <TableCell sx={{ py: 1.5 }}>
-                                        <Typography variant="body2" fontWeight={700} color="#1976d2">{fmt(item.subtotal)}</Typography>
+                                        <Typography variant="body2" fontWeight={700} color="#2563eb">{fmt(item.subtotal)}</Typography>
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -526,7 +534,7 @@ const OrderDetailPage: React.FC = () => {
                     <Box sx={{ px: 2.5, py: 1.5, bgcolor: '#f9f9f9', borderTop: '1px solid #f0f0f0', display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
                         <Box sx={{ textAlign: 'right' }}>
                             <Typography variant="caption" color="text.secondary">Tổng giá trị đơn hàng</Typography>
-                            <Typography variant="h6" fontWeight={800} color="#d32f2f">{fmt(order.finalAmount)}</Typography>
+                            <Typography variant="h6" fontWeight={800} color="#ef4444">{fmt(order.finalAmount)}</Typography>
                         </Box>
                     </Box>
                 </Paper>

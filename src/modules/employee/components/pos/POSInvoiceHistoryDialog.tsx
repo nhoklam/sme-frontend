@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-    Dialog, DialogContent, Box, Typography, IconButton,
+    Dialog, DialogContent, DialogTitle, DialogActions, Box, Typography, IconButton,
     Chip, Paper, Pagination, Skeleton, TextField, InputAdornment,
     FormControl, Select, MenuItem, Button
 } from '@mui/material';
-import { Close, ReceiptLong, Search, FilterList } from '@mui/icons-material';
+import { Close, ReceiptLong, Search, FilterList, Block } from '@mui/icons-material';
 import axiosInstance from '../../../../services/axiosConfig';
+import toast from 'react-hot-toast';
+import authService from '../../../../services/authService';
 
 const fmt = (n?: number) =>
     new Intl.NumberFormat('vi-VN', {
@@ -34,11 +36,16 @@ interface InvoicePayment {
 interface InvoiceResponse {
     id: string;
     code: string;
-    type: 'SALE' | 'RETURN';
+    shiftId?: string;
+    type: 'SALE' | 'RETURN' | 'VOIDED';
     finalAmount: number;
     totalAmount: number;
     discountAmount: number;
     customerName?: string;
+    cashierName?: string;
+    voidedByName?: string;
+    voidedAt?: string;
+    voidReason?: string;
     createdAt: string;
     items: InvoiceItem[];
     payments: InvoicePayment[];
@@ -47,10 +54,12 @@ interface InvoiceResponse {
 interface Props {
     open: boolean;
     onClose: () => void;
+    shiftId?: string;
     onRefundRequest?: (invoiceCode: string) => void;
+    onPrintRequest?: (invoice: InvoiceResponse) => void;
 }
 
-const POSInvoiceHistoryDialog: React.FC<Props> = ({ open, onClose, onRefundRequest }) => {
+const POSInvoiceHistoryDialog: React.FC<Props> = ({ open, onClose, shiftId, onRefundRequest, onPrintRequest }) => {
     const [invoices, setInvoices] = useState<InvoiceResponse[]>([]);
     const [loading, setLoading] = useState(false);
     const [page, setPage] = useState(0);
@@ -66,6 +75,13 @@ const POSInvoiceHistoryDialog: React.FC<Props> = ({ open, onClose, onRefundReque
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
     const [showFilters, setShowFilters] = useState(false);
+
+    // Void invoice
+    const [voidDialogOpen, setVoidDialogOpen] = useState(false);
+    const [voidReason, setVoidReason] = useState('');
+    const [voiding, setVoiding] = useState(false);
+    const currentUser = authService.getCurrentUser()?.user;
+    const canVoid = currentUser?.role === 'ROLE_ADMIN' || currentUser?.role === 'ROLE_MANAGER';
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -252,6 +268,7 @@ const POSInvoiceHistoryDialog: React.FC<Props> = ({ open, onClose, onRefundReque
                                             <MenuItem value="" sx={{ fontSize: 12 }}>Tất cả loại</MenuItem>
                                             <MenuItem value="SALE" sx={{ fontSize: 12 }}>🧾 Bán hàng</MenuItem>
                                             <MenuItem value="RETURN" sx={{ fontSize: 12 }}>↩ Trả hàng</MenuItem>
+                                            <MenuItem value="VOIDED" sx={{ fontSize: 12 }}>🚫 Đã hủy</MenuItem>
                                         </Select>
                                     </FormControl>
                                 </Box>
@@ -309,8 +326,8 @@ const POSInvoiceHistoryDialog: React.FC<Props> = ({ open, onClose, onRefundReque
                                                     {inv.code}
                                                 </Typography>
                                                 <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5, flexWrap: 'wrap' }}>
-                                                    <Chip label={inv.type === 'RETURN' ? 'Trả hàng' : 'Bán lẻ'} size="small"
-                                                        sx={{ height: 16, fontSize: 8.5, fontWeight: 700, borderRadius: 1, bgcolor: inv.type === 'RETURN' ? '#fee2e2' : '#f1f5f9', color: inv.type === 'RETURN' ? '#ef4444' : '#475569' }} />
+                                                    <Chip label={inv.type === 'VOIDED' ? 'Đã hủy' : inv.type === 'RETURN' ? 'Trả hàng' : 'Bán lẻ'} size="small"
+                                                        sx={{ height: 16, fontSize: 8.5, fontWeight: 700, borderRadius: 1, bgcolor: inv.type === 'VOIDED' ? '#fef3c7' : inv.type === 'RETURN' ? '#fee2e2' : '#f1f5f9', color: inv.type === 'VOIDED' ? '#d97706' : inv.type === 'RETURN' ? '#ef4444' : '#475569' }} />
                                                     {inv.payments?.map((p, pi) => {
                                                         const style = getPaymentStyle(p.method);
                                                         return (
@@ -326,6 +343,9 @@ const POSInvoiceHistoryDialog: React.FC<Props> = ({ open, onClose, onRefundReque
                                                 </Typography>
                                                 <Typography variant="caption" color="#94a3b8" fontSize={11} fontWeight={600} display="block">
                                                     {inv.createdAt ? new Date(inv.createdAt).toLocaleDateString('vi-VN') : ''}
+                                                </Typography>
+                                                <Typography variant="caption" color="#8b5cf6" fontSize={11} fontWeight={700} display="block">
+                                                    👤 {inv.cashierName || 'Không rõ'}
                                                 </Typography>
                                                 <Typography variant="caption" color="#3b82f6" fontSize={11} fontWeight={700}>
                                                     {inv.createdAt ? new Date(inv.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : ''}
@@ -361,15 +381,16 @@ const POSInvoiceHistoryDialog: React.FC<Props> = ({ open, onClose, onRefundReque
                                             {selected.code}
                                         </Typography>
                                     </Box>
-                                    <Chip label={selected.type === 'RETURN' ? 'Trả hàng' : 'Bán lẻ'}
-                                        sx={{ bgcolor: selected.type === 'RETURN' ? '#fee2e2' : '#f1f5f9', color: selected.type === 'RETURN' ? '#ef4444' : '#475569', fontWeight: 700, fontSize: 10, borderRadius: 1 }} />
+                                    <Chip label={selected.type === 'VOIDED' ? '🚫 Đã hủy' : selected.type === 'RETURN' ? 'Trả hàng' : 'Bán lẻ'}
+                                        sx={{ bgcolor: selected.type === 'VOIDED' ? '#fef3c7' : selected.type === 'RETURN' ? '#fee2e2' : '#f1f5f9', color: selected.type === 'VOIDED' ? '#d97706' : selected.type === 'RETURN' ? '#ef4444' : '#475569', fontWeight: 700, fontSize: 10, borderRadius: 1 }} />
                                 </Box>
-                                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1.5, mt: 2.5, pt: 2, borderTop: '1px dashed #e2e8f0' }}>
+                                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 1.5, mt: 2.5, pt: 2, borderTop: '1px dashed #e2e8f0' }}>
                                     {[
                                         { label: 'TỔNG TIỀN', value: fmt(selected.totalAmount), color: '#64748b' },
                                         { label: 'GIẢM GIÁ', value: fmt(selected.discountAmount || 0), color: '#f43f5e' },
                                         { label: 'THANH TOÁN', value: fmt(selected.finalAmount), bold: true, color: '#10b981' },
                                         { label: 'THỜI GIAN', value: selected.createdAt ? new Date(selected.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '-', color: '#3b82f6' },
+                                        { label: 'NHÂN VIÊN', value: selected.cashierName || 'Không rõ', color: '#8b5cf6' },
                                     ].map(r => (
                                         <Box key={r.label}>
                                             <Typography variant="caption" color="#94a3b8" display="block" fontSize={9} fontWeight={800} letterSpacing={0.5}>{r.label}</Typography>
@@ -378,8 +399,28 @@ const POSInvoiceHistoryDialog: React.FC<Props> = ({ open, onClose, onRefundReque
                                     ))}
                                 </Box>
                                 
-                                {onRefundRequest && selected.type === 'SALE' && (
-                                    <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end' }}>
+                                {/* Void info banner */}
+                                {selected.type === 'VOIDED' && (
+                                    <Box sx={{ mt: 2, p: 1.5, bgcolor: '#fef3c7', borderRadius: 1.5, border: '1px solid #fbbf24' }}>
+                                        <Typography fontSize={12} fontWeight={700} color="#92400e">🚫 Hóa đơn đã bị hủy</Typography>
+                                        <Typography fontSize={11} color="#92400e" sx={{ mt: 0.5 }}>Người hủy: {selected.voidedByName || 'Không rõ'}</Typography>
+                                        <Typography fontSize={11} color="#92400e">Lý do: {selected.voidReason || 'Không có'}</Typography>
+                                        {selected.voidedAt && <Typography fontSize={11} color="#92400e">Thời gian: {new Date(selected.voidedAt).toLocaleString('vi-VN')}</Typography>}
+                                    </Box>
+                                )}
+
+                                <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                                    {onPrintRequest && selected.type !== 'VOIDED' && (
+                                        <Button
+                                            variant="outlined"
+                                            size="small"
+                                            onClick={() => onPrintRequest(selected)}
+                                            sx={{ textTransform: 'none', fontWeight: 600, px: 3, borderRadius: 1.5, color: '#1890ff', borderColor: '#1890ff' }}
+                                        >
+                                            In lại
+                                        </Button>
+                                    )}
+                                    {onRefundRequest && selected.type === 'SALE' && (
                                         <Button
                                             variant="contained"
                                             color="error"
@@ -389,8 +430,19 @@ const POSInvoiceHistoryDialog: React.FC<Props> = ({ open, onClose, onRefundReque
                                         >
                                             Trả hàng
                                         </Button>
-                                    </Box>
-                                )}
+                                    )}
+                                    {canVoid && selected.type === 'SALE' && (
+                                        <Button
+                                            variant="contained"
+                                            size="small"
+                                            startIcon={<Block sx={{ fontSize: 14 }} />}
+                                            onClick={() => { setVoidReason(''); setVoidDialogOpen(true); }}
+                                            sx={{ textTransform: 'none', fontWeight: 600, px: 3, borderRadius: 1.5, bgcolor: '#d97706', '&:hover': { bgcolor: '#b45309' } }}
+                                        >
+                                            Hủy HĐ
+                                        </Button>
+                                    )}
+                                </Box>
                             </Box>
 
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5, px: 0.5 }}>
@@ -448,6 +500,55 @@ const POSInvoiceHistoryDialog: React.FC<Props> = ({ open, onClose, onRefundReque
                     )}
                 </Box>
             </Box>
+
+            {/* Void Confirmation Dialog */}
+            <Dialog open={voidDialogOpen} onClose={() => setVoidDialogOpen(false)} maxWidth="xs" fullWidth>
+                <DialogTitle sx={{ fontWeight: 700, fontSize: 16, color: '#92400e', bgcolor: '#fffbeb', borderBottom: '1px solid #fde68a' }}>
+                    🚫 Xác nhận hủy hóa đơn
+                </DialogTitle>
+                <Box sx={{ p: 3 }}>
+                    <Typography fontSize={13} color="#64748b" mb={2}>
+                        Bạn đang hủy hóa đơn <strong>{selected?.code}</strong> — {fmt(selected?.finalAmount)}.
+                        Hệ thống sẽ tự động hoàn kho, hoàn điểm và ghi cashbook âm.
+                    </Typography>
+                    <TextField
+                        fullWidth
+                        multiline
+                        rows={3}
+                        label="Lý do hủy *"
+                        value={voidReason}
+                        onChange={e => setVoidReason(e.target.value)}
+                        placeholder="VD: Khách đổi ý, nhập sai sản phẩm..."
+                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1.5 } }}
+                    />
+                </Box>
+                <DialogActions sx={{ px: 3, pb: 2 }}>
+                    <Button onClick={() => setVoidDialogOpen(false)} sx={{ textTransform: 'none', color: '#64748b' }}>Hủy bỏ</Button>
+                    <Button
+                        variant="contained"
+                        disabled={!voidReason.trim() || voiding}
+                        onClick={async () => {
+                            if (!selected || !voidReason.trim()) return;
+                            setVoiding(true);
+                            try {
+                                await axiosInstance.post(`/pos/invoices/${selected.id}/void`, {
+                                    shiftId: selected.shiftId || shiftId,
+                                    reason: voidReason.trim()
+                                });
+                                toast.success('Hủy hóa đơn thành công!');
+                                setVoidDialogOpen(false);
+                                setSelected(null);
+                                load();
+                            } catch (err: any) {
+                                toast.error(err.response?.data?.message || 'Không thể hủy hóa đơn');
+                            } finally { setVoiding(false); }
+                        }}
+                        sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 1.5, bgcolor: '#d97706', '&:hover': { bgcolor: '#b45309' } }}
+                    >
+                        {voiding ? 'Đang xử lý...' : 'Xác nhận hủy'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Dialog>
     );
 };

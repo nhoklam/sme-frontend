@@ -1,81 +1,189 @@
-// src/components/layout/Footer.jsx
+// src/components/layout/Footer.tsx
 import React from 'react';
-import { Box, Container, Grid, Typography, IconButton, Divider } from '@mui/material';
-import { Facebook, YouTube } from '@mui/icons-material';
+import { Box, Container, Grid, Typography, TextField, Button, IconButton, Divider } from '@mui/material';
+import { Facebook, Instagram, YouTube, Email, Phone, LocationOn, AlternateEmail } from '@mui/icons-material';
 
-const FOOTER_COLS = [
-    {
-        title: 'Danh mục',
-        links: ['Văn học', 'Kinh tế', 'Thiếu nhi', 'Kỹ năng sống', 'Ngoại ngữ'],
-    },
-    {
-        title: 'Hỗ trợ',
-        links: ['Hướng dẫn mua hàng', 'Chính sách đổi trả', 'Chính sách vận chuyển', 'Câu hỏi thường gặp'],
-    },
-    {
-        title: 'Liên hệ',
-        links: ['📞 0367287044', '✉️ quang@bookstore.vn', '🏢 TP. Hồ Chí Minh', '⏰ 8h - 22h hàng ngày'],
-    },
-];
-
-const Footer = () => (
-    <Box sx={{ bgcolor: '#1a1a2e', color: '#fff', pt: 5, pb: 3 }}>
-        <Container maxWidth="lg">
-            <Grid container spacing={4} sx={{ mb: 4 }}>
-                {/* Brand */}
-                <Grid size={{ xs: 12, md: 4 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                        <Box sx={{
-                            width: 36, height: 36, bgcolor: '#d32f2f', borderRadius: 1,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }}>
-                            <Typography fontSize={18}>📚</Typography>
-                        </Box>
-                        <Typography fontWeight={800} fontSize={18}>BookStore</Typography>
-                    </Box>
-                    <Typography variant="body2" color="#aaa" sx={{ mb: 2 }}>
-                        Nhà sách trực tuyến hàng đầu Việt Nam.<br />
-                        Hơn 50.000 đầu sách từ các NXB uy tín.
-                    </Typography>
-                    <Box sx={{ display: 'flex', gap: 1 }}>
-                        {[<Facebook />, <YouTube />].map((icon, i) => (
-                            <IconButton key={i} size="small" sx={{
-                                bgcolor: '#333', color: '#fff',
-                                '&:hover': { bgcolor: '#d32f2f' },
+const Footer = () => {
+    return (
+        <Box sx={{ 
+            bgcolor: '#1a1a2e', 
+            color: 'rgba(255, 255, 255, 0.75)', 
+            pt: 8, 
+            pb: 4, 
+            mt: 'auto',
+            borderTop: '3px solid #f5a623'
+        }}>
+            <Container maxWidth="lg">
+                <Grid container spacing={4}>
+                    
+                    {/* Brand Column */}
+                    <Grid size={{ xs: 12, md: 4 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
+                            <Box sx={{ 
+                                width: 38, height: 38, 
+                                bgcolor: '#ffffff', 
+                                border: '2px solid #f5a623',
+                                borderRadius: '8px', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center',
+                                color: '#1a1a2e', 
+                                fontWeight: 900, 
+                                fontSize: '18px',
+                                fontFamily: '"Playfair Display", serif'
                             }}>
-                                {icon}
-                            </IconButton>
-                        ))}
-                    </Box>
+                                B
+                            </Box>
+                            <Typography variant="h5" sx={{ 
+                                color: '#ffffff', 
+                                fontFamily: '"Playfair Display", serif', 
+                                fontWeight: 800,
+                                fontSize: '1.4rem'
+                            }}>
+                                Bookly
+                            </Typography>
+                        </Box>
+                        <Typography variant="body2" sx={{ mb: 2.5, lineHeight: 1.8, pr: 2, fontSize: '0.85rem' }}>
+                            "Mỗi cuốn sách, một hành trình mới". Bookly mang đến cho độc giả không chỉ là những trang giấy, mà là nguồn tri thức được tuyển chọn kỹ lưỡng cùng trải nghiệm mua sắm đẳng cấp nhất.
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 1.2 }}>
+                            <IconButton sx={{ bgcolor: 'rgba(255,255,255,0.06)', color: '#ffffff', '&:hover': { bgcolor: '#f5a623', color: '#1a1a2e' } }} size="small"><Facebook fontSize="small" /></IconButton>
+                            <IconButton sx={{ bgcolor: 'rgba(255,255,255,0.06)', color: '#ffffff', '&:hover': { bgcolor: '#f5a623', color: '#1a1a2e' } }} size="small"><Instagram fontSize="small" /></IconButton>
+                            <IconButton sx={{ bgcolor: 'rgba(255,255,255,0.06)', color: '#ffffff', '&:hover': { bgcolor: '#f5a623', color: '#1a1a2e' } }} size="small"><YouTube fontSize="small" /></IconButton>
+                            <IconButton sx={{ bgcolor: 'rgba(255,255,255,0.06)', color: '#ffffff', '&:hover': { bgcolor: '#f5a623', color: '#1a1a2e' } }} size="small"><AlternateEmail fontSize="small" /></IconButton>
+                        </Box>
+                    </Grid>
+
+                    {/* Về Bookly */}
+                    <Grid size={{ xs: 12, sm: 4, md: 2 }}>
+                        <Typography variant="subtitle2" sx={{ 
+                            color: '#ffffff', 
+                            fontWeight: 700, 
+                            mb: 2.5, 
+                            textTransform: 'uppercase', 
+                            letterSpacing: 1, 
+                            fontSize: '0.8rem' 
+                        }}>
+                            Về Bookly
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                            {['Giới thiệu', 'Tuyển dụng', 'Chính sách bảo mật', 'Điều khoản sử dụng', 'Blog'].map((item) => (
+                                <Typography key={item} variant="body2" sx={{ 
+                                    fontSize: '0.85rem',
+                                    cursor: 'pointer', 
+                                    transition: 'color 0.2s',
+                                    '&:hover': { color: '#f5a623' } 
+                                }}>
+                                    {item}
+                                </Typography>
+                            ))}
+                        </Box>
+                    </Grid>
+
+                    {/* Hỗ Trợ Khách Hàng */}
+                    <Grid size={{ xs: 12, sm: 4, md: 3 }}>
+                        <Typography variant="subtitle2" sx={{ 
+                            color: '#ffffff', 
+                            fontWeight: 700, 
+                            mb: 2.5, 
+                            textTransform: 'uppercase', 
+                            letterSpacing: 1, 
+                            fontSize: '0.8rem' 
+                        }}>
+                            Hỗ Trợ Khách Hàng
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <Box sx={{ display: 'flex', gap: 1.2, alignItems: 'flex-start' }}>
+                                <LocationOn sx={{ color: '#f5a623', fontSize: 18, mt: 0.2 }} />
+                                <Typography variant="body2" sx={{ fontSize: '0.85rem', lineHeight: 1.6 }}>
+                                    123 Đường Sách, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh
+                                </Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', gap: 1.2, alignItems: 'center' }}>
+                                <Phone sx={{ color: '#f5a623', fontSize: 18 }} />
+                                <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>
+                                    1800 6655 (Miễn phí)
+                                </Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', gap: 1.2, alignItems: 'center' }}>
+                                <Email sx={{ color: '#f5a623', fontSize: 18 }} />
+                                <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>
+                                    support@bookly.vn
+                                </Typography>
+                            </Box>
+                        </Box>
+                    </Grid>
+
+                    {/* Newsletter Column */}
+                    <Grid size={{ xs: 12, sm: 4, md: 3 }}>
+                        <Typography variant="subtitle2" sx={{ 
+                            color: '#ffffff', 
+                            fontWeight: 700, 
+                            mb: 2.5, 
+                            textTransform: 'uppercase', 
+                            letterSpacing: 1, 
+                            fontSize: '0.8rem' 
+                        }}>
+                            Đăng Ký Nhận Tin
+                        </Typography>
+                        <Typography variant="body2" sx={{ mb: 2, fontSize: '0.85rem', lineHeight: 1.6 }}>
+                            Nhận ngay mã giảm giá 10% và cập nhật các tựa sách mới phát hành sớm nhất.
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                            <TextField 
+                                variant="outlined" 
+                                placeholder="Email của bạn" 
+                                fullWidth 
+                                size="small"
+                                sx={{ 
+                                    bgcolor: 'rgba(255,255,255,0.05)', 
+                                    borderRadius: 1,
+                                    input: { color: '#ffffff', fontSize: 13, py: 1.2 },
+                                    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.15)' },
+                                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.4)' },
+                                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#f5a623' },
+                                }}
+                            />
+                            <Button 
+                                variant="contained" 
+                                fullWidth 
+                                sx={{ 
+                                    fontWeight: 700, 
+                                    bgcolor: '#f5a623', 
+                                    color: '#1a1a2e',
+                                    fontSize: 13,
+                                    py: 1,
+                                    '&:hover': { bgcolor: '#db941e' } 
+                                }}
+                            >
+                                Đăng ký ngay
+                            </Button>
+                        </Box>
+                    </Grid>
                 </Grid>
 
-                {/* Columns */}
-                {FOOTER_COLS.map((col) => (
-                    <Grid size={{ xs: 12, md: 2 }} ml={15} key={col.title} sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                        <Typography fontWeight={700} sx={{ mb: 2 }}>{col.title}</Typography>
-                        {col.links.map((link) => (
-                            <Typography key={link} variant="body2" color="#aaa" sx={{
-                                mb: 0.8, cursor: 'pointer',
-                                '&:hover': { color: '#d32f2f' },
-                            }}>
-                                {link}
-                            </Typography>
-                        ))}
-                    </Grid>
-                ))}
-            </Grid>
-
-            <Divider sx={{ borderColor: '#333', mb: 2 }} />
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
-                <Typography variant="caption" color="#666">
-                    © 2026 BookStore. Tất cả quyền được bảo lưu.
-                </Typography>
-                <Typography variant="caption" color="#666">
-                    Chính sách bảo mật · Điều khoản sử dụng
-                </Typography>
-            </Box>
-        </Container>
-    </Box>
-);
+                <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)', my: 4 }} />
+                
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.78rem' }}>
+                        © 2026 Bookly - All rights reserved.
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                        {/* payment method icons */}
+                        <Box sx={{ px: 1, py: 0.5, bgcolor: '#ffffff', borderRadius: 0.5, display: 'flex', alignItems: 'center' }}>
+                            <Typography variant="caption" sx={{ color: '#0054a6', fontWeight: 900, fontSize: '0.62rem' }}>VNPAY</Typography>
+                        </Box>
+                        <Box sx={{ px: 1, py: 0.5, bgcolor: '#a50064', borderRadius: 0.5, display: 'flex', alignItems: 'center' }}>
+                            <Typography variant="caption" sx={{ color: '#ffffff', fontWeight: 900, fontSize: '0.62rem' }}>MOMO</Typography>
+                        </Box>
+                        <Box sx={{ px: 1, py: 0.5, bgcolor: '#1a1f71', borderRadius: 0.5, display: 'flex', alignItems: 'center' }}>
+                            <Typography variant="caption" sx={{ color: '#ffffff', fontWeight: 900, fontSize: '0.62rem', fontStyle: 'italic' }}>VISA</Typography>
+                        </Box>
+                    </Box>
+                </Box>
+            </Container>
+        </Box>
+    );
+};
 
 export default Footer;

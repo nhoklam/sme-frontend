@@ -1,11 +1,12 @@
 // src/modules/customer/hooks/useCategories.ts
 import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import categoryService from '../../../services/categoryService';
 import { Category } from '../../../types';
 
 // Icon mapping tĩnh — backend không lưu icon, map theo tên danh mục
 const CATEGORY_ICONS: Record<string, string> = {
-    'Văn Học': '📖',
+    'Văn Học': '📚',
     'Kỹ Năng': '💡',
     'Kinh Tế': '💰',
     'Thiếu Nhi': '🧸',
@@ -13,6 +14,13 @@ const CATEGORY_ICONS: Record<string, string> = {
     'Khoa Học': '🔬',
     'Lịch Sử': '🏛️',
     'Ngoại Ngữ': '🌍',
+    'Sách Mầm Non': '👶',
+    'Sách Thiếu Nhi': '🧸',
+    'Sách Kĩ Năng': '💡',
+    'Sách Kinh Doanh': '📈',
+    'Sách Mẹ Và Bé': '🤱',
+    'Sách Văn Học': '📖',
+    'Sách Tham Khảo': '📓',
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -28,14 +36,16 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 export interface DisplayCategory {
     id: string;
+    parentId?: string | null;
     name: string;
     icon: string;
     color: string;
     slug: string;
+    children: DisplayCategory[];
 }
 
 /**
- * Hook lấy tất cả danh mục active, kèm icon và color mapping
+ * Hook lấy tất cả danh mục active, hỗ trợ cấu trúc phân cấp Parent-Child
  */
 export const useCategories = () => {
     const { data, isLoading, isError, error } = useQuery({
@@ -44,15 +54,52 @@ export const useCategories = () => {
         staleTime: 5 * 60 * 1000, // 5 phút
     });
 
-    const categories: DisplayCategory[] = (data ?? [])
-        .filter((cat: Category) => cat.isActive)
-        .map((cat: Category) => ({
+    const { categories, flatCategories } = useMemo(() => {
+        const activeList = (data ?? []).filter((cat: Category) => cat.isActive);
+        
+        // 1. Tạo danh sách phẳng được map thông tin icon/color
+        const mappedList: DisplayCategory[] = activeList.map((cat: Category) => ({
             id: cat.id,
+            parentId: cat.parentId,
             name: cat.name,
-            icon: CATEGORY_ICONS[cat.name] ?? '📚',
+            icon: CATEGORY_ICONS[cat.name] ?? '📖',
             color: CATEGORY_COLORS[cat.name] ?? '#f5f5f5',
             slug: cat.slug ?? cat.name.toLowerCase().replace(/\s+/g, '-'),
+            children: [],
         }));
 
-    return { categories, isLoading, isError, error: error as Error | null };
+        // 2. Xây dựng cây thư mục cha-con
+        const categoryMap = new Map<string, DisplayCategory>();
+        const rootCategories: DisplayCategory[] = [];
+
+        mappedList.forEach(cat => {
+            categoryMap.set(cat.id, cat);
+        });
+
+        mappedList.forEach(cat => {
+            if (cat.parentId && categoryMap.has(cat.parentId)) {
+                categoryMap.get(cat.parentId)!.children.push(cat);
+            } else {
+                rootCategories.push(cat);
+            }
+        });
+
+        // Sắp xếp các danh mục con theo thứ tự bảng chữ cái hoặc logic
+        rootCategories.forEach(root => {
+            root.children.sort((a, b) => a.name.localeCompare(b.name));
+        });
+
+        return {
+            categories: rootCategories,
+            flatCategories: mappedList
+        };
+    }, [data]);
+
+    return { 
+        categories, 
+        flatCategories, 
+        isLoading, 
+        isError, 
+        error: error as Error | null 
+    };
 };

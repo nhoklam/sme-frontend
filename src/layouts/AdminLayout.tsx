@@ -1,6 +1,6 @@
 // src/layouts/AdminLayout.jsx
 import React, { useState } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
     Box, AppBar, Toolbar, Typography, IconButton,
     Drawer, Avatar, Menu, MenuItem, Divider,
@@ -17,6 +17,7 @@ import authService from '../services/authService';
 import { notificationService, Notification } from '../services/notificationService';
 import warehouseService from '../services/warehouseService';
 import { useWebSocket, WsPayload } from '../store/hooks/useWebSocket';
+import toast from 'react-hot-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import AIChatWidget from '../components/common/AIChatWidget';
@@ -55,6 +56,7 @@ const AdminLayout = () => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
     const navigate = useNavigate();
+    const location = useLocation();
 
     const currentUser = authService.getCurrentUser()?.user;
     const displayName = currentUser?.fullName || currentUser?.username || 'Admin';
@@ -98,9 +100,30 @@ const AdminLayout = () => {
     useWebSocket({
         warehouseId: currentUser?.warehouseId,
         onMessage: (payload: WsPayload) => {
-            // Nhận thông báo mới từ socket
             setUnreadCount(prev => prev + 1);
-            loadNotifications(); // Reload danh sách
+            loadNotifications();
+            
+            // Hiện Pop-up ngay trên màn hình
+            switch (payload.type) {
+                case 'NEW_ORDER':
+                    toast(`Đơn hàng mới: ${payload.orderCode}`, { icon: '🛒', style: { borderRadius: '10px', background: '#333', color: '#fff' } });
+                    break;
+                case 'IMPORT_SUCCESS':
+                    toast.success(`Nhập kho thành công: ${payload.orderCode}`);
+                    break;
+                case 'LOW_STOCK':
+                    toast.error(`Sắp hết hàng: ${payload.productName}`, { icon: '⚠️' });
+                    break;
+                case 'OUT_OF_STOCK':
+                    toast.error(`Hết hàng: ${payload.productName}`, { icon: '🛑' });
+                    break;
+                case 'TRANSFER_ARRIVED':
+                    toast(`Có phiếu chuyển kho mới`, { icon: '📦' });
+                    break;
+                case 'SHIFT_PENDING_APPROVAL':
+                    toast(`Có ca làm việc cần duyệt`, { icon: '🔒' });
+                    break;
+            }
         },
         enabled: !!currentUser,
     });
@@ -133,8 +156,12 @@ const AdminLayout = () => {
 
     const handleLogout = () => {
         authService.logout();
-        navigate('/login', { replace: true });
+        navigate('/admin/login', { replace: true });
     };
+
+    if (location.pathname.includes('/pos')) {
+        return <Outlet />;
+    }
 
     return (
         <Box sx={{ display: 'flex' }}>
@@ -161,7 +188,7 @@ const AdminLayout = () => {
 
                     {/* Brand (show when sidebar closed) */}
                     {(!open || isMobile) && (
-                        <Typography variant="subtitle1" fontWeight={800} color="#1976d2" sx={{ mr: 2 }}>
+                        <Typography variant="subtitle1" fontWeight={800} color="#2563eb" sx={{ mr: 2 }}>
                             SME ERP & POS
                         </Typography>
                     )}
@@ -251,7 +278,7 @@ const AdminLayout = () => {
                                 '&:hover': { bgcolor: '#f5f5f5' },
                             }}
                         >
-                            <Avatar sx={{ width: 30, height: 30, bgcolor: '#1976d2', fontSize: 13, fontWeight: 700 }}>
+                            <Avatar sx={{ width: 30, height: 30, bgcolor: '#2563eb', fontSize: 13, fontWeight: 700 }}>
                                 {displayName.charAt(0).toUpperCase()}
                             </Avatar>
                             <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
@@ -322,7 +349,7 @@ const AdminLayout = () => {
                 }}>
                     <Box sx={{
                         width: 32, height: 32, borderRadius: 1.5,
-                        bgcolor: '#1976d2', display: 'flex',
+                        bgcolor: '#2563eb', display: 'flex',
                         alignItems: 'center', justifyContent: 'center',
                         flexShrink: 0,
                     }}>
@@ -330,7 +357,7 @@ const AdminLayout = () => {
                     </Box>
                     {open && (
                         <Box>
-                            <Typography variant="subtitle2" fontWeight={800} color="#1976d2" lineHeight={1.1}>
+                            <Typography variant="subtitle2" fontWeight={800} color="#2563eb" lineHeight={1.1}>
                                 SME ERP & POS
                             </Typography>
                         </Box>

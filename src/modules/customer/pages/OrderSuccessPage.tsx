@@ -1,51 +1,79 @@
-// src/modules/customer/pages/OrderSuccessPage.tsx
 import React from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { Box, Container, Typography, Button, Paper, Divider } from '@mui/material';
-import { CheckCircle, ShoppingBag, Home } from '@mui/icons-material';
-import { fmt } from '../../../utils/constants';
+import { Box, Container, Typography, Paper, Button } from '@mui/material';
+import { CheckCircleOutline, ShoppingBag, ReceiptLong } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 
-const OrderSuccessPage: React.FC = () => {
+const OrderSuccessPage = () => {
     const navigate = useNavigate();
-    const location = useLocation();
-    const order = (location.state as any)?.order;
+
+    // Mock order data
+    const orderId = 'ORD-' + Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
+    const orderDate = new Date().toLocaleDateString('vi-VN', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
 
     return (
-        <Box sx={{ bgcolor: '#f5f5f5', minHeight: '80vh' }}>
-            <Container maxWidth="sm" sx={{ py: 6 }}>
-                <Paper elevation={0} sx={{ borderRadius: 3, p: 5, textAlign: 'center' }}>
-                    <CheckCircle sx={{ fontSize: 72, color: '#4caf50', mb: 2 }} />
-                    <Typography variant="h5" fontWeight={800} mb={1}>Đặt hàng thành công! 🎉</Typography>
-                    <Typography color="text.secondary" mb={3}>
-                        Cảm ơn bạn đã mua hàng. Đơn hàng của bạn đang được xử lý.
+        <Box sx={{ bgcolor: 'var(--bg-default)', minHeight: '80vh', py: 8, display: 'flex', alignItems: 'center' }}>
+            <Container maxWidth="sm">
+                <Paper elevation={0} sx={{ p: { xs: 4, md: 6 }, borderRadius: '16px', border: '1px solid var(--color-border)', textAlign: 'center' }}>
+                    
+                    <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
+                        <Box sx={{ 
+                            width: 80, height: 80, borderRadius: '50%', 
+                            bgcolor: 'rgba(76, 175, 80, 0.1)', display: 'flex', 
+                            justifyContent: 'center', alignItems: 'center' 
+                        }}>
+                            <CheckCircleOutline sx={{ fontSize: 50, color: '#4caf50' }} />
+                        </Box>
+                    </Box>
+
+                    <Typography variant="h4" sx={{ fontFamily: '"Playfair Display", serif', fontWeight: 700, color: 'var(--color-primary)', mb: 2 }}>
+                        Đặt Hàng Thành Công!
+                    </Typography>
+                    
+                    <Typography variant="body1" sx={{ color: 'text.secondary', mb: 4, lineHeight: 1.6 }}>
+                        Cảm ơn bạn đã mua sắm tại Bookly. Đơn hàng của bạn đang được chúng tôi xử lý và sẽ được giao trong thời gian sớm nhất.
                     </Typography>
 
-                    {order && (
-                        <Box sx={{ bgcolor: '#f9f9f9', borderRadius: 2, p: 2.5, mb: 3, textAlign: 'left' }}>
-                            <Typography variant="body2" fontWeight={700} mb={1}>Thông tin đơn hàng</Typography>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                <Typography variant="body2" color="text.secondary">Mã đơn:</Typography>
-                                <Typography variant="body2" fontWeight={700} color="#d32f2f">{order.code}</Typography>
-                            </Box>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                <Typography variant="body2" color="text.secondary">Tổng tiền:</Typography>
-                                <Typography variant="body2" fontWeight={700}>{fmt(order.finalAmount)}</Typography>
-                            </Box>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <Typography variant="body2" color="text.secondary">Thanh toán:</Typography>
-                                <Typography variant="body2" fontWeight={600}>{order.paymentMethod}</Typography>
-                            </Box>
+                    <Box sx={{ bgcolor: 'var(--bg-default)', p: 3, borderRadius: '8px', mb: 4, textAlign: 'left' }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
+                            <Typography variant="body2" color="text.secondary">Mã đơn hàng:</Typography>
+                            <Typography variant="subtitle2" fontWeight={700} color="var(--color-secondary)">{orderId}</Typography>
                         </Box>
-                    )}
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
+                            <Typography variant="body2" color="text.secondary">Ngày đặt:</Typography>
+                            <Typography variant="subtitle2" fontWeight={600}>{orderDate}</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <Typography variant="body2" color="text.secondary">Thanh toán:</Typography>
+                            <Typography variant="subtitle2" fontWeight={600}>Khi nhận hàng (COD)</Typography>
+                        </Box>
+                    </Box>
 
-                    <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
-                        <Button variant="outlined" startIcon={<ShoppingBag />} onClick={() => navigate('/shop')}
-                            sx={{ borderColor: '#d32f2f', color: '#d32f2f', textTransform: 'none', fontWeight: 600 }}>
-                            Tiếp tục mua sắm
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <Button 
+                            variant="contained" 
+                            color="secondary" 
+                            size="large"
+                            startIcon={<ReceiptLong />}
+                            onClick={() => console.log('View order details')}
+                            sx={{ borderRadius: '8px', fontWeight: 600 }}
+                        >
+                            Xem Chi Tiết Đơn Hàng
                         </Button>
-                        <Button variant="contained" startIcon={<Home />} onClick={() => navigate('/')}
-                            sx={{ bgcolor: '#d32f2f', textTransform: 'none', fontWeight: 600, '&:hover': { bgcolor: '#b71c1c' } }}>
-                            Về trang chủ
+                        <Button 
+                            variant="outlined" 
+                            color="primary" 
+                            size="large"
+                            startIcon={<ShoppingBag />}
+                            onClick={() => navigate('/')}
+                            sx={{ borderRadius: '8px', fontWeight: 600 }}
+                        >
+                            Tiếp Tục Mua Sắm
                         </Button>
                     </Box>
                 </Paper>

@@ -2,42 +2,42 @@ import React from 'react';
 import { Box, Container } from '@mui/material';
 
 import HeroBanner from '../components/home/HeroBanner';
-import ServicesBar from '../components/home/ServicesBar';
 import CategorySlider from '../components/home/CategorySlider';
 import FeaturedProducts from '../components/home/FeaturedProducts';
+import FlashSale from '../components/home/FlashSale';
+import NewArrivals from '../components/home/NewArrivals';
+import Authors from '../components/home/Authors';
 import PromotionBanner from '../components/home/PromotionBanner';
 
-const HomePage = () => (
-    <Box sx={{ bgcolor: '#f4f4f4', minHeight: '100vh' }}>
-        <Container maxWidth="lg" sx={{ py: 2 }}>
+const HomePage = () => {
+    return (
+        <Box sx={{ bgcolor: 'var(--bg-default)', minHeight: '100vh', pb: 8, pt: 2 }}>
+            <Container maxWidth="lg">
+                {/* 1. Hero Banner */}
+                <Box sx={{ mb: 6 }}>
+                    <HeroBanner />
+                </Box>
 
-            {/* Hero Banner */}
-            <HeroBanner />
-
-            {/* Services strip */}
-            <ServicesBar />
-
-            {/* Category chips */}
-            <Box sx={{
-                bgcolor: '#fff',
-                borderRadius: 1.5,
-                border: '1px solid #ececec',
-                px: 2,
-                py: 1.75,
-                mb: 2,
-                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-            }}>
+                {/* 2. Category Slider (8 prominent categories) */}
                 <CategorySlider />
-            </Box>
 
-            {/* Products sections */}
-            <FeaturedProducts />
+                {/* 3. Flash Sale */}
+                <FlashSale />
 
-            {/* Promotion */}
-            <PromotionBanner />
+                {/* 4. Featured / Best Seller Products with Tabs */}
+                <FeaturedProducts />
 
-        </Container>
-    </Box>
-);
+                {/* 5. New Arrivals */}
+                <NewArrivals />
+
+                {/* 6. Promotion Banners */}
+                <PromotionBanner />
+
+                {/* 7. Featured Authors */}
+                <Authors />
+            </Container>
+        </Box>
+    );
+};
 
 export default HomePage;

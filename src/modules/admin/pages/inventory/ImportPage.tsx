@@ -323,7 +323,7 @@ const PurchaseOrderDetailDialog: React.FC<{
             {/* Actions */}
             <DialogActions sx={{ px: 3, pb: 2.5, gap: 1, borderTop: '1px solid #e2e8f0' }}>
                 <Button onClick={handlePrint} variant="contained" startIcon={<Print />}
-                    sx={{ textTransform: 'none', bgcolor: '#1976d2', '&:hover': { bgcolor: '#1565c0' } }}>
+                    sx={{ textTransform: 'none', bgcolor: '#10b981', '&:hover': { bgcolor: '#059669' } }}>
                     In phiếu nhập
                 </Button>
                 <Button onClick={onClose} variant="outlined" sx={{ textTransform: 'none' }}>Đóng</Button>
@@ -336,7 +336,7 @@ const PurchaseOrderDetailDialog: React.FC<{
                 )}
                 {(order?.status === 'DRAFT' || order?.status === 'PENDING') && (
                     <Button onClick={onCancel} variant="contained" disabled={loading}
-                        sx={{ textTransform: 'none', bgcolor: '#d32f2f', '&:hover': { bgcolor: '#b71c1c' } }}>
+                        sx={{ textTransform: 'none', bgcolor: '#ef4444', '&:hover': { bgcolor: '#dc2626' } }}>
                         ✕ Hủy phiếu
                     </Button>
                 )}
@@ -768,7 +768,7 @@ const CreatePurchaseDialog: React.FC<{
                 <Button onClick={onClose} variant="outlined">Đóng</Button>
                 <Button onClick={handleCreate} variant="contained"
                     disabled={creating || !supplierId || !warehouseId || cartItems.length === 0}
-                    sx={{ bgcolor: '#1976d2' }}>
+                    sx={{ textTransform: 'none', fontWeight: 700, bgcolor: '#2563eb', '&:hover': { bgcolor: '#1d4ed8' } }}>
                     {creating ? 'Đang tạo...' : 'Tạo phiếu nhập'}
                 </Button>
             </DialogActions>
@@ -859,7 +859,7 @@ const ImportPage: React.FC = () => {
                     <Typography variant="h5" fontWeight={800} color="#1a1a2e" mt={0.5}>Phiếu nhập kho</Typography>
                     <Typography variant="body2" color="text.secondary" fontSize={12}>Quản lý nhập hàng từ Nhà cung cấp · Hỗ trợ Batch/Lô số</Typography>
                 </Box>
-                <Button variant="contained" startIcon={<Add />} onClick={() => setCreateOpen(true)} sx={{ bgcolor: '#1976d2' }}>
+                <Button variant="contained" startIcon={<Add />} onClick={() => setCreateOpen(true)} sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 2, bgcolor: '#2563eb', '&:hover': { bgcolor: '#1d4ed8' } }}>
                     Tạo phiếu nhập
                 </Button>
             </Box>
@@ -913,12 +913,12 @@ const ImportPage: React.FC = () => {
                                         <TableCell>{order.createdAt ? new Date(order.createdAt).toLocaleDateString('vi-VN') : '—'}</TableCell>
                                         <TableCell onClick={e => e.stopPropagation()}>
                                             <Box sx={{ display: 'flex', gap: 0.5 }}>
-                                                <IconButton size="small" onClick={() => { setSelectedOrder(order); setDetailOpen(true); }}><Visibility /></IconButton>
+                                                <IconButton size="small" onClick={() => { setSelectedOrder(order); setDetailOpen(true); }} sx={{ color: '#3b82f6', '&:hover': { bgcolor: '#eff6ff' } }}><Visibility /></IconButton>
                                                 {order.status === 'PENDING' && (
-                                                    <IconButton size="small" onClick={() => { setSelectedOrder(order); handleApprove(); }} sx={{ color: '#2e7d32' }}><CheckCircle /></IconButton>
+                                                    <IconButton size="small" onClick={() => { setSelectedOrder(order); handleApprove(); }} sx={{ color: '#16a34a', '&:hover': { bgcolor: '#f0fdf4' } }}><CheckCircle /></IconButton>
                                                 )}
                                                 {(order.status === 'DRAFT' || order.status === 'PENDING') && (
-                                                    <IconButton size="small" onClick={() => { setSelectedOrder(order); setCancelOpen(true); }} sx={{ color: '#d32f2f' }}><Cancel /></IconButton>
+                                                    <IconButton size="small" onClick={() => { setSelectedOrder(order); setCancelOpen(true); }} sx={{ color: '#ef4444', '&:hover': { bgcolor: '#fef2f2' } }}><Cancel /></IconButton>
                                                 )}
                                             </Box>
                                         </TableCell>

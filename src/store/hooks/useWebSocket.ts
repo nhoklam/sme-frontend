@@ -5,7 +5,9 @@ export type WsEventType =
     | 'LOW_STOCK'
     | 'NEW_ORDER'
     | 'SHIFT_PENDING_APPROVAL'
-    | 'TRANSFER_ARRIVED';
+    | 'TRANSFER_ARRIVED'
+    | 'IMPORT_SUCCESS'
+    | 'OUT_OF_STOCK';
 
 export interface WsPayload {
     type: WsEventType;
@@ -16,12 +18,20 @@ export interface WsPayload {
     minQuantity?: number;
     productName?: string;
     orderCode?: string;
+    amount?: number;
     shiftId?: string;
     transferId?: string;
     [key: string]: unknown;
 }
 
 type TopicHandler = (payload: WsPayload) => void;
+
+// Define a global audio object to prevent multiple allocations
+let notificationAudio: HTMLAudioElement | null = null;
+if (typeof window !== 'undefined') {
+    notificationAudio = new Audio('/assets/ting.mp3');
+    notificationAudio.volume = 0.8;
+}
 
 interface UseWebSocketOptions {
     warehouseId: string | undefined | null;
@@ -67,6 +77,7 @@ export function useWebSocket({ warehouseId, onMessage, enabled = true }: UseWebS
             `/topic/warehouse/${wid}/new-order`,
             `/topic/warehouse/${wid}/shift-alert`,
             `/topic/warehouse/${wid}/transfer`,
+            `/topic/warehouse/${wid}/inventory`,
         ];
 
         topics.forEach(topic => {
@@ -111,6 +122,7 @@ export function useWebSocket({ warehouseId, onMessage, enabled = true }: UseWebS
                 `/topic/warehouse/${warehouseId}/new-order`,
                 `/topic/warehouse/${warehouseId}/shift-alert`,
                 `/topic/warehouse/${warehouseId}/transfer`,
+                `/topic/warehouse/${warehouseId}/inventory`,
             ];
 
         // Reset retry counter khi thông tin thay đổi
@@ -138,6 +150,12 @@ export function useWebSocket({ warehouseId, onMessage, enabled = true }: UseWebS
                     const sub = client.subscribe(topic, (msg: IMessage) => {
                         try {
                             const payload = JSON.parse(msg.body) as WsPayload;
+
+                            // Phát âm thanh khi có đơn hàng mới
+                            if (payload.type === 'NEW_ORDER' && notificationAudio) {
+                                notificationAudio.play().catch(e => console.warn('Autoplay prevented:', e));
+                            }
+
                             onMessageRef.current(payload);
                         } catch {
                             console.warn('[WebSocket] Cannot parse message:', msg.body);

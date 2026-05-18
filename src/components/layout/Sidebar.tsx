@@ -107,7 +107,7 @@ const Sidebar: React.FC = () => {
                 <Typography variant="caption" color="text.secondary" display="block">
                     Đăng nhập với tư cách
                 </Typography>
-                <Typography variant="body2" fontWeight={700} color="#1976d2" noWrap>
+                <Typography variant="body2" fontWeight={700} color="#2563eb" noWrap>
                     {currentUser?.fullName || 'Admin'}
                 </Typography>
                 <Chip
@@ -118,8 +118,8 @@ const Sidebar: React.FC = () => {
                     size="small"
                     sx={{
                         mt: 0.5, height: 18, fontSize: 10,
-                        bgcolor: userRole === 'ROLE_ADMIN' ? '#e3f2fd' : '#f3e5f5',
-                        color: userRole === 'ROLE_ADMIN' ? '#1565c0' : '#6a1b9a',
+                        bgcolor: userRole === 'ROLE_ADMIN' ? '#eff6ff' : '#f3e5f5',
+                        color: userRole === 'ROLE_ADMIN' ? '#2563eb' : '#6a1b9a',
                         fontWeight: 700,
                     }}
                 />
@@ -151,11 +151,11 @@ const Sidebar: React.FC = () => {
                                                     onClick={() => toggleMenu(item.text)}
                                                     sx={{
                                                         mx: 1, borderRadius: 1.5, mb: 0.25,
-                                                        bgcolor: active ? '#e3f2fd' : 'transparent',
-                                                        '&:hover': { bgcolor: '#f0f4ff' },
+                                                        bgcolor: active ? '#eff6ff' : 'transparent',
+                                                        '&:hover': { bgcolor: '#f1f5f9' },
                                                     }}
                                                 >
-                                                    <ListItemIcon sx={{ minWidth: 36, color: active ? '#1976d2' : '#666' }}>
+                                                    <ListItemIcon sx={{ minWidth: 36, color: active ? '#2563eb' : '#666' }}>
                                                         {item.icon}
                                                     </ListItemIcon>
                                                     <ListItemText
@@ -172,8 +172,8 @@ const Sidebar: React.FC = () => {
                                                                 onClick={() => navigate(child.path)}
                                                                 sx={{
                                                                     mx: 1, borderRadius: 1.5, mb: 0.25,
-                                                                    bgcolor: location.pathname === child.path ? '#e3f2fd' : 'transparent',
-                                                                    '&:hover': { bgcolor: '#f0f4ff' },
+                                                                    bgcolor: location.pathname === child.path ? '#eff6ff' : 'transparent',
+                                                                    '&:hover': { bgcolor: '#f1f5f9' },
                                                                 }}
                                                             >
                                                                 <ListItemText
@@ -181,7 +181,7 @@ const Sidebar: React.FC = () => {
                                                                     primaryTypographyProps={{
                                                                         fontSize: 12,
                                                                         fontWeight: location.pathname === child.path ? 600 : 400,
-                                                                        color: location.pathname === child.path ? '#1976d2' : '#555',
+                                                                        color: location.pathname === child.path ? '#2563eb' : '#555',
                                                                     }}
                                                                 />
                                                             </ListItemButton>
@@ -197,11 +197,11 @@ const Sidebar: React.FC = () => {
                                             onClick={() => navigate(item.path)}
                                             sx={{
                                                 mx: 1, borderRadius: 1.5, mb: 0.25,
-                                                bgcolor: active ? '#e3f2fd' : 'transparent',
-                                                '&:hover': { bgcolor: '#f0f4ff' },
+                                                bgcolor: active ? '#eff6ff' : 'transparent',
+                                                '&:hover': { bgcolor: '#f1f5f9' },
                                             }}
                                         >
-                                            <ListItemIcon sx={{ minWidth: 36, color: active ? '#1976d2' : '#666' }}>
+                                            <ListItemIcon sx={{ minWidth: 36, color: active ? '#2563eb' : '#666' }}>
                                                 {item.icon}
                                             </ListItemIcon>
                                             <ListItemText
@@ -209,7 +209,7 @@ const Sidebar: React.FC = () => {
                                                 primaryTypographyProps={{
                                                     fontSize: 13,
                                                     fontWeight: active ? 600 : 400,
-                                                    color: active ? '#1976d2' : '#333',
+                                                    color: active ? '#2563eb' : '#333',
                                                 }}
                                             />
                                         </ListItemButton>

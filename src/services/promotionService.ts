@@ -54,12 +54,12 @@ const promotionService = {
     },
 
     /** Validate mã KM, trả về số tiền giảm */
-    validate: async (code: string, orderTotal: number): Promise<{ code: string; discountAmount: number; finalAmount: number }> => {
-        console.log('[PromotionService] Validating:', { code, orderTotal, typeOfTotal: typeof orderTotal });
+    validate: async (code: string, orderTotal: number, channel: string = 'ONLINE'): Promise<{ code: string; discountAmount: number; finalAmount: number }> => {
+        console.log('[PromotionService] Validating:', { code, orderTotal, channel });
         try {
             const res = await axiosInstance.post<ApiResponse<{ code: string; discountAmount: number; finalAmount: number }>>(
                 '/promotions/validate',
-                { code, orderTotal }
+                { codes: [code], orderTotal, channel }
             );
             return res.data.data;
         } catch (error: any) {

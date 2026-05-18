@@ -14,6 +14,7 @@ const STATUS_MAP: Record<string, { label: string; color: any }> = {
     DELIVERED: { label: 'Đã giao', color: 'success' },
     CANCELLED: { label: 'Đã hủy', color: 'error' },
     RETURNED: { label: 'Đã trả', color: 'error' },
+    PAID: { label: 'Đã thanh toán (POS)', color: 'success' },
 };
 
 const OrderHistory = () => {

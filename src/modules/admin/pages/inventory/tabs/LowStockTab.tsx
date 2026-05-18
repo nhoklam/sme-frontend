@@ -128,10 +128,10 @@ const QuickImportDialog: React.FC<{
             <DialogTitle sx={{ pb: 0.5, pt: 2.5, px: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
-                        <ShoppingCart sx={{ fontSize: 18, color: '#1976d2' }} />
+                        <ShoppingCart sx={{ fontSize: 18, color: '#2563eb' }} />
                         <Typography fontWeight={800} fontSize={16}>Tạo phiếu nhập nhanh</Typography>
                         <Chip label={`${cart.length} sản phẩm`} size="small"
-                            sx={{ height: 22, fontSize: 10, bgcolor: '#e3f2fd', color: '#1565c0', fontWeight: 700 }} />
+                            sx={{ height: 22, fontSize: 10, bgcolor: '#eff6ff', color: '#2563eb', fontWeight: 700 }} />
                     </Box>
                     <Typography variant="caption" color="text.secondary">
                         Từ danh sách cảnh báo tồn kho thấp · Có thể điều chỉnh SL và giá nhập
@@ -146,7 +146,7 @@ const QuickImportDialog: React.FC<{
                 <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
                     <Box sx={{ flex: 1, minWidth: 200 }}>
                         <Typography variant="caption" fontWeight={700} color="#555" display="block" mb={0.75}>
-                            Nhà cung cấp <span style={{ color: '#d32f2f' }}>*</span>
+                            Nhà cung cấp <span style={{ color: '#ef4444' }}>*</span>
                         </Typography>
                         <FormControl fullWidth size="small">
                             <Select value={supplierId} onChange={e => setSupplierId(e.target.value)} displayEmpty>
@@ -157,7 +157,7 @@ const QuickImportDialog: React.FC<{
                     </Box>
                     <Box sx={{ flex: 1, minWidth: 200 }}>
                         <Typography variant="caption" fontWeight={700} color="#555" display="block" mb={0.75}>
-                            Kho nhập <span style={{ color: '#d32f2f' }}>*</span>
+                            Kho nhập <span style={{ color: '#ef4444' }}>*</span>
                         </Typography>
                         <FormControl fullWidth size="small">
                             <Select value={warehouseId} onChange={e => setWarehouseId(e.target.value)} displayEmpty>
@@ -201,7 +201,7 @@ const QuickImportDialog: React.FC<{
                                     </TableCell>
                                     <TableCell align="center" sx={{ py: 1.25 }}>
                                         <Typography variant="body2" fontWeight={700}
-                                            color={item.currentStock === 0 ? '#d32f2f' : '#e65100'}>
+                                            color={item.currentStock === 0 ? '#ef4444' : '#f59e0b'}>
                                             {item.currentStock}
                                         </Typography>
                                     </TableCell>
@@ -232,13 +232,13 @@ const QuickImportDialog: React.FC<{
                                         />
                                     </TableCell>
                                     <TableCell align="right" sx={{ py: 1.25 }}>
-                                        <Typography variant="body2" fontWeight={700} color="#1976d2">
+                                        <Typography variant="body2" fontWeight={700} color="#2563eb">
                                             {fmtCurrency(item.quantity * item.importPrice)}
                                         </Typography>
                                     </TableCell>
                                     <TableCell align="center" sx={{ py: 1.25 }}>
                                         <IconButton size="small" onClick={() => removeItem(item.productId)}>
-                                            <Close sx={{ fontSize: 14, color: '#d32f2f' }} />
+                                            <Close sx={{ fontSize: 14, color: '#ef4444' }} />
                                         </IconButton>
                                     </TableCell>
                                 </TableRow>
@@ -254,7 +254,7 @@ const QuickImportDialog: React.FC<{
                     </Typography>
                     <Paper elevation={0} sx={{ p: 1.5, bgcolor: '#f5f5f5', borderRadius: 1.5 }}>
                         <Typography variant="body2" fontWeight={700}>
-                            Tổng tiền: <strong style={{ color: '#d32f2f' }}>{fmtCurrency(totalAmount)}</strong>
+                            Tổng tiền: <strong style={{ color: '#ef4444' }}>{fmtCurrency(totalAmount)}</strong>
                         </Typography>
                     </Paper>
                 </Box>
@@ -272,7 +272,7 @@ const QuickImportDialog: React.FC<{
                     variant="contained"
                     disabled={creating || !supplierId || !warehouseId || cart.length === 0}
                     startIcon={creating ? <CircularProgress size={14} sx={{ color: '#fff' }} /> : <Add />}
-                    sx={{ bgcolor: '#1976d2', textTransform: 'none', fontWeight: 700 }}
+                    sx={{ bgcolor: '#2563eb', textTransform: 'none', fontWeight: 700, borderRadius: 1.5, height: 36 }}
                 >
                     {creating ? 'Đang tạo...' : `Tạo phiếu nhập (${cart.length} SP)`}
                 </Button>
@@ -326,19 +326,47 @@ const LowStockTab: React.FC<Props> = ({ warehouses }) => {
     }, [isAdmin, myWarehouseId, warehouses]);
 
     const load = useCallback(async () => {
-        if (!accessibleWarehouseIds.length) { setItems([]); return; }
+        if (!accessibleWarehouseIds.length || !products.length) { setItems([]); return; }
         setLoading(true);
         try {
-            const all = await Promise.all(
+            const allInventories = await Promise.all(
                 accessibleWarehouseIds.map(id =>
-                    inventoryService.getLowStock(id).catch(() => [] as LowStockItem[])
+                    inventoryService.getByWarehouse(id).catch(() => [])
                 )
             );
-            setItems(all.flat());
+
+            const lowStockItems: LowStockItem[] = [];
+            accessibleWarehouseIds.forEach((wId, i) => {
+                const w = warehouses.find(wh => wh.id === wId);
+                if (!w) return;
+                const invs = allInventories[i] as any[];
+                const invMap = new Map<string, any>(invs.map(inv => [inv.productId, inv]));
+
+                products.forEach(p => {
+                    const inv = invMap.get(p.id);
+                    const qty = inv ? Number(inv.availableQuantity) : 0;
+                    const minQty = inv ? Number(inv.minQuantity) : 0; // Defaults to 0
+
+                    if (qty <= minQty) {
+                        lowStockItems.push({
+                            inventoryId: inv ? inv.id : '',
+                            productId: p.id,
+                            productName: p.name,
+                            productSku: p.sku,
+                            warehouseId: w.id,
+                            warehouseName: w.name,
+                            quantity: qty,
+                            minQuantity: minQty,
+                            reservedQuantity: inv ? Number(inv.reservedQuantity || 0) : 0
+                        });
+                    }
+                });
+            });
+            setItems(lowStockItems);
         } catch {
             setItems([]);
         } finally { setLoading(false); }
-    }, [accessibleWarehouseIds]);
+    }, [accessibleWarehouseIds, products, warehouses]);
 
     useEffect(() => { load(); }, [load]);
 
@@ -408,8 +436,10 @@ const LowStockTab: React.FC<Props> = ({ warehouses }) => {
                             startIcon={<Add sx={{ fontSize: 14 }} />}
                             onClick={handleCreateImportAll}
                             sx={{
-                                bgcolor: '#e65100', textTransform: 'none', fontWeight: 700,
+                                bgcolor: '#f59e0b', '&:hover': { bgcolor: '#d97706' },
+                                textTransform: 'none', fontWeight: 700,
                                 fontSize: 11, whiteSpace: 'nowrap',
+                                borderRadius: 1.5, height: 28,
                             }}
                         >
                             Nhập hàng tất cả ({filtered.length})
@@ -455,16 +485,16 @@ const LowStockTab: React.FC<Props> = ({ warehouses }) => {
                     </Select>
                 </FormControl>
                 <Button size="small" variant="outlined" startIcon={<Refresh sx={{ fontSize: 15 }} />}
-                    onClick={load} sx={{ textTransform: 'none', borderColor: '#e0e0e0', color: '#555' }}>
+                    onClick={load} sx={{ textTransform: 'none', borderColor: '#e0e0e0', color: '#555', borderRadius: 1.5, height: 36 }}>
                     Làm mới
                 </Button>
                 <Button size="small" variant="outlined" startIcon={<FileDownloadOutlined sx={{ fontSize: 15 }} />}
-                    onClick={handleExport} sx={{ textTransform: 'none', borderColor: '#2e7d32', color: '#2e7d32' }}>
+                    onClick={handleExport} sx={{ textTransform: 'none', borderColor: '#16a34a', color: '#16a34a', borderRadius: 1.5, height: 36 }}>
                     Excel ({filtered.length})
                 </Button>
                 {activeCount > 0 && (
                     <Button size="small" onClick={clearFilters}
-                        sx={{ textTransform: 'none', color: '#d32f2f', fontSize: 12 }}>
+                        sx={{ textTransform: 'none', color: '#ef4444', fontSize: 12, fontWeight: 600 }}>
                         Xóa bộ lọc ({activeCount})
                     </Button>
                 )}
@@ -512,7 +542,7 @@ const LowStockTab: React.FC<Props> = ({ warehouses }) => {
                                             <TableCell>
                                                 {p?.categoryName ? (
                                                     <Chip label={p.categoryName} size="small"
-                                                        sx={{ height: 20, fontSize: 10, bgcolor: '#e3f2fd', color: '#1565c0', fontWeight: 600 }} />
+                                                        sx={{ height: 20, fontSize: 10, bgcolor: '#eff6ff', color: '#2563eb', fontWeight: 700 }} />
                                                 ) : <Typography variant="caption" color="#bbb">—</Typography>}
                                             </TableCell>
                                             <TableCell>
@@ -520,7 +550,7 @@ const LowStockTab: React.FC<Props> = ({ warehouses }) => {
                                             </TableCell>
                                             <TableCell>
                                                 <Typography variant="body2" fontWeight={800}
-                                                    color={item.quantity === 0 ? '#d32f2f' : '#e65100'}>
+                                                    color={item.quantity === 0 ? '#ef4444' : '#f59e0b'}>
                                                     {item.quantity}
                                                 </Typography>
                                             </TableCell>
@@ -530,9 +560,9 @@ const LowStockTab: React.FC<Props> = ({ warehouses }) => {
                                             <TableCell sx={{ minWidth: 120 }}>
                                                 <LinearProgress variant="determinate" value={pct}
                                                     sx={{
-                                                        height: 6, borderRadius: 3, bgcolor: '#ffcdd2',
+                                                        height: 6, borderRadius: 3, bgcolor: '#f1f5f9',
                                                         '& .MuiLinearProgress-bar': {
-                                                            bgcolor: item.quantity === 0 ? '#d32f2f' : '#f57c00',
+                                                            bgcolor: item.quantity === 0 ? '#ef4444' : '#f59e0b',
                                                         },
                                                     }} />
                                                 <Typography variant="caption" color="#aaa" fontSize={10}>{pct.toFixed(0)}%</Typography>
@@ -554,9 +584,13 @@ const LowStockTab: React.FC<Props> = ({ warehouses }) => {
                                                         fontSize: 11,
                                                         py: 0.4,
                                                         px: 1.25,
-                                                        borderColor: '#1976d2',
-                                                        color: '#1976d2',
+                                                        borderColor: '#f59e0b',
+                                                        color: '#f59e0b',
                                                         whiteSpace: 'nowrap',
+                                                        borderRadius: 1.5,
+                                                        height: 28,
+                                                        fontWeight: 700,
+                                                        '&:hover': { bgcolor: '#fffbeb', borderColor: '#d97706', color: '#d97706' },
                                                     }}
                                                 >
                                                     Nhập hàng

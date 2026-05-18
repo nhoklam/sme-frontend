@@ -618,9 +618,17 @@ const ProductDetailPage = () => {
 
                                     {product.description && (
                                         <AdminSection title="Mô tả">
-                                            <Typography variant="body2" color="#555" lineHeight={1.75} fontSize={13}>
-                                                {product.description}
-                                            </Typography>
+                                            <Box sx={{ 
+                                                maxHeight: 200, 
+                                                overflowY: 'auto', 
+                                                pr: 1,
+                                                '&::-webkit-scrollbar': { width: 4 },
+                                                '&::-webkit-scrollbar-thumb': { bgcolor: '#e0e0e0', borderRadius: 2 },
+                                            }}>
+                                                <Typography variant="body2" color="#555" lineHeight={1.75} fontSize={13} sx={{ whiteSpace: 'pre-line' }}>
+                                                    {product.description}
+                                                </Typography>
+                                            </Box>
                                         </AdminSection>
                                     )}
 

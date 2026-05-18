@@ -47,7 +47,7 @@ export interface UserResponse {
   posSettings?: string;
 }
 
-export type UserRole = 'ROLE_ADMIN' | 'ROLE_MANAGER' | 'ROLE_CASHIER';
+export type UserRole = 'ROLE_ADMIN' | 'ROLE_MANAGER' | 'ROLE_CASHIER' | 'ROLE_CUSTOMER';
 
 export interface CreateUserRequest {
   username: string;
@@ -490,9 +490,10 @@ export interface CreateOrderRequest {
   paymentMethod: string;
   type?: string;
   note?: string;
-  assignedWarehouseId?: string;
+  shippingFee?: number;
   couponCode?: string;
   discountAmount?: number;
+  assignedWarehouseId?: string;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -799,6 +800,84 @@ export interface TopProductParams {
   warehouseId?: string;
   paymentMethod?: string;
 }
+
+// ─────────────────────────────────────────────────────────────
+// STOREFRONT TYPES (Added for E-commerce)
+// ─────────────────────────────────────────────────────────────
+export type PageData<T> = PageResponse<T>;
+
+export interface Product extends ProductResponse {
+  publisher?: string;
+  publishYear?: number;
+  numberOfPages?: number;
+  dimensions?: string;
+  coverType?: string;
+  language?: string;
+  authorId?: string;
+  averageRating?: number;
+  totalReviews?: number;
+  slug?: string;
+  coverPrice?: number;
+}
+
+export interface Author {
+  id: string;
+  name: string;
+  avatarUrl?: string;
+  biography?: string;
+  isFeatured: boolean;
+}
+
+export interface HomeBanner {
+  id: string;
+  title?: string;
+  imageUrl: string;
+  linkUrl?: string;
+  buttonText?: string;
+  sortOrder: number;
+  bannerType: 'HERO_SLIDER' | 'PROMOTION_BANNER' | 'CATEGORY_BANNER';
+  isActive: boolean;
+}
+
+export interface ProductReview {
+  id: string;
+  productId: string;
+  customerId: string;
+  customerName: string;
+  rating: number;
+  comment?: string;
+  isVerifiedPurchase: boolean;
+  createdAt: string;
+}
+
+export interface CustomerAddress {
+  id: string;
+  customerId: string;
+  receiverName: string;
+  receiverPhone: string;
+  provinceCity: string;
+  district: string;
+  ward?: string;
+  specificAddress: string;
+  isDefault: boolean;
+}
+
+export interface WishlistItem {
+  wishlistId: string;
+  product: Product;
+  addedAt: string;
+}
+
+export interface RegisterRequest {
+  phone: string;
+  password: string;
+  fullName: string;
+  email?: string;
+}
+
+export interface AuthUser extends UserResponse {}
+export interface Order extends OrderResponse {}
+export interface OrderItem extends OrderItemResponse {}
 
 
 export interface DashboardStats {

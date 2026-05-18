@@ -6,6 +6,8 @@ import {
 import { Search, QrCodeScanner } from '@mui/icons-material';
 import productService from '../../../../services/productService';
 import { ProductResponse } from '../../../../types';
+import BarcodeScannerDialog from './BarcodeScannerDialog';
+import { IconButton } from '@mui/material';
 
 const fmt = (n?: number) =>
     new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(n ?? 0);
@@ -22,6 +24,7 @@ const POSProductSearchBar: React.FC<Props> = ({ onAdd, onScanCoupon, disabled })
     const [loading, setLoading] = useState(false);
     const [barcodeErr, setBarcodeErr] = useState('');
     const [isFocused, setIsFocused] = useState(false);
+    const [scannerOpen, setScannerOpen] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
     const dropRef = useRef<HTMLDivElement>(null);
 
@@ -30,7 +33,6 @@ const POSProductSearchBar: React.FC<Props> = ({ onAdd, onScanCoupon, disabled })
 
     useEffect(() => {
         const q = query.trim();
-        if (isBarcode(q)) { setResults([]); setBarcodeErr(''); return; }
         if (!q && !isFocused) { setResults([]); setBarcodeErr(''); return; }
 
         const t = setTimeout(async () => {
@@ -93,7 +95,7 @@ const POSProductSearchBar: React.FC<Props> = ({ onAdd, onScanCoupon, disabled })
         <Box sx={{ position: 'relative' }} ref={dropRef}>
             <TextField
                 fullWidth size="small" inputRef={inputRef} disabled={disabled} autoFocus
-                placeholder="Thêm sản phẩm vào đơn (F3) — Tìm tên hoặc quét ISBN"
+                placeholder="Thêm sản phẩm vào đơn (F3) — Tìm tên, SKU hoặc ISBN"
                 value={query}
                 onChange={e => { setQuery(e.target.value); setBarcodeErr(''); }}
                 onKeyDown={handleKeyDown}
@@ -101,9 +103,9 @@ const POSProductSearchBar: React.FC<Props> = ({ onAdd, onScanCoupon, disabled })
                 onBlur={() => setTimeout(() => setIsFocused(false), 200)}
                 sx={{
                     '& .MuiOutlinedInput-root': {
-                        bgcolor: 'rgba(255,255,255,0.95)', borderRadius: 1.5, fontSize: 13,
-                        '& fieldset': { borderColor: 'transparent' },
-                        '&:hover fieldset, &.Mui-focused fieldset': { borderColor: '#fff', borderWidth: 2 },
+                        bgcolor: '#fff', borderRadius: 1.5, fontSize: 13,
+                        '& fieldset': { borderColor: '#d9d9d9', borderWidth: 1 },
+                        '&:hover fieldset, &.Mui-focused fieldset': { borderColor: '#1890ff', borderWidth: 1 },
                     },
                     '& input': { py: '6px' },
                 }}
@@ -117,7 +119,13 @@ const POSProductSearchBar: React.FC<Props> = ({ onAdd, onScanCoupon, disabled })
                     ),
                     endAdornment: loading
                         ? <InputAdornment position="end"><CircularProgress size={14} sx={{ color: '#64748b' }} /></InputAdornment>
-                        : undefined,
+                        : (
+                            <InputAdornment position="end">
+                                <IconButton size="small" onClick={() => setScannerOpen(true)} sx={{ color: '#1890ff' }}>
+                                    <QrCodeScanner fontSize="small" />
+                                </IconButton>
+                            </InputAdornment>
+                        ),
                 }}
             />
             {(results.length > 0 || barcodeErr) && (
@@ -150,7 +158,7 @@ const POSProductSearchBar: React.FC<Props> = ({ onAdd, onScanCoupon, disabled })
                                         : <Box sx={{ width: 30, height: 40, bgcolor: '#f1f5f9', borderRadius: 0.5, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>📦</Box>}
                                     <Box sx={{ flex: 1, minWidth: 0 }}>
                                         <Typography variant="body2" fontWeight={600} fontSize={12} noWrap color="#1e293b">{p.name}</Typography>
-                                        <Typography variant="caption" color="#94a3b8" fontSize={10}>{p.isbnBarcode}</Typography>
+                                        <Typography variant="caption" color="#94a3b8" fontSize={10}>{p.sku || p.isbnBarcode || 'Không có SKU'}</Typography>
                                     </Box>
                                     <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
                                         <Typography variant="body2" fontWeight={700} fontSize={12} color="#1d4ed8">{fmt(p.retailPrice)}</Typography>
@@ -164,6 +172,30 @@ const POSProductSearchBar: React.FC<Props> = ({ onAdd, onScanCoupon, disabled })
                     )}
                 </Paper>
             )}
+            <BarcodeScannerDialog 
+                open={scannerOpen} 
+                onClose={() => setScannerOpen(false)} 
+                onScan={async (code) => {
+                    setScannerOpen(false);
+                    setQuery(code);
+                    setBarcodeErr('');
+                    setLoading(true);
+                    try {
+                        const p = await productService.getByBarcode(code);
+                        onAdd(p);
+                        setQuery('');
+                        setResults([]);
+                    } catch {
+                        try {
+                            const r = await productService.search({ keyword: code, page: 0, size: 10, isActive: true });
+                            if (r.content.length === 1) { onAdd(r.content[0]); setQuery(''); setResults([]); }
+                            else if (r.content.length > 1) setResults(r.content);
+                            else setBarcodeErr(`Không tìm thấy sản phẩm có mã: ${code}`);
+                        } catch { setBarcodeErr(`Không tìm thấy sản phẩm có mã: ${code}`); }
+                    } finally { setLoading(false); }
+                    inputRef.current?.focus();
+                }}
+            />
         </Box>
     );
 };

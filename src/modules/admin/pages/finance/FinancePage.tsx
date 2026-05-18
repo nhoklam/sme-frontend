@@ -264,7 +264,7 @@ const CreateEntryDialog: React.FC<{
             <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
                 <Button onClick={onClose} variant="outlined" sx={{ textTransform: 'none', borderColor: '#e0e0e0', color: '#555', borderRadius: 1.5 }}>Hủy</Button>
                 <Button onClick={handleSave} variant="contained" disabled={saving}
-                    sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, bgcolor: isThu ? '#16a34a' : '#dc2626', '&:hover': { filter: 'brightness(0.9)' } }}>
+                    sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, bgcolor: isThu ? '#16a34a' : '#ef4444', '&:hover': { filter: 'brightness(0.9)' }, height: 36 }}>
                     {saving ? 'Đang lưu...' : `Tạo ${isThu ? 'Phiếu Thu' : 'Phiếu Chi'}`}
                 </Button>
             </DialogActions>
@@ -349,7 +349,7 @@ const PayDebtDialog: React.FC<{
             </DialogContent>
             <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
                 <Button onClick={onClose} variant="outlined" sx={{ textTransform: 'none', borderColor: '#e0e0e0', color: '#555', borderRadius: 1.5 }}>Hủy</Button>
-                <Button onClick={handlePay} variant="contained" disabled={saving} sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, bgcolor: '#7c3aed', '&:hover': { bgcolor: '#6d28d9' } }}>
+                <Button onClick={handlePay} variant="contained" disabled={saving} sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, bgcolor: '#2563eb', '&:hover': { bgcolor: '#1d4ed8' }, height: 36 }}>
                     {saving ? 'Đang xử lý...' : `Thanh toán ${amount ? fmtCurrency(Number(amount)) : ''}`}
                 </Button>
             </DialogActions>
@@ -429,7 +429,7 @@ const CodReconcileDialog: React.FC<{ open: boolean; onClose: () => void; warehou
                             <Button size="small" variant="text" startIcon={<FileDownloadOutlined sx={{ fontSize: 15 }} />} onClick={downloadTemplate} sx={{ textTransform: 'none', color: '#6b7280' }}>Tải template</Button>
                             <input ref={fileRef} type="file" accept=".xlsx,.xls" hidden onChange={handleImportExcel} />
                             <Box sx={{ flex: 1 }} />
-                            <Button size="small" startIcon={<Add sx={{ fontSize: 15 }} />} onClick={addRow} sx={{ textTransform: 'none', color: '#0891b2' }}>Thêm dòng</Button>
+                            <Button size="small" startIcon={<Add sx={{ fontSize: 15 }} />} onClick={addRow} sx={{ textTransform: 'none', color: '#2563eb', fontWeight: 700 }}>Thêm dòng</Button>
                         </Box>
                         <Paper elevation={0} sx={{ border: '1px solid #e5e7eb', borderRadius: 1.5, overflow: 'hidden', mb: 2 }}>
                             <Table size="small">
@@ -489,12 +489,12 @@ const CodReconcileDialog: React.FC<{ open: boolean; onClose: () => void; warehou
                 {!result ? (
                     <>
                         <Button onClick={onClose} variant="outlined" sx={{ textTransform: 'none', borderColor: '#e0e0e0', color: '#555', borderRadius: 1.5 }}>Hủy</Button>
-                        <Button onClick={handleReconcile} variant="contained" disabled={loading} sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, bgcolor: '#0891b2', '&:hover': { bgcolor: '#0e7490' } }}>
+                        <Button onClick={handleReconcile} variant="contained" disabled={loading} sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, bgcolor: '#2563eb', '&:hover': { bgcolor: '#1d4ed8' }, height: 36 }}>
                             {loading ? <><CircularProgress size={16} sx={{ mr: 1, color: '#fff' }} />Đang đối soát...</> : 'Thực hiện đối soát'}
                         </Button>
                     </>
                 ) : (
-                    <Button fullWidth onClick={() => { onDone(); onClose(); }} variant="contained" sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, bgcolor: '#16a34a' }}>Hoàn thành</Button>
+                    <Button fullWidth onClick={() => { onDone(); onClose(); }} variant="contained" sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, bgcolor: '#16a34a', height: 40 }}>Hoàn thành</Button>
                 )}
             </DialogActions>
         </Dialog>
@@ -657,8 +657,8 @@ const CashbookTab: React.FC<{ warehouses: Warehouse[] }> = ({ warehouses }) => {
                     </FormControl>
 
                     <Button size="small" variant="outlined" startIcon={<Refresh sx={{ fontSize: 15 }} />} onClick={() => refetch()} sx={{ textTransform: 'none', borderColor: '#e0e0e0', color: '#555' }}>Làm mới</Button>
-                    <Button size="small" variant="outlined" startIcon={<FileDownloadOutlined sx={{ fontSize: 15 }} />} onClick={handleExport} sx={{ textTransform: 'none', borderColor: '#16a34a', color: '#16a34a' }}>Excel</Button>
-                    <Button variant="contained" startIcon={<Add sx={{ fontSize: 16 }} />} onClick={() => setCreateOpen(true)} sx={{ textTransform: 'none', fontWeight: 700, bgcolor: '#1d4ed8', '&:hover': { bgcolor: '#1e40af' } }}>Tạo phiếu</Button>
+                    <Button size="small" variant="outlined" startIcon={<FileDownloadOutlined sx={{ fontSize: 15 }} />} onClick={handleExport} sx={{ textTransform: 'none', borderColor: '#16a34a', color: '#16a34a', borderRadius: 1.5, height: 36 }}>Excel</Button>
+                    <Button variant="contained" startIcon={<Add sx={{ fontSize: 16 }} />} onClick={() => setCreateOpen(true)} sx={{ textTransform: 'none', fontWeight: 700, bgcolor: '#2563eb', '&:hover': { bgcolor: '#1d4ed8' }, borderRadius: 1.5, height: 36 }}>Tạo phiếu</Button>
                 </Box>
             </Paper>
 
@@ -746,7 +746,7 @@ const CashbookTab: React.FC<{ warehouses: Warehouse[] }> = ({ warehouses }) => {
                                             <TableCell sx={{ py: 1.5 }}>
                                                 <Tooltip title="In phiếu" placement="top">
                                                     <IconButton size="small" onClick={() => handlePrintReceipt(t)}
-                                                        sx={{ color: '#6b7280', '&:hover': { color: '#1d4ed8', bgcolor: '#eff6ff' }, borderRadius: 1.5 }}>
+                                                        sx={{ color: '#6b7280', '&:hover': { color: '#16a34a', bgcolor: '#f0fdf4' }, borderRadius: 1.5 }}>
                                                         <Print sx={{ fontSize: 16 }} />
                                                     </IconButton>
                                                 </Tooltip>
@@ -960,7 +960,7 @@ const CodTab: React.FC<{ warehouses: Warehouse[] }> = ({ warehouses }) => {
                     <Typography variant="h6" fontWeight={700} color="#111">Đối soát COD</Typography>
                     <Typography variant="body2" color="#6b7280" mt={0.5}>Đối chiếu tiền COD từ các đơn vị vận chuyển với hệ thống</Typography>
                 </Box>
-                <Button variant="contained" startIcon={<SwapHoriz />} onClick={() => setCodOpen(true)} sx={{ textTransform: 'none', fontWeight: 700, bgcolor: '#0891b2', '&:hover': { bgcolor: '#0e7490' } }}>Thực hiện đối soát</Button>
+                <Button variant="contained" startIcon={<SwapHoriz />} onClick={() => setCodOpen(true)} sx={{ textTransform: 'none', fontWeight: 700, bgcolor: '#2563eb', '&:hover': { bgcolor: '#1d4ed8' } }}>Thực hiện đối soát</Button>
             </Box>
             <Grid container spacing={2} sx={{ mb: 3 }}>
                 {[{ icon: '📦', title: 'Nhập dữ liệu', desc: 'Nhập tay từng đơn hoặc import file Excel từ GHN, GHTK, VTP...' }, { icon: '🔍', title: 'Đối chiếu', desc: 'Hệ thống tự động so khớp mã đơn hàng và số tiền COD' }, { icon: '📊', title: 'Kết quả', desc: 'Xem báo cáo đơn khớp / không khớp và tổng thực nhận ròng' }, { icon: '✅', title: 'Xác nhận', desc: 'Ghi nhận vào sổ quỹ, tự động tạo phiếu thu COD' }].map(c => (

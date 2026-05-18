@@ -1,5 +1,7 @@
 // src/services/axiosConfig.ts
 import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosError } from 'axios';
+import customerAuthService from './customerAuthService';
+import authService from './authService';
 
 const axiosInstance: AxiosInstance = axios.create({
   baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8080/api',
@@ -92,9 +94,12 @@ axiosInstance.interceptors.response.use(
         isRefreshing = false;
         // Chỉ redirect nếu không phải trang khách hàng (ví dụ: trang admin)
         const currentPath = window.location.pathname;
-        const isCustomerPage = !currentPath.startsWith('/admin') && currentPath !== '/login';
-        
-        if (!isCustomerPage) {
+        const isCustomerPage = !currentPath.startsWith('/admin') && currentPath !== '/admin/login';
+        if (!isCustomerPage && !authService.getCurrentUser()) {
+          // Token expired and no user info for Admin
+          window.location.href = '/admin/login';
+        } else if (isCustomerPage && !customerAuthService.getCurrentCustomerAuth()) {
+          // Token expired for Customer
           window.location.href = '/login';
         }
         return Promise.reject(error);
@@ -133,8 +138,12 @@ axiosInstance.interceptors.response.use(
         // Only redirect if we're on a non-customer page
         const currentPath = window.location.pathname;
         const isCustomerPage = !currentPath.startsWith('/admin');
-        if (!isCustomerPage) {
+        if (isCustomerPage) {
+          customerAuthService.logout();
           window.location.href = '/login';
+        } else {
+          authService.logout();
+          window.location.href = '/admin/login';
         }
         return Promise.reject(refreshError);
       } finally {

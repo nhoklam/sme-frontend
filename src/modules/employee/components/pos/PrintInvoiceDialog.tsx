@@ -229,7 +229,7 @@ const PrintInvoiceDialog: React.FC<PrintInvoiceDialogProps> = ({
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {invoice.items.map((item, idx) => (
+                                    {(invoice.items || []).map((item, idx) => (
                                         <React.Fragment key={idx}>
                                             <tr>
                                                 <td colSpan={3} style={{ paddingTop: 6, paddingBottom: 2, textTransform: 'uppercase' }}>
@@ -322,7 +322,7 @@ const PrintInvoiceDialog: React.FC<PrintInvoiceDialogProps> = ({
                         variant="contained"
                         startIcon={<Print />}
                         onClick={handlePrint}
-                        sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 2, bgcolor: '#1d4ed8' }}
+                        sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 2, bgcolor: '#2563eb', '&:hover': { bgcolor: '#1d4ed8' } }}
                     >
                         In hóa đơn (F10)
                     </Button>

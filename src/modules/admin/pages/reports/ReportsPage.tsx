@@ -12,7 +12,7 @@ import {
     Error as ErrorIcon, Description,
     PieChart as PieChartIcon,
     TrendingUp, Inventory2, Business,
-    Category,
+    Category, BarChart as BarChartIcon, Receipt,
 } from '@mui/icons-material';
 import {
     AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -818,134 +818,110 @@ const ReportsPage: React.FC = () => {
         };
     };
 
-    const TAB_CONFIG = [
-        { label: 'Báo cáo doanh thu', icon: <TrendingUp sx={{ fontSize: 16 }} />, desc: 'Chart + top sản phẩm' },
-        { label: 'Import NCC', icon: <Business sx={{ fontSize: 16 }} />, desc: 'Nhập nhà cung cấp từ Excel' },
-        { label: 'Import Sản phẩm', icon: <Inventory2 sx={{ fontSize: 16 }} />, desc: 'Nhập hàng hóa từ Excel' },
-        { label: 'Phân bổ kho', icon: <PieChartIcon sx={{ fontSize: 16 }} />, desc: 'Pie theo danh mục & chi nhánh' },
+    const SIDEBAR_TABS = [
+        { key: 'revenue', label: 'Doanh thu', desc: 'Biến động doanh số', icon: <BarChartIcon sx={{ fontSize: 18 }} /> },
+        { key: 'topProducts', label: 'Sản phẩm bán chạy', desc: 'Hiệu quả kinh doanh', icon: <PieChartIcon sx={{ fontSize: 18 }} /> },
+        { key: 'orders', label: 'Đơn hàng', desc: 'Chi tiết giao dịch', icon: <Receipt sx={{ fontSize: 18 }} /> },
+        { key: 'inventory', label: 'Tồn kho chi nhánh', desc: 'Quản lý nhiều kho', icon: <Business sx={{ fontSize: 18 }} /> },
+        { key: 'merchandise', label: 'Hàng hóa', desc: 'Giá trị & Định mức', icon: <Category sx={{ fontSize: 18 }} /> },
+        { key: 'import', label: 'Nhập liệu', desc: 'Import từ Excel', icon: <Upload sx={{ fontSize: 18 }} /> },
     ];
 
+    const renderContent = () => {
+        switch (tab) {
+            case 0: return <RevenueTab warehouses={warehouses} />;
+            case 1: case 2: return <RevenueTab warehouses={warehouses} />;
+            case 3: return <InventoryDistributionTab warehouses={warehouses} />;
+            case 4: return <InventoryDistributionTab warehouses={warehouses} />;
+            case 5: return (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <ImportTab title="Import Nhà Cung Cấp từ Excel" description="Nhập hàng loạt danh mục nhà cung cấp" templateFilename="mau-nha-cung-cap" color="#7c3aed" icon={<Business />} onImport={handleImportSupplier}
+                        templateColumns={['name (Tên NCC) *', 'phone (Số điện thoại) *', 'email (Email)', 'address (Địa chỉ)', 'taxCode (Mã số thuế)', 'contactPerson (Người liên hệ)', 'bankAccount (Số tài khoản)', 'bankName (Tên ngân hàng)', 'paymentTermDays (Hạn công nợ, ngày)', 'notes (Ghi chú)']}
+                        templateSampleRow={{ name: 'Công ty TNHH XYZ', phone: '0901234567', email: 'contact@xyz.com', address: '123 Lê Văn Lương, Hà Nội', taxCode: '0123456789', contactPerson: 'Nguyễn Văn A', bankAccount: '1234567890', bankName: 'VietcomBank', paymentTermDays: 30, notes: '' }}
+                        tips={['Cột name và phone là bắt buộc.', 'Nếu NCC đã tồn tại (trùng phone), hệ thống sẽ cập nhật.', 'paymentTermDays: số ngày được nợ.', 'Không đổi tên các cột trong file template.', 'Tối đa 500 dòng mỗi lần import.']} />
+                    <ImportTab title="Import Sản Phẩm / Hàng Hóa từ Excel" description="Nhập hàng loạt sản phẩm và cập nhật tồn kho" templateFilename="mau-san-pham" color="#16a34a" icon={<Inventory2 />} onImport={handleImportProduct}
+                        templateColumns={['sku (Mã SKU) *', 'name (Tên sản phẩm) *', 'categoryName (Tên danh mục) *', 'unit (Đơn vị tính) *', 'costPrice (Giá nhập)', 'retailPrice (Giá bán lẻ) *', 'wholesalePrice (Giá bán sỉ)', 'warehouseName (Tên chi nhánh) *', 'openingQuantity (Tồn kho đầu kỳ)', 'minStock (Ngưỡng cảnh báo)', 'barcode (Mã vạch)', 'description (Mô tả)']}
+                        templateSampleRow={{ sku: 'SP-001', name: 'Áo thun nam cổ tròn', categoryName: 'Áo', unit: 'cái', costPrice: 80000, retailPrice: 150000, wholesalePrice: 120000, warehouseName: 'Kho Hà Nội', openingQuantity: 50, minStock: 5, barcode: '8938505012345', description: '' }}
+                        tips={['SKU phải là duy nhất trong hệ thống.', 'categoryName phải khớp chính xác với danh mục đã có.', 'warehouseName phải khớp với tên chi nhánh/kho.', 'Giá bán sỉ phải nhỏ hơn hoặc bằng giá bán lẻ.', 'Tối đa 1000 dòng mỗi lần import.']} />
+                </Box>
+            );
+            default: return <RevenueTab warehouses={warehouses} />;
+        }
+    };
+
     return (
-        <Box sx={{ p: 3, bgcolor: '#f9fafb', minHeight: '100vh' }}>
+        <Box sx={{ bgcolor: '#f8f9fa', minHeight: '100vh', p: '20px 24px' }}>
             {/* Header */}
-            <Box sx={{ mb: 3 }}>
-                <Typography variant="caption" color="#9ca3af" fontSize={11}>Dashboard / <strong style={{ color: '#6b7280' }}>Báo cáo</strong></Typography>
-                <Typography variant="h5" fontWeight={800} color="#111" mt={0.5} letterSpacing="-0.5px">Báo cáo & Nhập liệu</Typography>
-                <Typography variant="body2" color="#6b7280" fontSize={12}>Phân tích doanh thu, import dữ liệu từ Excel, phân bổ tồn kho</Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Box>
+                    <Typography variant="h6" fontWeight={700} sx={{ m: 0 }}>Hệ thống Báo cáo</Typography>
+                    <Typography variant="body2" color="#8c8c8c" fontSize={13}>Phân tích chuyên sâu dữ liệu kinh doanh đa chiều</Typography>
+                </Box>
             </Box>
 
-            {/* Tab nav */}
-            <Box sx={{ display: 'flex', gap: 1.5, mb: 3, flexWrap: 'wrap' }}>
-                {TAB_CONFIG.map((t, i) => (
-                    <Box key={i} onClick={() => setTab(i)} sx={{
-                        display: 'flex', alignItems: 'center', gap: 1.25, px: 2, py: 1.25, borderRadius: 2, cursor: 'pointer',
-                        border: `1.5px solid ${tab === i ? '#1d4ed8' : '#e5e7eb'}`,
-                        bgcolor: tab === i ? '#eff6ff' : '#fff',
-                        transition: 'all 0.15s',
-                        '&:hover': { borderColor: '#1d4ed8', bgcolor: '#eff6ff' },
-                    }}>
-                        <Box sx={{ color: tab === i ? '#1d4ed8' : '#6b7280' }}>{t.icon}</Box>
-                        <Box>
-                            <Typography fontSize={13} fontWeight={700} color={tab === i ? '#1d4ed8' : '#374151'}>{t.label}</Typography>
-                            <Typography variant="caption" color="#9ca3af" fontSize={10.5}>{t.desc}</Typography>
-                        </Box>
+            <Grid container spacing={3} sx={{ alignItems: 'flex-start' }}>
+                {/* ── LEFT SIDEBAR ── */}
+                <Grid size={{ xs: 12, md: 3 }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        {/* Report Types */}
+                        <Paper elevation={0} sx={{ borderRadius: 2, p: 2, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                            <Typography fontWeight={700} fontSize={13} color="#8c8c8c" textTransform="uppercase" mb={2}>Loại báo cáo</Typography>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                {SIDEBAR_TABS.map((t, i) => (
+                                    <Box key={t.key} onClick={() => setTab(i)} sx={{
+                                        p: '12px 16px', borderRadius: 1.5, cursor: 'pointer', transition: '0.2s',
+                                        display: 'flex', alignItems: 'center', gap: 1.5,
+                                        bgcolor: tab === i ? '#f0f2f5' : 'transparent',
+                                        borderLeft: `4px solid ${tab === i ? '#1a2e85' : 'transparent'}`,
+                                        '&:hover': { bgcolor: '#f0f2f5' },
+                                    }}>
+                                        <Box sx={{ color: tab === i ? '#1a2e85' : '#8c8c8c' }}>{t.icon}</Box>
+                                        <Box>
+                                            <Typography fontSize={14} fontWeight={tab === i ? 700 : 400} color={tab === i ? '#1a2e85' : '#262626'} display="block">{t.label}</Typography>
+                                            <Typography fontSize={11} color="#8c8c8c">{t.desc}</Typography>
+                                        </Box>
+                                    </Box>
+                                ))}
+                            </Box>
+                        </Paper>
+
+                        {/* Filters */}
+                        <Paper elevation={0} sx={{ borderRadius: 2, p: 2.5, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                            <Typography fontWeight={700} fontSize={13} color="#8c8c8c" textTransform="uppercase" mb={2}>Bộ lọc dữ liệu</Typography>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                <Box>
+                                    <Typography variant="body2" color="#8c8c8c" fontSize={12} mb={1}>Chi nhánh / Kho</Typography>
+                                    <FormControl size="small" fullWidth>
+                                        <Select displayEmpty defaultValue="">
+                                            <MenuItem value="">Tất cả chi nhánh</MenuItem>
+                                            {warehouses.filter(w => w.isActive).map(w => <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>)}
+                                        </Select>
+                                    </FormControl>
+                                </Box>
+                                <Box>
+                                    <Typography variant="body2" color="#8c8c8c" fontSize={12} mb={1}>Thời gian báo cáo</Typography>
+                                    <FormControl size="small" fullWidth>
+                                        <Select defaultValue="thisMonth">
+                                            <MenuItem value="today">Hôm nay</MenuItem>
+                                            <MenuItem value="7days">7 ngày gần đây</MenuItem>
+                                            <MenuItem value="thisMonth">Tháng này</MenuItem>
+                                            <MenuItem value="lastMonth">Tháng trước</MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                </Box>
+                                <Button variant="outlined" fullWidth sx={{ mt: 1, textTransform: 'none', borderColor: '#d9d9d9', color: '#595959' }} startIcon={<Refresh sx={{ fontSize: 14 }} />}>
+                                    Xóa bộ lọc
+                                </Button>
+                            </Box>
+                        </Paper>
                     </Box>
-                ))}
-            </Box>
+                </Grid>
 
-            {/* Tab content */}
-            {tab === 0 && <RevenueTab warehouses={warehouses} />}
-
-            {tab === 1 && (
-                <ImportTab
-                    title="Import Nhà Cung Cấp từ Excel"
-                    description="Nhập hàng loạt danh mục nhà cung cấp vào hệ thống"
-                    templateFilename="mau-nha-cung-cap"
-                    color="#7c3aed"
-                    icon={<Business />}
-                    onImport={handleImportSupplier}
-                    templateColumns={[
-                        'name (Tên NCC) *',
-                        'phone (Số điện thoại) *',
-                        'email (Email)',
-                        'address (Địa chỉ)',
-                        'taxCode (Mã số thuế)',
-                        'contactPerson (Người liên hệ)',
-                        'bankAccount (Số tài khoản)',
-                        'bankName (Tên ngân hàng)',
-                        'paymentTermDays (Hạn công nợ, ngày)',
-                        'notes (Ghi chú)',
-                    ]}
-                    templateSampleRow={{
-                        name: 'Công ty TNHH XYZ',
-                        phone: '0901234567',
-                        email: 'contact@xyz.com',
-                        address: '123 Lê Văn Lương, Hà Nội',
-                        taxCode: '0123456789',
-                        contactPerson: 'Nguyễn Văn A',
-                        bankAccount: '1234567890',
-                        bankName: 'VietcomBank',
-                        paymentTermDays: 30,
-                        notes: '',
-                    }}
-                    tips={[
-                        'Cột name và phone là bắt buộc. Các cột khác có thể để trống.',
-                        'Nếu NCC đã tồn tại (trùng phone), hệ thống sẽ cập nhật thay vì tạo mới.',
-                        'paymentTermDays: số ngày được nợ, ví dụ 30 = nợ tối đa 30 ngày.',
-                        'Không đổi tên các cột trong file template.',
-                        'Tối đa 500 dòng mỗi lần import.',
-                    ]}
-                />
-            )}
-
-            {tab === 2 && (
-                <ImportTab
-                    title="Import Sản Phẩm / Hàng Hóa từ Excel"
-                    description="Nhập hàng loạt sản phẩm và cập nhật tồn kho đầu kỳ"
-                    templateFilename="mau-san-pham"
-                    color="#16a34a"
-                    icon={<Inventory2 />}
-                    onImport={handleImportProduct}
-                    templateColumns={[
-                        'sku (Mã SKU) *',
-                        'name (Tên sản phẩm) *',
-                        'categoryName (Tên danh mục) *',
-                        'unit (Đơn vị tính) *',
-                        'costPrice (Giá nhập)',
-                        'retailPrice (Giá bán lẻ) *',
-                        'wholesalePrice (Giá bán sỉ)',
-                        'warehouseName (Tên chi nhánh) *',
-                        'openingQuantity (Tồn kho đầu kỳ)',
-                        'minStock (Ngưỡng cảnh báo tồn kho)',
-                        'barcode (Mã vạch)',
-                        'description (Mô tả)',
-                    ]}
-                    templateSampleRow={{
-                        sku: 'SP-001',
-                        name: 'Áo thun nam cổ tròn',
-                        categoryName: 'Áo',
-                        unit: 'cái',
-                        costPrice: 80000,
-                        retailPrice: 150000,
-                        wholesalePrice: 120000,
-                        warehouseName: 'Kho Hà Nội',
-                        openingQuantity: 50,
-                        minStock: 5,
-                        barcode: '8938505012345',
-                        description: '',
-                    }}
-                    tips={[
-                        'SKU phải là duy nhất trong hệ thống. Nếu đã tồn tại, sẽ cập nhật thông tin.',
-                        'categoryName phải khớp chính xác với danh mục đã có trong hệ thống.',
-                        'warehouseName phải khớp với tên chi nhánh/kho trong hệ thống.',
-                        'openingQuantity: số lượng tồn kho đầu kỳ, chỉ áp dụng khi tạo mới sản phẩm.',
-                        'Giá bán sỉ phải nhỏ hơn hoặc bằng giá bán lẻ.',
-                        'Tối đa 1000 dòng mỗi lần import.',
-                    ]}
-                />
-            )}
-
-            {tab === 3 && <InventoryDistributionTab warehouses={warehouses} />}
+                {/* ── RIGHT CONTENT ── */}
+                <Grid size={{ xs: 12, md: 9 }}>
+                    {renderContent()}
+                </Grid>
+            </Grid>
 
             <Snackbar open={!!snack} autoHideDuration={3500} onClose={() => setSnack('')} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
                 {snack ? <Alert severity="success" onClose={() => setSnack('')} sx={{ borderRadius: 2, fontWeight: 600 }}>{snack}</Alert> : <div />}

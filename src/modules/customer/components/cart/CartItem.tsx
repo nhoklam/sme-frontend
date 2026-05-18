@@ -64,7 +64,7 @@ const CartItem = ({ item, onUpdateQty, onRemove }) => {
 
                     {/* Price */}
                     <Box sx={{ textAlign: 'right' }}>
-                        <Typography variant="body2" fontWeight={700} color="#d32f2f">
+                        <Typography variant="body2" fontWeight={800} color="#1a1a2e">
                             {fmt(item.price * item.qty)}
                         </Typography>
                         {item.qty > 1 && (
@@ -78,7 +78,7 @@ const CartItem = ({ item, onUpdateQty, onRemove }) => {
 
             {/* Delete */}
             <IconButton size="small" onClick={() => onRemove(item.id)}
-                sx={{ alignSelf: 'flex-start', color: '#bbb', '&:hover': { color: '#d32f2f', bgcolor: '#ffebee' } }}>
+                sx={{ alignSelf: 'flex-start', color: '#bbb', '&:hover': { color: '#ff4d4f', bgcolor: '#fff0f6' } }}>
                 <DeleteOutline sx={{ fontSize: 18 }} />
             </IconButton>
         </Box>

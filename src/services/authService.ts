@@ -1,9 +1,9 @@
 import axiosInstance from './axiosConfig';
-import { ApiResponse, UserResponse } from '../types';
+import { ApiResponse, UserResponse, LoginRequest } from '../types';
 
 const authService = {
     login: async (username: string, password: string) => {
-        const response = await axiosInstance.post('/auth/login', { username, password });
+        const response = await axiosInstance.post('/auth/admin/login', { username, password });
         return response.data;
     },
 

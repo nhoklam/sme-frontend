@@ -55,7 +55,7 @@ const PromotionDialog: React.FC<Props> = ({ open, totalAmount, appliedCode, scan
         const validateAuto = async (c: string) => {
             setIsValidating(true);
             try {
-                const res = await promotionService.validate(c, totalAmount);
+                const res = await promotionService.validate(c, totalAmount, 'POS');
                 // Tìm promotion trong list active để hiển thị chi tiết
                 const matchedPromo = promotions.find(p => p.code === c.toUpperCase());
                 if (matchedPromo) {
@@ -95,7 +95,7 @@ const PromotionDialog: React.FC<Props> = ({ open, totalAmount, appliedCode, scan
         setIsValidating(true);
         setError('');
         try {
-            const res = await promotionService.validate(code.trim(), totalAmount);
+            const res = await promotionService.validate(code.trim(), totalAmount, 'POS');
             const matchedPromo = promotions.find(p => p.code === code.trim().toUpperCase());
             if (matchedPromo) {
                 setFound(matchedPromo);
@@ -118,7 +118,7 @@ const PromotionDialog: React.FC<Props> = ({ open, totalAmount, appliedCode, scan
         setError('');
         setIsValidating(true);
         try {
-            const res = await promotionService.validate(promo.code, totalAmount);
+            const res = await promotionService.validate(promo.code, totalAmount, 'POS');
             setFound(promo);
             setValidatedDiscount(res.discountAmount);
         } catch (err: any) {

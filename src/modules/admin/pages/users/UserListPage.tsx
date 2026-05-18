@@ -47,12 +47,12 @@ const RowMenu: React.FC<RowMenuProps> = ({ user, onToggleActive }) => {
                 <MenuItem
                     onClick={() => { navigate(`/admin/users/${user.id}/edit`); setAnchor(null); }}
                     sx={{ fontSize: 13, gap: 1 }}>
-                    <Edit sx={{ fontSize: 16, color: '#1976d2' }} /> Chỉnh sửa
+                    <Edit sx={{ fontSize: 16, color: '#f59e0b' }} /> Chỉnh sửa
                 </MenuItem>
                 <Divider />
                 <MenuItem
                     onClick={() => { onToggleActive(user); setAnchor(null); }}
-                    sx={{ fontSize: 13, gap: 1, color: user.isActive ? '#d32f2f' : '#2e7d32' }}>
+                    sx={{ fontSize: 13, gap: 1, color: user.isActive ? '#ef4444' : '#22c55e' }}>
                     {user.isActive
                         ? <><LockIcon sx={{ fontSize: 16 }} /> Vô hiệu hóa</>
                         : <><LockOpen sx={{ fontSize: 16 }} /> Kích hoạt</>}
@@ -148,7 +148,7 @@ const UserListPage: React.FC = () => {
                     </Tooltip>
                     <Button variant="contained" startIcon={<Add />}
                         onClick={() => setOpenCreate(true)}
-                        sx={{ bgcolor: '#1976d2', textTransform: 'none', fontWeight: 700, '&:hover': { bgcolor: '#1565c0' } }}>
+                        sx={{ bgcolor: '#2563eb', textTransform: 'none', fontWeight: 700, '&:hover': { bgcolor: '#1d4ed8' } }}>
                         Tạo tài khoản mới
                     </Button>
                 </Box>

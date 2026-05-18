@@ -27,6 +27,8 @@ import {
     CreateOrderRequest, Customer, Warehouse, ProductResponse
 } from '../../../../types';
 import productService from '../../../../services/productService';
+import InlineCustomerSearch from '../../../employee/components/pos/InlineCustomerSearch';
+import POSProductSearchBar from '../../../employee/components/pos/POSProductSearchBar';
 
 // ── Memoized OrderRow ──────────────────────────────────────────
 const OrderRow = React.memo(({
@@ -43,7 +45,7 @@ const OrderRow = React.memo(({
 
     return (
         <TableRow hover
-            sx={{ bgcolor: isCancelled ? '#fafafa' : idx % 2 === 0 ? '#fff' : '#fafafa', '&:hover': { bgcolor: '#f5f9ff' }, opacity: isCancelled ? 0.7 : 1, cursor: 'pointer' }}
+            sx={{ bgcolor: isCancelled ? '#fff0f0' : idx % 2 === 0 ? '#fff' : '#fafafa', '&:hover': { bgcolor: '#f5f9ff' }, cursor: 'pointer' }}
             onClick={() => onClick(order)}>
             <TableCell sx={{ py: 1.5 }}>
                 <Typography variant="caption" color="#bbb" fontWeight={600}>{page * PAGE_SIZE + idx + 1}</Typography>
@@ -82,12 +84,21 @@ const OrderRow = React.memo(({
                     {order.createdAt ? new Date(order.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : ''}
                 </Typography>
             </TableCell>
+            <TableCell sx={{ py: 1.5 }}>
+                <Typography variant="body2" fontWeight={600} fontSize={12} color="#1a1a2e">
+                    {order.createdByName || '—'}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">Nhân viên</Typography>
+            </TableCell>
             <TableCell align="right" sx={{ py: 1.5 }}>
-                <Typography variant="body2" fontWeight={700} fontSize={13} color={isCancelled ? '#bbb' : '#1a1a2e'}>
+                <Typography variant="body2" fontWeight={700} fontSize={13} color="#1a1a2e">
                     {fmt(order.finalAmount)}
                 </Typography>
+            </TableCell>
+            <TableCell sx={{ py: 1.5 }}>
                 {order.paymentMethod && (
-                    <Typography variant="caption" color="text.secondary">{order.paymentMethod}</Typography>
+                    <Chip label={order.paymentMethod === 'COD' ? 'COD' : order.paymentMethod === 'BANK_TRANSFER' ? 'Chuyển khoản' : order.paymentMethod === 'CASH' ? 'Tiền mặt' : order.paymentMethod === 'MOMO' ? 'MoMo' : order.paymentMethod === 'VNPAY' ? 'VNPay' : order.paymentMethod}
+                        size="small" sx={{ height: 20, fontSize: 10, fontWeight: 700, bgcolor: '#f0f4ff', color: '#1976d2' }} />
                 )}
             </TableCell>
             <TableCell align="center" sx={{ py: 1.5 }}>
@@ -115,7 +126,7 @@ const STATUS_MAP: Record<OrderStatus, { label: string; color: string; bg: string
     PACKING: { label: 'Đóng gói', color: '#1976d2', bg: '#e3f2fd', step: 1 },
     SHIPPING: { label: 'Đang giao', color: '#6a1b9a', bg: '#f3e5f5', step: 2 },
     DELIVERED: { label: 'Hoàn thành', color: '#2e7d32', bg: '#e8f5e9', step: 3 },
-    CANCELLED: { label: 'Đã hủy', color: '#888', bg: '#f5f5f5', step: -1 },
+    CANCELLED: { label: 'Đã hủy', color: '#d32f2f', bg: '#ffebee', step: -1 },
     RETURNED: { label: 'Hoàn trả', color: '#d32f2f', bg: '#ffebee', step: -1 },
 };
 
@@ -197,7 +208,7 @@ const RowMenu: React.FC<{
                     { label: 'Xác nhận giao hàng', action: 'shipping', show: status === 'PACKING' && order.type !== 'BOPIS' },
                     { label: order.type === 'BOPIS' ? 'Khách đã lấy hàng' : 'Đã giao', action: 'delivered', show: status === 'SHIPPING' || (status === 'PENDING' && order.type === 'BOPIS') },
                     {
-                        label: 'Hủy đơn', action: 'cancel', color: '#d32f2f',
+                        label: 'Hủy đơn', action: 'cancel', color: '#ef4444',
                         show: status !== 'CANCELLED' && status !== 'DELIVERED' && status !== 'RETURNED'
                     },
                 ].filter(i => i.show !== false).map(item => (
@@ -229,14 +240,14 @@ const OrderDetailDialog: React.FC<{
     const nextActions: { label: string; action: string; color: string }[] = [];
     if (!isOffline) {
         if (order.type === 'BOPIS') {
-            if (order.status === 'PENDING') nextActions.push({ label: 'Khách đã lấy hàng', action: 'DELIVERED', color: '#2e7d32' });
+            if (order.status === 'PENDING') nextActions.push({ label: 'Khách đã lấy hàng', action: 'DELIVERED', color: '#16a34a' });
         } else {
-            if (order.status === 'PENDING') nextActions.push({ label: 'Xác nhận đóng gói', action: 'PACKING', color: '#1976d2' });
-            if (order.status === 'PACKING') nextActions.push({ label: 'Xác nhận giao hàng', action: 'SHIPPING', color: '#6a1b9a' });
-            if (order.status === 'SHIPPING') nextActions.push({ label: 'Xác nhận đã giao', action: 'DELIVERED', color: '#2e7d32' });
+            if (order.status === 'PENDING') nextActions.push({ label: 'Xác nhận đóng gói', action: 'PACKING', color: '#2563eb' });
+            if (order.status === 'PACKING') nextActions.push({ label: 'Xác nhận giao hàng', action: 'SHIPPING', color: '#8b5cf6' });
+            if (order.status === 'SHIPPING') nextActions.push({ label: 'Xác nhận đã giao', action: 'DELIVERED', color: '#16a34a' });
         }
         if (!isCancelled && order.status !== 'DELIVERED') {
-            nextActions.push({ label: 'Hủy đơn', action: 'CANCELLED', color: '#d32f2f' });
+            nextActions.push({ label: 'Hủy đơn', action: 'CANCELLED', color: '#ef4444' });
         }
     }
 
@@ -257,6 +268,8 @@ const OrderDetailDialog: React.FC<{
                     </Box>
                     <Typography variant="caption" color="text.secondary">
                         Tạo lúc: {order.createdAt ? new Date(order.createdAt).toLocaleString('vi-VN') : '—'}
+                        {order.cashierName && ` · Thu ngân: ${order.cashierName}`}
+                        {order.createdByName && ` · Người tạo: ${order.createdByName}`}
                     </Typography>
                 </Box>
                 <IconButton size="small" onClick={onClose}><Close sx={{ fontSize: 18 }} /></IconButton>
@@ -276,11 +289,11 @@ const OrderDetailDialog: React.FC<{
                         </Stepper>
                     </Box>
                 )}
-                {isCancelled && !isOffline && (
+                {isCancelled && (
                     <Box sx={{ mb: 2, p: 1.5, bgcolor: '#ffebee', borderRadius: 2, border: '1px solid #ffcdd2', display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Cancel sx={{ color: '#d32f2f', fontSize: 18 }} />
                         <Typography variant="body2" fontWeight={700} color="#d32f2f">
-                            Đơn hàng {order.status === 'CANCELLED' ? 'đã bị hủy' : 'đã được hoàn trả'}
+                            {isOffline ? 'Hóa đơn' : 'Đơn hàng'} {order.status === 'CANCELLED' ? 'đã bị hủy' : 'đã được hoàn trả'}
                             {order.cancelledReason ? ` — ${order.cancelledReason}` : ''}
                         </Typography>
                     </Box>
@@ -473,13 +486,8 @@ const CreateOrderDialog: React.FC<{
     onCreated: () => void;
     warehouses: Warehouse[];
 }> = ({ open, onClose, onCreated, warehouses }) => {
-    const [step, setStep] = useState(0);
-    const [customerPhone, setCustomerPhone] = useState('');
     const [customer, setCustomer] = useState<Customer | null>(null);
-    const [lookupError, setLookupError] = useState('');
     const [cartItems, setCartItems] = useState<CartItem[]>([]);
-    const [productSearch, setProductSearch] = useState('');
-    const [products, setProducts] = useState<ProductResponse[]>([]);
     const [shippingName, setShippingName] = useState('');
     const [shippingPhone, setShippingPhone] = useState('');
     const [shippingAddress, setShippingAddress] = useState('');
@@ -491,37 +499,13 @@ const CreateOrderDialog: React.FC<{
 
     useEffect(() => {
         if (!open) {
-            setStep(0); setCustomerPhone(''); setCustomer(null);
-            setCartItems([]); setShippingName(''); setShippingPhone('');
+            setCustomer(null);
+            setCartItems([]);
+            setShippingName(''); setShippingPhone('');
             setShippingAddress(''); setProvinceCode(''); setPaymentMethod('COD');
             setAssignedWarehouseId(''); setError('');
         }
     }, [open]);
-
-    useEffect(() => {
-        if (productSearch.trim().length >= 2) {
-            productService.search({ keyword: productSearch, page: 0, size: 8, isActive: true })
-                .then(r => setProducts(r.content))
-                .catch(() => { });
-        } else {
-            setProducts([]);
-        }
-    }, [productSearch]);
-
-    const lookupCustomer = async () => {
-        if (!customerPhone.trim()) return;
-        setLookupError('');
-        try {
-            const c = await customerService.lookupByPhone(customerPhone.trim());
-            setCustomer(c);
-            setShippingName(c.fullName);
-            setShippingPhone(c.phoneNumber);
-            setShippingAddress(c.address || '');
-        } catch {
-            setLookupError('Không tìm thấy khách hàng. Nhập thủ công bên dưới.');
-            setCustomer(null);
-        }
-    };
 
     const addProduct = (p: ProductResponse) => {
         setCartItems(prev => {
@@ -529,8 +513,6 @@ const CreateOrderDialog: React.FC<{
             if (existing) return prev.map(i => i.productId === p.id ? { ...i, quantity: i.quantity + 1 } : i);
             return [...prev, { productId: p.id, productName: p.name, quantity: 1, unitPrice: p.retailPrice }];
         });
-        setProductSearch('');
-        setProducts([]);
     };
 
     const totalAmount = cartItems.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
@@ -565,254 +547,105 @@ const CreateOrderDialog: React.FC<{
         }
     };
 
-    const STEPS_LABEL = ['Khách hàng', 'Sản phẩm', 'Giao hàng', 'Xác nhận'];
-
     return (
-        <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth
-            PaperProps={{ sx: { borderRadius: 2.5 } }}>
+        <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth PaperProps={{ sx: { borderRadius: 2.5, maxHeight: '90vh' } }}>
             <DialogTitle sx={{ pb: 0, pt: 2.5, px: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Box>
                     <Typography fontWeight={800} fontSize={17} color="#1a1a2e">Tạo đơn hàng mới</Typography>
-                    <Typography variant="caption" color="text.secondary">Điền thông tin để tạo đơn hàng Online</Typography>
+                    <Typography variant="caption" color="text.secondary">Bán hàng qua điện thoại / Zalo — Tạo đơn giao hàng cho khách</Typography>
                 </Box>
                 <IconButton size="small" onClick={onClose}><Close sx={{ fontSize: 18 }} /></IconButton>
             </DialogTitle>
-            <Box sx={{ px: 3, pt: 2 }}>
-                <Stepper activeStep={step} alternativeLabel>
-                    {STEPS_LABEL.map(s => <Step key={s}><StepLabel sx={{ '& .MuiStepLabel-label': { fontSize: 12 } }}>{s}</StepLabel></Step>)}
-                </Stepper>
-            </Box>
-            <Divider sx={{ mx: 3, mt: 2 }} />
+            <Divider sx={{ mx: 3, mt: 1.5 }} />
             <DialogContent sx={{ px: 3, py: 2 }}>
                 {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
-
-                {/* STEP 0: Khách hàng */}
-                {step === 0 && (
-                    <Box>
-                        <Typography variant="body2" fontWeight={700} mb={1.5}>Tra cứu khách hàng theo SĐT</Typography>
-                        <Box sx={{ display: 'flex', gap: 1, mb: 1.5 }}>
-                            <TextField fullWidth size="small" placeholder="Nhập số điện thoại khách hàng"
-                                value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
-                                onKeyDown={e => e.key === 'Enter' && lookupCustomer()} />
-                            <Button variant="contained" onClick={lookupCustomer}
-                                sx={{ textTransform: 'none', fontWeight: 700, bgcolor: '#1976d2', whiteSpace: 'nowrap' }}>
-                                Tra cứu
-                            </Button>
-                        </Box>
-                        {lookupError && <Alert severity="warning" sx={{ mb: 2, borderRadius: 1.5 }}>{lookupError}</Alert>}
-                        {customer && (
-                            <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #c8e6c9', bgcolor: '#e8f5e9' }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                    <CheckCircle sx={{ color: '#2e7d32', fontSize: 20 }} />
-                                    <Box>
-                                        <Typography variant="body2" fontWeight={700}>{customer.fullName}</Typography>
-                                        <Typography variant="caption" color="text.secondary">
-                                            {customer.phoneNumber} · {customer.loyaltyPoints} điểm · Hạng {customer.customerTier}
-                                        </Typography>
-                                    </Box>
-                                </Box>
-                            </Paper>
-                        )}
-                        {!customer && (
-                            <Alert severity="info" sx={{ borderRadius: 1.5 }}>
-                                Tra cứu SĐT để tự động điền thông tin. Khách hàng phải tồn tại trong hệ thống.
-                            </Alert>
-                        )}
-                    </Box>
-                )}
-
-                {/* STEP 1: Sản phẩm */}
-                {step === 1 && (
-                    <Box>
-                        <Typography variant="body2" fontWeight={700} mb={1.5}>Tìm kiếm và thêm sản phẩm</Typography>
-                        <TextField fullWidth size="small" placeholder="Nhập tên sách, ISBN..."
-                            value={productSearch} onChange={e => setProductSearch(e.target.value)}
-                            sx={{ mb: 1 }} />
-                        {products.length > 0 && (
-                            <Paper elevation={2} sx={{ mb: 2, maxHeight: 200, overflowY: 'auto', borderRadius: 1.5 }}>
-                                {products.map(p => (
-                                    <Box key={p.id} onClick={() => addProduct(p)} sx={{
-                                        px: 2, py: 1.25, cursor: 'pointer', borderBottom: '1px solid #f5f5f5',
-                                        '&:hover': { bgcolor: '#f5f9ff' }, display: 'flex', justifyContent: 'space-between',
-                                    }}>
-                                        <Box>
-                                            <Typography variant="body2" fontWeight={600} fontSize={13}>{p.name}</Typography>
-                                            <Typography variant="caption" color="text.secondary">{p.isbnBarcode}</Typography>
-                                        </Box>
-                                        <Typography variant="body2" fontWeight={700} color="#d32f2f">{fmt(p.retailPrice)}</Typography>
-                                    </Box>
-                                ))}
-                            </Paper>
-                        )}
-                        {cartItems.length > 0 && (
-                            <Paper elevation={0} sx={{ border: '1px solid #f0f0f0', borderRadius: 1.5, overflow: 'hidden' }}>
-                                <Table size="small">
-                                    <TableHead>
-                                        <TableRow sx={{ bgcolor: '#fafafa' }}>
-                                            {['Sản phẩm', 'SL', 'Đơn giá', 'Thành tiền', ''].map(c => (
-                                                <TableCell key={c} sx={{ fontSize: 11, fontWeight: 700, color: '#888', py: 1 }}>{c}</TableCell>
-                                            ))}
-                                        </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                        {cartItems.map((item, idx) => (
-                                            <TableRow key={idx}>
-                                                <TableCell sx={{ py: 1 }}>
-                                                    <Typography variant="body2" fontWeight={600} fontSize={12}>{item.productName}</Typography>
-                                                </TableCell>
-                                                <TableCell sx={{ py: 1 }}>
-                                                    <TextField size="small" type="number" value={item.quantity}
-                                                        onChange={e => setCartItems(prev => prev.map((i, ii) =>
-                                                            ii === idx ? { ...i, quantity: Math.max(1, +e.target.value) } : i))}
-                                                        sx={{ width: 60 }} inputProps={{ min: 1 }} />
-                                                </TableCell>
-                                                <TableCell sx={{ py: 1 }}>
-                                                    <Typography variant="caption">{fmt(item.unitPrice)}</Typography>
-                                                </TableCell>
-                                                <TableCell sx={{ py: 1 }}>
-                                                    <Typography variant="body2" fontWeight={700} color="#1976d2">
-                                                        {fmt(item.quantity * item.unitPrice)}
-                                                    </Typography>
-                                                </TableCell>
-                                                <TableCell sx={{ py: 1 }}>
-                                                    <IconButton size="small" onClick={() => setCartItems(prev => prev.filter((_, ii) => ii !== idx))}>
-                                                        <Close sx={{ fontSize: 15, color: '#d32f2f' }} />
-                                                    </IconButton>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                                <Box sx={{ px: 2, py: 1.5, bgcolor: '#fafafa', borderTop: '1px solid #f0f0f0', display: 'flex', justifyContent: 'flex-end' }}>
-                                    <Typography variant="body1" fontWeight={800} color="#d32f2f">Tổng: {fmt(totalAmount)}</Typography>
-                                </Box>
-                            </Paper>
-                        )}
-                    </Box>
-                )}
-
-                {/* STEP 2: Giao hàng */}
-                {step === 2 && (
-                    <Grid container spacing={2}>
-                        <Grid size={{ xs: 12, sm: 6 }}>
-                            <Typography variant="caption" fontWeight={700} color="#555" display="block" mb={0.75}>
-                                Tên người nhận <span style={{ color: '#d32f2f' }}>*</span>
-                            </Typography>
-                            <TextField fullWidth size="small" value={shippingName} onChange={e => setShippingName(e.target.value)} />
-                        </Grid>
-                        <Grid size={{ xs: 12, sm: 6 }}>
-                            <Typography variant="caption" fontWeight={700} color="#555" display="block" mb={0.75}>
-                                SĐT người nhận <span style={{ color: '#d32f2f' }}>*</span>
-                            </Typography>
-                            <TextField fullWidth size="small" value={shippingPhone} onChange={e => setShippingPhone(e.target.value)} />
-                        </Grid>
-                        <Grid size={{ xs: 12 }}>
-                            <Typography variant="caption" fontWeight={700} color="#555" display="block" mb={0.75}>
-                                Địa chỉ giao hàng <span style={{ color: '#d32f2f' }}>*</span>
-                            </Typography>
-                            <TextField fullWidth size="small" value={shippingAddress} onChange={e => setShippingAddress(e.target.value)} />
-                        </Grid>
-                        <Grid size={{ xs: 12, sm: 6 }}>
-                            <Typography variant="caption" fontWeight={700} color="#555" display="block" mb={0.75}>
-                                Tỉnh / Thành phố <span style={{ color: '#d32f2f' }}>*</span>
-                            </Typography>
-                            <FormControl fullWidth size="small">
-                                <Select value={provinceCode} onChange={e => setProvinceCode(e.target.value)} displayEmpty>
-                                    <MenuItem value="">Chọn tỉnh/thành</MenuItem>
-                                    {PROVINCES.map(p => <MenuItem key={p.code} value={p.code} sx={{ fontSize: 13 }}>{p.name}</MenuItem>)}
-                                </Select>
-                            </FormControl>
-                        </Grid>
-                        <Grid size={{ xs: 12, sm: 6 }}>
-                            <Typography variant="caption" fontWeight={700} color="#555" display="block" mb={0.75}>Phương thức thanh toán</Typography>
-                            <FormControl fullWidth size="small">
-                                <Select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}>
-                                    {['COD', 'BANK_TRANSFER', 'MOMO', 'VNPAY'].map(m => (
-                                        <MenuItem key={m} value={m} sx={{ fontSize: 13 }}>{m}</MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                        </Grid>
-                        <Grid size={{ xs: 12 }}>
-                            <Typography variant="caption" fontWeight={700} color="#555" display="block" mb={0.75}>Kho đóng gói (tuỳ chọn)</Typography>
-                            <FormControl fullWidth size="small">
-                                <Select value={assignedWarehouseId} onChange={e => setAssignedWarehouseId(e.target.value)} displayEmpty>
-                                    <MenuItem value="">Tự động (Smart Routing)</MenuItem>
-                                    {warehouses.filter(w => w.isActive).map(w => (
-                                        <MenuItem key={w.id} value={w.id} sx={{ fontSize: 13 }}>{w.name}</MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                        </Grid>
-                    </Grid>
-                )}
-
-                {/* STEP 3: Xác nhận */}
-                {step === 3 && (
-                    <Box>
-                        <Typography variant="body2" fontWeight={700} mb={2}>Xác nhận thông tin đơn hàng</Typography>
-                        <Grid container spacing={2}>
-                            {[
-                                { label: 'Khách hàng', value: customer?.fullName || '—' },
-                                { label: 'SĐT', value: shippingPhone },
-                                { label: 'Địa chỉ', value: shippingAddress },
-                                { label: 'Khu vực', value: PROVINCES.find(p => p.code === provinceCode)?.name || '—' },
-                                { label: 'Thanh toán', value: paymentMethod },
-                                { label: 'Kho đóng gói', value: warehouses.find(w => w.id === assignedWarehouseId)?.name || 'Tự động' },
-                            ].map(row => (
-                                <Grid size={{ xs: 12, sm: 6 }} key={row.label}>
-                                    <Box sx={{ display: 'flex', gap: 1 }}>
-                                        <Typography variant="caption" color="text.secondary" sx={{ minWidth: 100 }}>{row.label}:</Typography>
-                                        <Typography variant="caption" fontWeight={600}>{row.value}</Typography>
-                                    </Box>
-                                </Grid>
-                            ))}
-                        </Grid>
-                        <Divider sx={{ my: 2 }} />
-                        <Typography variant="body2" fontWeight={700} mb={1}>Sản phẩm ({cartItems.length})</Typography>
-                        {cartItems.map((item, idx) => (
-                            <Box key={idx} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
-                                <Typography variant="caption">{item.productName} × {item.quantity}</Typography>
-                                <Typography variant="caption" fontWeight={700}>{fmt(item.quantity * item.unitPrice)}</Typography>
+                <Grid container spacing={3}>
+                    {/* LEFT: KH + SP */}
+                    <Grid size={{ xs: 12, md: 7 }}>
+                        <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #f0f0f0', mb: 2 }}>
+                            <Typography variant="caption" fontWeight={700} color="#555" letterSpacing={0.3} display="block" mb={1}>KHÁCH HÀNG</Typography>
+                            <InlineCustomerSearch
+                                customer={customer}
+                                onSelect={(c) => {
+                                    setCustomer(c);
+                                    if (c) {
+                                        setShippingName(c.fullName);
+                                        setShippingPhone(c.phoneNumber);
+                                        setShippingAddress(c.address || '');
+                                    } else {
+                                        setShippingName('');
+                                        setShippingPhone('');
+                                        setShippingAddress('');
+                                    }
+                                }}
+                            />
+                        </Paper>
+                        <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #f0f0f0' }}>
+                            <Typography variant="caption" fontWeight={700} color="#555" letterSpacing={0.3} display="block" mb={1}>SẢN PHẨM</Typography>
+                            <Box sx={{ mb: 1.5 }}>
+                                <POSProductSearchBar onAdd={addProduct} />
                             </Box>
-                        ))}
-                        <Divider sx={{ my: 1 }} />
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <Typography variant="body2" fontWeight={700}>Tổng cộng</Typography>
-                            <Typography variant="body1" fontWeight={800} color="#d32f2f">{fmt(totalAmount)}</Typography>
-                        </Box>
-                    </Box>
-                )}
+                            {cartItems.length > 0 ? (
+                                <Box sx={{ border: '1px solid #f0f0f0', borderRadius: 1.5, overflow: 'hidden' }}>
+                                    {cartItems.map((item, idx) => (
+                                        <Box key={idx} sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 1, borderBottom: '1px solid #f5f5f5', '&:last-child': { borderBottom: 0 } }}>
+                                            <Box sx={{ flex: 1, minWidth: 0 }}><Typography variant="body2" fontWeight={600} fontSize={12} noWrap>{item.productName}</Typography><Typography variant="caption" color="text.secondary">{fmt(item.unitPrice)}</Typography></Box>
+                                            <TextField size="small" type="number" value={item.quantity} onChange={e => setCartItems(prev => prev.map((i, ii) => ii === idx ? { ...i, quantity: Math.max(1, +e.target.value) } : i))} sx={{ width: 56 }} inputProps={{ min: 1, style: { textAlign: 'center', fontSize: 12, padding: '4px' } }} />
+                                            <Typography variant="body2" fontWeight={700} color="#1976d2" fontSize={12} sx={{ minWidth: 80, textAlign: 'right' }}>{fmt(item.quantity * item.unitPrice)}</Typography>
+                                            <IconButton size="small" onClick={() => setCartItems(prev => prev.filter((_, ii) => ii !== idx))}><Close sx={{ fontSize: 14, color: '#d32f2f' }} /></IconButton>
+                                        </Box>
+                                    ))}
+                                    <Box sx={{ px: 2, py: 1.5, bgcolor: '#fafafa', borderTop: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between' }}>
+                                        <Typography variant="body2" fontWeight={600} fontSize={12}>{cartItems.length} sản phẩm</Typography>
+                                        <Typography variant="body1" fontWeight={800} color="#d32f2f">{fmt(totalAmount)}</Typography>
+                                    </Box>
+                                </Box>
+                            ) : (
+                                <Box sx={{ textAlign: 'center', py: 3, color: '#bbb' }}><Inventory2Outlined sx={{ fontSize: 36, mb: 0.5 }} /><Typography variant="caption" display="block">Chưa có sản phẩm</Typography></Box>
+                            )}
+                        </Paper>
+                    </Grid>
+                    {/* RIGHT: Giao hàng + TT */}
+                    <Grid size={{ xs: 12, md: 5 }}>
+                        <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #f0f0f0', mb: 2 }}>
+                            <Typography variant="caption" fontWeight={700} color="#555" letterSpacing={0.3} display="block" mb={1.5}>THÔNG TIN GIAO HÀNG</Typography>
+                            <Grid container spacing={1.5}>
+                                <Grid size={{ xs: 6 }}><TextField fullWidth size="small" label="Người nhận *" value={shippingName} onChange={e => setShippingName(e.target.value)} /></Grid>
+                                <Grid size={{ xs: 6 }}><TextField fullWidth size="small" label="SĐT nhận *" value={shippingPhone} onChange={e => setShippingPhone(e.target.value)} /></Grid>
+                                <Grid size={{ xs: 12 }}><TextField fullWidth size="small" label="Địa chỉ *" value={shippingAddress} onChange={e => setShippingAddress(e.target.value)} /></Grid>
+                                <Grid size={{ xs: 12 }}><FormControl fullWidth size="small"><Select value={provinceCode} onChange={e => setProvinceCode(e.target.value)} displayEmpty sx={{ fontSize: 13 }}><MenuItem value="">Chọn tỉnh/thành *</MenuItem>{PROVINCES.map(p => <MenuItem key={p.code} value={p.code} sx={{ fontSize: 13 }}>{p.name}</MenuItem>)}</Select></FormControl></Grid>
+                            </Grid>
+                        </Paper>
+                        <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #f0f0f0', mb: 2 }}>
+                            <Typography variant="caption" fontWeight={700} color="#555" letterSpacing={0.3} display="block" mb={1.5}>THANH TOÁN & KHO</Typography>
+                            <Grid container spacing={1.5}>
+                                <Grid size={{ xs: 6 }}><FormControl fullWidth size="small"><Select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} sx={{ fontSize: 13 }}>{[{ v: 'COD', l: 'COD' }, { v: 'BANK_TRANSFER', l: 'Chuyển khoản' }, { v: 'MOMO', l: 'MoMo' }, { v: 'VNPAY', l: 'VNPay' }].map(m => <MenuItem key={m.v} value={m.v} sx={{ fontSize: 13 }}>{m.l}</MenuItem>)}</Select></FormControl></Grid>
+                                <Grid size={{ xs: 6 }}><FormControl fullWidth size="small"><Select value={assignedWarehouseId} onChange={e => setAssignedWarehouseId(e.target.value)} displayEmpty sx={{ fontSize: 13 }}><MenuItem value="">Kho tự động</MenuItem>{warehouses.filter(w => w.isActive).map(w => <MenuItem key={w.id} value={w.id} sx={{ fontSize: 13 }}>{w.name}</MenuItem>)}</Select></FormControl></Grid>
+                            </Grid>
+                        </Paper>
+                        <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #e0e7ff', bgcolor: '#f8faff' }}>
+                            <Typography variant="caption" fontWeight={700} color="#555" letterSpacing={0.3} display="block" mb={1}>TÓM TẮT</Typography>
+                            {[{ l: 'Khách hàng', v: customer?.fullName || '—' }, { l: 'Sản phẩm', v: `${cartItems.length} mặt hàng` }, { l: 'Thanh toán', v: paymentMethod }, { l: 'Kho', v: warehouses.find(w => w.id === assignedWarehouseId)?.name || 'Tự động' }].map(r => (
+                                <Box key={r.l} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}><Typography variant="caption" color="text.secondary">{r.l}</Typography><Typography variant="caption" fontWeight={600}>{r.v}</Typography></Box>
+                            ))}
+                            <Divider sx={{ my: 1 }} />
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Typography variant="body2" fontWeight={700}>Tổng cộng</Typography>
+                                <Typography variant="h6" fontWeight={800} color="#d32f2f">{fmt(totalAmount)}</Typography>
+                            </Box>
+                        </Paper>
+                    </Grid>
+                </Grid>
             </DialogContent>
-
-            <DialogActions sx={{ px: 3, pb: 2.5, pt: 1, gap: 1 }}>
-                {step > 0 && (
-                    <Button onClick={() => setStep(s => s - 1)} startIcon={<ArrowBack />}
-                        sx={{ textTransform: 'none', color: '#555' }}>
-                        Quay lại
-                    </Button>
-                )}
+            <DialogActions sx={{ px: 3, pb: 2.5, pt: 1, gap: 1, borderTop: '1px solid #f0f0f0' }}>
                 <Box sx={{ flex: 1 }} />
-                <Button onClick={onClose} variant="outlined"
-                    sx={{ textTransform: 'none', borderColor: '#e0e0e0', color: '#555', borderRadius: 1.5 }}>
-                    Hủy
-                </Button>
-                {step < 3 ? (
-                    <Button variant="contained" onClick={() => setStep(s => s + 1)}
-                        disabled={step === 0 && !customer}
-                        sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, bgcolor: '#1976d2', '&:hover': { bgcolor: '#1565c0' } }}>
-                        Tiếp theo
-                    </Button>
-                ) : (
-                    <Button variant="contained" onClick={handleCreate} disabled={saving}
-                        sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, bgcolor: '#2e7d32', '&:hover': { bgcolor: '#1b5e20' } }}>
-                        {saving ? 'Đang tạo...' : 'Tạo đơn hàng'}
-                    </Button>
-                )}
+                <Button onClick={onClose} variant="outlined" sx={{ textTransform: 'none', borderColor: '#e0e0e0', color: '#555', borderRadius: 1.5 }}>Hủy</Button>
+                <Button variant="contained" onClick={handleCreate} disabled={saving || !customer || cartItems.length === 0} sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, bgcolor: '#16a34a', '&:hover': { bgcolor: '#15803d' }, px: 3 }}>{saving ? 'Đang tạo...' : 'Tạo đơn hàng'}</Button>
             </DialogActions>
         </Dialog>
     );
 };
+
 
 // ══════════════════════════════════════════════════════════════
 // MAIN PAGE
@@ -870,25 +703,43 @@ const OrderListPage: React.FC = () => {
                 tElements += res?.totalElements ?? 0;
             }
 
-            if (source === 'OFFLINE' || source === 'ALL') {
+            let shouldFetchOffline = source === 'OFFLINE' || source === 'ALL';
+            let typeParam = '';
+
+            if (statusFilter) {
+                if (statusFilter === 'DELIVERED') typeParam = '&type=SALE';
+                else if (statusFilter === 'RETURNED') typeParam = '&type=RETURN';
+                else if (statusFilter === 'CANCELLED') typeParam = '&type=VOIDED';
+                else shouldFetchOffline = false; // Các trạng thái khác (PENDING, v.v.) không có trong hóa đơn OFFLINE
+            }
+
+            if (shouldFetchOffline) {
                 const kwParam = search ? `&keyword=${encodeURIComponent(search)}` : '';
-                const res = await axiosInstance.get(`/pos/invoices?page=${page}&size=${PAGE_SIZE}${kwParam}`);
+                const res = await axiosInstance.get(`/pos/invoices?page=${page}&size=${PAGE_SIZE}${kwParam}${typeParam}`);
                 const data = res.data?.data;
-                const mappedOffline = (data?.content ?? []).map((inv: any) => ({
-                    id: inv.id,
-                    code: inv.code,
-                    customerName: inv.customerName || 'Khách lẻ',
-                    customerPhone: inv.customerPhone || '—',
-                    totalAmount: inv.totalAmount,
-                    finalAmount: inv.finalAmount,
-                    status: inv.type === 'RETURN' ? 'RETURNED' : 'DELIVERED',
-                    paymentStatus: 'PAID',
-                    paymentMethod: 'Tiền mặt/Chuyển khoản',
-                    createdAt: inv.createdAt,
-                    assignedWarehouseName: inv.warehouseName,
-                    type: inv.type === 'RETURN' ? 'RETURN' : 'POS',
-                    _source: 'OFFLINE'
-                }));
+                const mappedOffline = (data?.content ?? []).map((inv: any) => {
+                    let mappedStatus = 'DELIVERED';
+                    if (inv.type === 'RETURN') mappedStatus = 'RETURNED';
+                    if (inv.type === 'VOIDED') mappedStatus = 'CANCELLED';
+
+                    return {
+                        id: inv.id,
+                        code: inv.code,
+                        customerName: inv.customerName || 'Khách lẻ',
+                        customerPhone: inv.customerPhone || '—',
+                        totalAmount: inv.totalAmount,
+                        finalAmount: inv.finalAmount,
+                        status: mappedStatus,
+                        paymentStatus: 'PAID',
+                        paymentMethod: inv.payments?.[0]?.method || 'CASH',
+                        createdAt: inv.createdAt,
+                        assignedWarehouseName: inv.warehouseName,
+                        type: inv.type === 'RETURN' ? 'RETURN' : 'POS',
+                        _source: 'OFFLINE',
+                        cashierName: inv.cashierName,
+                        cancelledReason: inv.voidReason
+                    };
+                });
                 finalOrders = [...finalOrders, ...mappedOffline];
                 tPages = Math.max(tPages, data?.totalPages ?? 0);
                 tElements += data?.totalElements ?? 0;
@@ -946,7 +797,8 @@ const OrderListPage: React.FC = () => {
                     shippingAddress: 'Bán tại quầy',
                     paymentMethod: inv.payments?.[0]?.method || 'Tiền mặt',
                     payments: inv.payments,
-                    _source: 'OFFLINE'
+                    _source: 'OFFLINE',
+                    cashierName: inv.cashierName || order.cashierName
                 };
                 setDetailOrder(mapped);
             } catch { setDetailOrder(order); }
@@ -1005,7 +857,7 @@ const OrderListPage: React.FC = () => {
                         </Button>
                         <Button variant="contained" size="small" startIcon={<Add sx={{ fontSize: 15 }} />}
                             onClick={() => setCreateOpen(true)}
-                            sx={{ textTransform: 'none', fontWeight: 700, bgcolor: '#1976d2', '&:hover': { bgcolor: '#1565c0' } }}>
+                            sx={{ textTransform: 'none', fontWeight: 700, bgcolor: '#2563eb', '&:hover': { bgcolor: '#1d4ed8' } }}>
                             Tạo đơn hàng
                         </Button>
                     </Box>
@@ -1145,9 +997,11 @@ const OrderListPage: React.FC = () => {
                                     { label: 'Khu vực', width: 130 },
                                     { label: 'Kho đóng gói', width: 130 },
                                     { label: 'Ngày tạo', width: 100 },
+                                    { label: 'Người tạo', width: 130 },
                                     { label: 'Tổng tiền', width: 110, align: 'right' },
-                                    { label: 'Thanh toán', width: 100, align: 'center' },
-                                    { label: 'Trạng thái', width: 110, align: 'center' },
+                                    { label: 'Hình thức TT', width: 100 },
+                                    { label: 'Thanh toán', width: 90, align: 'center' },
+                                    { label: 'Trạng thái', width: 100, align: 'center' },
                                     { label: '', width: 50, align: 'center' },
                                 ].map(col => (
                                     <TableCell key={col.label} align={(col.align as any) || 'left'}
@@ -1161,7 +1015,7 @@ const OrderListPage: React.FC = () => {
                             {loading ? (
                                 [1, 2, 3, 4, 5, 6, 7, 8].map(i => (
                                     <TableRow key={i}>
-                                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(j => (
+                                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(j => (
                                             <TableCell key={j}><Skeleton height={20} /></TableCell>
                                         ))}
                                     </TableRow>

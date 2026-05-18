@@ -1,193 +1,595 @@
-// src/components/layout/Header.jsx
-import React from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+// src/components/layout/Header.tsx
+import React, { useState } from 'react';
+import { useNavigate, useLocation, useMatch } from 'react-router-dom';
 import {
-    Box, Container, Typography, Button,
-    IconButton, Badge, InputBase, Paper,
+    Box, Container, Typography, Button, IconButton, Badge, 
+    InputBase, Paper, Menu, MenuItem, Divider, useScrollTrigger, Drawer, List, ListItem, ListItemButton, ListItemText, ListItemIcon
 } from '@mui/material';
-import { Search, ShoppingCart, Phone, Email } from '@mui/icons-material';
+import { 
+    Search, ShoppingCart, Phone, Email, FavoriteBorder, AccountCircle, 
+    ExitToApp, Receipt, CardGiftcard, LocalShipping, LocalOffer, Undo
+} from '@mui/icons-material';
+import MenuIcon from '@mui/icons-material/Menu';
+import CloseIcon from '@mui/icons-material/Close';
 import { useCartContext } from '../../store/CartContext';
 import { useCurrentUser } from '../../modules/customer/hooks/useAccount';
-import { useCategories } from '../../modules/customer/hooks/useCategories';
-import { Link } from 'react-router-dom';
-import { AccountCircle } from '@mui/icons-material';
-
-// Các link cố định luôn xuất hiện
-const FIXED_NAV = [
-    { name: 'Trang chủ', url: '/' },
-];
-
-const EXTRA_NAV = [
-    { name: 'Flash sale', url: '/shop?sort=price_asc' },
-    { name: 'Tin tức', url: '/' },
-];
+import { useWishlist } from '../../modules/customer/hooks/useWishlist';
+import authService from '../../services/authService';
+import CategorySidebar from '../../modules/customer/components/home/CategorySidebar';
 
 const Header = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const trigger = useScrollTrigger({
+        disableHysteresis: true,
+        threshold: 50,
+    });
+
     const { totalItems, openCart } = useCartContext();
     const { user, isLoggedIn } = useCurrentUser();
-    const { categories } = useCategories();
-    const [searchVal, setSearchVal] = React.useState('');
+    const { items: wishlistItems } = useWishlist();
+    
+    const [searchVal, setSearchVal] = useState('');
+    const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+    const [isHoveringMenu, setIsHoveringMenu] = useState(false);
+    const [mobileOpen, setMobileOpen] = useState(false);
 
-    // Xây dựng danh sách link động từ categories
-    const navLinks = React.useMemo(() => {
-        const catLinks = categories.slice(0, 5).map(c => ({
-            name: c.name,
-            url: `/shop?category=${encodeURIComponent(c.name)}`
-        }));
-        return [...FIXED_NAV, ...catLinks, ...EXTRA_NAV];
-    }, [categories]);
+    // Active link states using useMatch
+    const matchHome = useMatch('/');
+    const matchNews = useMatch('/tin-tuc');
+    const isHomeActive = !!matchHome;
+    const isFlashSaleActive = location.pathname === '/shop' && location.search.includes('sort=flash_sale');
+    const isNewsActive = !!matchNews;
 
-    const handleSearch = (e) => {
+    const handleOpenMenu = (event: React.MouseEvent<HTMLElement>) => {
+        setAnchorEl(event.currentTarget);
+    };
+
+    const handleCloseMenu = () => {
+        setAnchorEl(null);
+    };
+
+    const handleLogout = () => {
+        authService.logout();
+        window.location.href = '/login';
+    };
+
+    const handleSearch = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && searchVal.trim()) {
-            navigate(`/shop?search=${encodeURIComponent(searchVal.trim())}`);
+            navigate(`/shop?keyword=${encodeURIComponent(searchVal.trim())}`);
         }
     };
 
-    const handleNavClick = (url: string) => {
+    const handleSearchClick = () => {
+        if (searchVal.trim()) {
+            navigate(`/shop?keyword=${encodeURIComponent(searchVal.trim())}`);
+        }
+    };
+
+    const handleDrawerToggle = () => {
+        setMobileOpen(!mobileOpen);
+    };
+
+    const handleMobileLinkClick = (url: string) => {
         navigate(url);
-    };
-
-    // Kiểm tra nav link nào đang active dựa trên URL hiện tại
-    const isActive = (target: string) => {
-        const [targetPath, targetQuery] = target.split('?');
-        const currentPath = location.pathname;
-        const currentSearch = location.search;
-
-        if (target === '/') return currentPath === '/';
-
-        if (targetPath === '/shop') {
-            if (currentPath !== '/shop') return false;
-            if (!targetQuery) {
-                const params = new URLSearchParams(currentSearch);
-                return !params.get('category') && !params.get('sort');
-            }
-            const targetParams = new URLSearchParams(targetQuery);
-            const currentParams = new URLSearchParams(currentSearch);
-            for (const [key, val] of targetParams.entries()) {
-                if (currentParams.get(key) !== val) return false;
-            }
-            return true;
-        }
-        return currentPath === targetPath;
+        setMobileOpen(false);
     };
 
     return (
-        <Box sx={{ position: 'sticky', top: 0, zIndex: 100 }}>
-            {/* Top bar */}
-            <Box sx={{ bgcolor: '#d32f2f', py: 0.5 }}>
+        <Box sx={{ 
+            position: 'sticky', 
+            top: 0, 
+            zIndex: 1100, 
+            boxShadow: trigger ? '0 4px 20px rgba(26,26,46,0.1)' : 'none',
+            transition: 'box-shadow 0.25s ease'
+        }}>
+            {/* TẦNG 1 — TOPBAR (height: 32px, bg: #fafafb) */}
+            <Box sx={{ 
+                bgcolor: '#fafafb', 
+                height: 32, 
+                display: 'flex', 
+                alignItems: 'center',
+                borderBottom: '1px solid #eef0f2'
+            }}>
                 <Container maxWidth="lg">
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <Phone sx={{ color: '#fff', fontSize: 14 }} />
-                                <Typography variant="caption" color="#fff">1800 6655</Typography>
+                        {/* Trái: SĐT + Email */}
+                        <Box sx={{ display: 'flex', gap: 2.5, alignItems: 'center' }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, color: '#1a1a2e', fontSize: '11px', fontWeight: 600 }}>
+                                <Phone sx={{ fontSize: 13, color: '#f5a623' }} /> 1800 6655
                             </Box>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <Email sx={{ color: '#fff', fontSize: 14 }} />
-                                <Typography variant="caption" color="#fff">cskh@bookstore.vn</Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, color: '#1a1a2e', fontSize: '11px', fontWeight: 600 }}>
+                                <Email sx={{ fontSize: 13, color: '#f5a623' }} /> cskh@bookly.vn
                             </Box>
                         </Box>
-                        <Typography variant="caption" color="#fff">
-                            🚚 Miễn phí vận chuyển đơn từ 150.000đ
-                        </Typography>
+
+                        {/* Phải: Slogan + Freeship (Ẩn trên mobile) */}
+                        <Box sx={{ 
+                            display: { xs: 'none', md: 'flex' }, 
+                            alignItems: 'center', 
+                            gap: 1.5,
+                            color: '#5c6a79',
+                            fontSize: '11px',
+                            fontWeight: 500
+                        }}>
+                            <Typography sx={{ fontSize: '11px', color: '#5c6a79', fontWeight: 500 }}>
+                                "Mỗi cuốn sách, một hành trình mới"
+                            </Typography>
+                            <Typography sx={{ fontSize: '11px', color: '#eef0f2' }}>|</Typography>
+                            <Typography sx={{ fontSize: '11px', color: '#f5a623', fontWeight: 700 }}>
+                                Freeship đơn từ 150k
+                            </Typography>
+                        </Box>
                     </Box>
                 </Container>
             </Box>
 
-            {/* Main header */}
-            <Box sx={{ bgcolor: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+            {/* TẦNG 2 — HEADER CHÍNH (bg: #ffffff) */}
+            <Box sx={{ bgcolor: '#ffffff', py: { xs: 1.5, md: 2 }, borderBottom: '1px solid #eef0f2' }}>
                 <Container maxWidth="lg">
-                    <Box sx={{ display: 'flex', alignItems: 'center', py: 1.5, gap: 2 }}>
-                        {/* Logo */}
-                        <Box onClick={() => navigate('/')} sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 160, cursor: 'pointer' }}>
-                            <Box sx={{ width: 40, height: 40, bgcolor: '#d32f2f', borderRadius: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <Typography sx={{ fontSize: 20 }}>📚</Typography>
+                    {/* Bố cục lưới responsive */}
+                    <Box sx={{ 
+                        display: 'flex', 
+                        flexDirection: { xs: 'column', md: 'row' }, 
+                        alignItems: 'center', 
+                        gap: { xs: 1.5, md: 3 } 
+                    }}>
+                        
+                        {/* Hàng trên cùng của mobile: Logo + Actions + Hamburger */}
+                        <Box sx={{ 
+                            display: 'flex', 
+                            justifyContent: 'space-between', 
+                            alignItems: 'center', 
+                            width: '100%',
+                            flexShrink: 0
+                        }}>
+                            {/* Logo */}
+                            <Box onClick={() => navigate('/')} sx={{ display: 'flex', alignItems: 'center', gap: 1.2, cursor: 'pointer' }}>
+                                <Box sx={{ 
+                                    width: 36, height: 36, 
+                                    bgcolor: '#1a1a2e', 
+                                    borderRadius: '50%',
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center',
+                                }}>
+                                    <Typography sx={{ fontSize: 18 }}>📚</Typography>
+                                </Box>
+                                <Box>
+                                    <Typography sx={{ 
+                                        fontWeight: 800, 
+                                        color: '#1a1a2e', 
+                                        fontSize: '20px', 
+                                        lineHeight: 1.1,
+                                        fontFamily: '"Playfair Display", serif'
+                                    }}>
+                                        Bookly
+                                    </Typography>
+                                    <Typography sx={{ fontSize: '11px', color: '#888', fontWeight: 500, lineHeight: 1 }}>
+                                        Hành trình tri thức
+                                    </Typography>
+                                </Box>
                             </Box>
-                            <Box>
-                                <Typography variant="subtitle1" fontWeight={800} color="#d32f2f" lineHeight={1}>BookStore</Typography>
-                                <Typography variant="caption" color="text.secondary" lineHeight={1}>Sách hay giá tốt</Typography>
+
+                            {/* Search bar tích hợp giữa trên Desktop */}
+                            <Box sx={{ 
+                                display: { xs: 'none', md: 'block' },
+                                flex: 1, 
+                                mx: 4, 
+                                maxWidth: '520px'
+                            }}>
+                                <Paper elevation={0} sx={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    border: '1.5px solid #e0e0e0', 
+                                    borderRadius: '24px', 
+                                    overflow: 'hidden',
+                                    height: 40,
+                                    px: 1.5,
+                                    bgcolor: '#fafafb',
+                                    transition: 'all 0.25s ease',
+                                    '&:focus-within': { borderColor: '#1a1a2e' }
+                                }}>
+                                    <InputBase
+                                        placeholder="Tìm kiếm tựa sách, tác giả, thể loại..."
+                                        value={searchVal}
+                                        onChange={e => setSearchVal(e.target.value)}
+                                        onKeyDown={handleSearch}
+                                        sx={{ flex: 1, px: 1, fontSize: 13, fontWeight: 500 }}
+                                    />
+                                    <Button variant="contained"
+                                        onClick={handleSearchClick}
+                                        sx={{ 
+                                            bgcolor: '#f5a623', 
+                                            color: '#1a1a2e',
+                                            fontWeight: 800,
+                                            borderRadius: '20px', 
+                                            px: 3, 
+                                            height: 32,
+                                            minWidth: 0,
+                                            textTransform: 'none',
+                                            fontSize: 12,
+                                            '&:hover': { bgcolor: '#e0951a' } 
+                                        }}>
+                                        Tìm kiếm
+                                    </Button>
+                                </Paper>
                             </Box>
-                        </Box>
 
-                        {/* Search */}
-                        <Paper elevation={0} sx={{ flex: 1, display: 'flex', alignItems: 'center', border: '2px solid #d32f2f', borderRadius: 2, overflow: 'hidden' }}>
-                            <InputBase
-                                placeholder="Tìm kiếm sách, tác giả, NXB..."
-                                value={searchVal}
-                                onChange={e => setSearchVal(e.target.value)}
-                                onKeyDown={handleSearch}
-                                sx={{ flex: 1, px: 2, fontSize: 14 }}
-                            />
-                            <Button variant="contained"
-                                onClick={() => searchVal.trim() && navigate(`/shop?search=${encodeURIComponent(searchVal.trim())}`)}
-                                sx={{ bgcolor: '#d32f2f', '&:hover': { bgcolor: '#b71c1c' }, borderRadius: 0, px: 2.5, py: 1.2, minWidth: 0 }}>
-                                <Search />
-                            </Button>
-                        </Paper>
-
-                        {/* Actions */}
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <IconButton onClick={openCart} sx={{ position: 'relative' }}>
-                                <Badge badgeContent={totalItems} color="error" max={99}>
-                                    <ShoppingCart />
-                                </Badge>
-                            </IconButton>
-
-                            {isLoggedIn ? (
-                                <Button
-                                    onClick={() => navigate('/account')}
-                                    startIcon={<AccountCircle />}
-                                    sx={{
-                                        color: '#333', textTransform: 'none', fontWeight: 600,
-                                        '&:hover': { color: '#d32f2f' }
+                            {/* Actions Right Side */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, md: 1.5 } }}>
+                                {/* Yêu thích (Chỉ hiện trên Desktop) */}
+                                <IconButton 
+                                    onClick={() => navigate('/wishlist')} 
+                                    sx={{ 
+                                        color: '#1a1a2e', 
+                                        display: { xs: 'none', md: 'inline-flex' },
+                                        '&:hover': { color: '#f5a623' } 
                                     }}
                                 >
-                                    {user?.fullName?.split(' ').pop() || 'Tài khoản'}
-                                </Button>
-                            ) : (
-                                <>
-                                    <Button variant="outlined" size="small" onClick={() => navigate('/login')} sx={{
-                                        borderColor: '#d32f2f', color: '#d32f2f', textTransform: 'none', fontWeight: 600,
-                                        '&:hover': { bgcolor: '#ffebee', borderColor: '#d32f2f' },
-                                    }}>
-                                        Đăng nhập
-                                    </Button>
-                                    <Button variant="contained" size="small" onClick={() => navigate('/register')} sx={{
-                                        bgcolor: '#d32f2f', textTransform: 'none', fontWeight: 600, '&:hover': { bgcolor: '#b71c1c' },
-                                    }}>
-                                        Đăng ký
-                                    </Button>
-                                </>
-                            )}
+                                    <Badge badgeContent={wishlistItems.length} color="secondary" sx={{ '& .MuiBadge-badge': { bgcolor: '#e8401c', color: '#ffffff', fontWeight: 700 } }}>
+                                        <FavoriteBorder sx={{ fontSize: 22 }} />
+                                    </Badge>
+                                </IconButton>
+
+                                {/* Giỏ hàng */}
+                                <IconButton onClick={openCart} sx={{ color: '#1a1a2e', '&:hover': { color: '#f5a623' } }}>
+                                    <Badge badgeContent={totalItems} color="secondary" sx={{ '& .MuiBadge-badge': { bgcolor: '#e8401c', color: '#ffffff', fontWeight: 700 } }}>
+                                        <ShoppingCart sx={{ fontSize: 22 }} />
+                                    </Badge>
+                                </IconButton>
+
+                                {/* Tài khoản/Auth Buttons (Chỉ hiện trên Desktop) */}
+                                <Box sx={{ display: { xs: 'none', md: 'block' } }}>
+                                    {isLoggedIn ? (
+                                        <>
+                                            <Button
+                                                onClick={handleOpenMenu}
+                                                startIcon={<AccountCircle sx={{ color: '#1a1a2e' }} />}
+                                                sx={{
+                                                    color: '#1a1a2e', 
+                                                    textTransform: 'none', 
+                                                    fontWeight: 700,
+                                                    fontSize: 13,
+                                                    '&:hover': { color: '#f5a623' }
+                                                }}
+                                            >
+                                                {user?.fullName?.split(' ').pop() || 'Tài khoản'}
+                                            </Button>
+                                            <Menu
+                                                anchorEl={anchorEl}
+                                                open={Boolean(anchorEl)}
+                                                onClose={handleCloseMenu}
+                                                sx={{
+                                                    '& .MuiPaper-root': {
+                                                        borderRadius: '8px',
+                                                        mt: 1,
+                                                        minWidth: 180,
+                                                        boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
+                                                    }
+                                                }}
+                                            >
+                                                <MenuItem onClick={() => { handleCloseMenu(); navigate('/account'); }} sx={{ fontSize: 13, gap: 1, py: 1 }}>
+                                                    <AccountCircle fontSize="small" sx={{ color: '#666' }} /> Thông tin cá nhân
+                                                </MenuItem>
+                                                <MenuItem onClick={() => { handleCloseMenu(); navigate('/account?tab=orders'); }} sx={{ fontSize: 13, gap: 1, py: 1 }}>
+                                                    <Receipt fontSize="small" sx={{ color: '#666' }} /> Đơn hàng của tôi
+                                                </MenuItem>
+                                                <MenuItem onClick={() => { handleCloseMenu(); navigate('/account?tab=points'); }} sx={{ fontSize: 13, gap: 1, py: 1 }}>
+                                                    <CardGiftcard fontSize="small" sx={{ color: '#666' }} /> Điểm thưởng
+                                                </MenuItem>
+                                                <Divider />
+                                                <MenuItem onClick={handleLogout} sx={{ fontSize: 13, gap: 1, py: 1, color: '#e8401c' }}>
+                                                    <ExitToApp fontSize="small" /> Đăng xuất
+                                                </MenuItem>
+                                            </Menu>
+                                        </>
+                                    ) : (
+                                        <Box sx={{ display: 'flex', gap: 1 }}>
+                                            <Button variant="outlined" size="small" onClick={() => navigate('/login')} sx={{
+                                                borderColor: '#1a1a2e', color: '#1a1a2e', textTransform: 'none', fontWeight: 700,
+                                                borderRadius: '20px', height: 34, px: 2,
+                                                '&:hover': { bgcolor: 'rgba(26,26,46,0.04)', borderColor: '#1a1a2e' },
+                                            }}>
+                                                Đăng nhập
+                                            </Button>
+                                            <Button variant="contained" size="small" onClick={() => navigate('/register')} sx={{
+                                                bgcolor: '#f5a623', color: '#1a1a2e', textTransform: 'none', fontWeight: 800,
+                                                borderRadius: '20px', height: 34, px: 2,
+                                                '&:hover': { bgcolor: '#e0951a' },
+                                            }}>
+                                                Đăng ký
+                                            </Button>
+                                        </Box>
+                                    )}
+                                </Box>
+
+                                {/* Hamburger Menu Button (Mobile) */}
+                                <IconButton 
+                                    onClick={handleDrawerToggle}
+                                    sx={{ 
+                                        color: '#1a1a2e', 
+                                        display: { xs: 'inline-flex', md: 'none' } 
+                                    }}
+                                >
+                                    <MenuIcon sx={{ fontSize: 24 }} />
+                                </IconButton>
+                            </Box>
                         </Box>
+
+                        {/* Search Bar Xuống Dòng trên Mobile */}
+                        <Box sx={{ 
+                            display: { xs: 'block', md: 'none' },
+                            width: '100%'
+                        }}>
+                            <Paper elevation={0} sx={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                border: '1.5px solid #e0e0e0', 
+                                borderRadius: '24px', 
+                                overflow: 'hidden',
+                                height: 38,
+                                px: 1.5,
+                                bgcolor: '#fafafb'
+                            }}>
+                                <InputBase
+                                    placeholder="Tìm kiếm tựa sách, tác giả..."
+                                    value={searchVal}
+                                    onChange={e => setSearchVal(e.target.value)}
+                                    onKeyDown={handleSearch}
+                                    sx={{ flex: 1, px: 1, fontSize: 13 }}
+                                />
+                                <Button variant="contained"
+                                    onClick={handleSearchClick}
+                                    sx={{ 
+                                        bgcolor: '#f5a623', 
+                                        color: '#1a1a2e',
+                                        fontWeight: 800,
+                                        borderRadius: '20px', 
+                                        px: 2, 
+                                        height: 30,
+                                        minWidth: 0,
+                                        textTransform: 'none',
+                                        fontSize: 11,
+                                        '&:hover': { bgcolor: '#e0951a' } 
+                                    }}>
+                                    Tìm kiếm
+                                </Button>
+                            </Paper>
+                        </Box>
+
                     </Box>
                 </Container>
-
-                {/* Nav */}
-                <Box sx={{ borderTop: '1px solid #f5f5f5' }}>
-                    <Container maxWidth="lg">
-                        <Box sx={{ display: 'flex' }}>
-                            {navLinks.map((item) => {
-                                const active = isActive(item.url);
-                                return (
-                                    <Button key={item.name} onClick={() => handleNavClick(item.url)} sx={{
-                                        color: active ? '#d32f2f' : '#333',
-                                        textTransform: 'none',
-                                        fontWeight: active ? 700 : 500,
-                                        fontSize: 13, px: 2, py: 1, borderRadius: 0,
-                                        borderBottom: active ? '2px solid #d32f2f' : '2px solid transparent',
-                                        '&:hover': { color: '#d32f2f', bgcolor: 'transparent', borderBottomColor: '#d32f2f' },
-                                    }}>
-                                        {item.name}
-                                    </Button>
-                                );
-                            })}
-                        </Box>
-                    </Container>
-                </Box>
             </Box>
+
+            {/* TẦNG 3 — NAVBAR (height: 42px, bg: #1a1a2e) */}
+            <Box sx={{ bgcolor: '#1a1a2e', height: 42, display: 'flex', alignItems: 'stretch' }}>
+                <Container maxWidth="lg" sx={{ display: 'flex', alignItems: 'stretch' }}>
+                    <Box sx={{ display: 'flex', width: '100%', alignItems: 'stretch', justifyContent: 'space-between' }}>
+                        
+                        {/* [A] Ô "DANH MỤC SÁCH" */}
+                        <Box 
+                            onMouseEnter={() => setIsHoveringMenu(true)}
+                            onMouseLeave={() => setIsHoveringMenu(false)}
+                            sx={{ position: 'relative', display: 'flex', alignItems: 'stretch' }}
+                        >
+                            <Button
+                                startIcon={<MenuIcon sx={{ color: '#1a1a2e' }} />}
+                                sx={{
+                                    bgcolor: '#f5a623',
+                                    color: '#1a1a2e',
+                                    px: 3,
+                                    textTransform: 'none',
+                                    fontWeight: 800,
+                                    borderRadius: 0,
+                                    fontSize: '13px',
+                                    letterSpacing: '0.5px',
+                                    minWidth: 190,
+                                    height: '100%',
+                                    '&:hover': {
+                                        bgcolor: '#e0951a',
+                                    }
+                                }}
+                            >
+                                DANH MỤC SÁCH
+                            </Button>
+
+                            {/* Dropdown Paper chứa CategorySidebar */}
+                            {isHoveringMenu && (
+                                <Paper 
+                                    elevation={0}
+                                    sx={{
+                                        position: 'absolute',
+                                        top: '100%',
+                                        left: 0,
+                                        width: 240,
+                                        bgcolor: '#ffffff',
+                                        border: '1px solid #eef0f2',
+                                        boxShadow: '0 8px 30px rgba(26,26,46,0.12)',
+                                        zIndex: 1200,
+                                        overflow: 'visible'
+                                    }}
+                                >
+                                    <CategorySidebar />
+                                </Paper>
+                            )}
+                        </Box>
+
+                        {/* [B] Nav links */}
+                        <Box sx={{ display: 'flex', alignItems: 'stretch', ml: 1 }}>
+                            <Button
+                                onClick={() => navigate('/')}
+                                sx={{
+                                    color: isHomeActive ? '#f5a623' : 'rgba(255,255,255,0.85)',
+                                    fontSize: '13px',
+                                    fontWeight: 700,
+                                    px: 2,
+                                    borderRadius: 0,
+                                    height: '100%',
+                                    textTransform: 'none',
+                                    borderBottom: isHomeActive ? '3px solid #f5a623' : '3px solid transparent',
+                                    '&:hover': { color: '#f5a623', borderBottomColor: '#f5a623', bgcolor: 'transparent' }
+                                }}
+                            >
+                                Trang chủ
+                            </Button>
+                            <Button
+                                onClick={() => navigate('/shop?sort=flash_sale')}
+                                sx={{
+                                    color: isFlashSaleActive ? '#f5a623' : 'rgba(255,255,255,0.85)',
+                                    fontSize: '13px',
+                                    fontWeight: 700,
+                                    px: 2,
+                                    borderRadius: 0,
+                                    height: '100%',
+                                    textTransform: 'none',
+                                    borderBottom: isFlashSaleActive ? '3px solid #f5a623' : '3px solid transparent',
+                                    '&:hover': { color: '#f5a623', borderBottomColor: '#f5a623', bgcolor: 'transparent' }
+                                }}
+                            >
+                                Flash Sale
+                            </Button>
+                            <Button
+                                onClick={() => navigate('/shop')}
+                                sx={{
+                                    color: isNewsActive ? '#f5a623' : 'rgba(255,255,255,0.85)',
+                                    fontSize: '13px',
+                                    fontWeight: 700,
+                                    px: 2,
+                                    borderRadius: 0,
+                                    height: '100%',
+                                    textTransform: 'none',
+                                    borderBottom: isNewsActive ? '3px solid #f5a623' : '3px solid transparent',
+                                    '&:hover': { color: '#f5a623', borderBottomColor: '#f5a623', bgcolor: 'transparent' }
+                                }}
+                            >
+                                Tin tức
+                            </Button>
+                        </Box>
+
+                        {/* [C] Spacer */}
+                        <Box sx={{ flex: 1 }} />
+
+                        {/* [D] Thông tin dịch vụ (Chỉ hiện md trở lên) */}
+                        <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', height: '100%' }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, px: 1.75, color: 'rgba(255,255,255,0.7)', fontSize: '11px', fontWeight: 500 }}>
+                                <LocalShipping sx={{ fontSize: 14 }} /> Ship COD Toàn Quốc
+                            </Box>
+                            <Divider orientation="vertical" flexItem sx={{ borderColor: 'rgba(255,255,255,0.15)', my: 1.5 }} />
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, px: 1.75, color: 'rgba(255,255,255,0.7)', fontSize: '11px', fontWeight: 500 }}>
+                                <LocalOffer sx={{ fontSize: 14 }} /> Freeship từ 150k
+                            </Box>
+                            <Divider orientation="vertical" flexItem sx={{ borderColor: 'rgba(255,255,255,0.15)', my: 1.5 }} />
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, px: 1.75, color: 'rgba(255,255,255,0.7)', fontSize: '11px', fontWeight: 500 }}>
+                                <Undo sx={{ fontSize: 14 }} /> Đổi trả 7 ngày
+                            </Box>
+                            <Divider orientation="vertical" flexItem sx={{ borderColor: 'rgba(255,255,255,0.15)', my: 1.5 }} />
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, px: 1.75, color: 'rgba(255,255,255,0.7)', fontSize: '11px', fontWeight: 500 }}>
+                                <Phone sx={{ fontSize: 14 }} /> 1800 6655
+                            </Box>
+                        </Box>
+
+                    </Box>
+                </Container>
+            </Box>
+
+            {/* Mobile Responsive Navigation Drawer */}
+            <Drawer
+                anchor="right"
+                open={mobileOpen}
+                onClose={handleDrawerToggle}
+                ModalProps={{ keepMounted: true }}
+                sx={{
+                    '& .MuiPaper-root': {
+                        width: 280,
+                        bgcolor: '#ffffff',
+                        p: 2.5,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 2
+                    }
+                }}
+            >
+                {/* Header Drawer */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#1a1a2e' }}>Bookly Menu</Typography>
+                    <IconButton onClick={handleDrawerToggle} sx={{ color: '#1a1a2e' }}>
+                        <CloseIcon />
+                    </IconButton>
+                </Box>
+                <Divider />
+
+                {/* Nav Links */}
+                <List dense sx={{ p: 0 }}>
+                    <ListItem disablePadding>
+                        <ListItemButton onClick={() => handleMobileLinkClick('/')}>
+                            <ListItemText primary="Trang chủ" primaryTypographyProps={{ fontWeight: 700, color: '#1a1a2e' }} />
+                        </ListItemButton>
+                    </ListItem>
+                    <ListItem disablePadding>
+                        <ListItemButton onClick={() => handleMobileLinkClick('/shop?sort=flash_sale')}>
+                            <ListItemText primary="Flash Sale" primaryTypographyProps={{ fontWeight: 700, color: '#1a1a2e' }} />
+                        </ListItemButton>
+                    </ListItem>
+                    <ListItem disablePadding>
+                        <ListItemButton onClick={() => handleMobileLinkClick('/shop')}>
+                            <ListItemText primary="Tin tức" primaryTypographyProps={{ fontWeight: 700, color: '#1a1a2e' }} />
+                        </ListItemButton>
+                    </ListItem>
+                    <ListItem disablePadding>
+                        <ListItemButton onClick={() => handleMobileLinkClick('/wishlist')}>
+                            <ListItemText primary="Sản phẩm yêu thích" primaryTypographyProps={{ fontWeight: 700, color: '#1a1a2e' }} />
+                        </ListItemButton>
+                    </ListItem>
+                </List>
+
+                <Divider sx={{ my: 1 }} />
+
+                {/* Account / Actions inside mobile Drawer */}
+                {isLoggedIn ? (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 700, px: 1, color: '#888' }}>
+                            Xin chào, {user?.fullName || 'khách hàng'}!
+                        </Typography>
+                        <Button 
+                            variant="outlined" 
+                            size="small" 
+                            startIcon={<AccountCircle />}
+                            onClick={() => handleMobileLinkClick('/account')}
+                            sx={{ textTransform: 'none', borderColor: '#1a1a2e', color: '#1a1a2e', fontWeight: 700, borderRadius: '20px' }}
+                        >
+                            Tài khoản của tôi
+                        </Button>
+                        <Button 
+                            variant="contained" 
+                            size="small" 
+                            color="error"
+                            startIcon={<ExitToApp />}
+                            onClick={handleLogout}
+                            sx={{ textTransform: 'none', bgcolor: '#e8401c', fontWeight: 700, borderRadius: '20px' }}
+                        >
+                            Đăng xuất
+                        </Button>
+                    </Box>
+                ) : (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                        <Button 
+                            variant="outlined" 
+                            onClick={() => handleMobileLinkClick('/login')}
+                            sx={{ textTransform: 'none', borderColor: '#1a1a2e', color: '#1a1a2e', fontWeight: 700, borderRadius: '20px' }}
+                        >
+                            Đăng nhập
+                        </Button>
+                        <Button 
+                            variant="contained" 
+                            onClick={() => handleMobileLinkClick('/register')}
+                            sx={{ textTransform: 'none', bgcolor: '#f5a623', color: '#1a1a2e', fontWeight: 800, borderRadius: '20px', '&:hover': { bgcolor: '#e0951a' } }}
+                        >
+                            Đăng ký tài khoản
+                        </Button>
+                    </Box>
+                )}
+            </Drawer>
         </Box>
     );
 };

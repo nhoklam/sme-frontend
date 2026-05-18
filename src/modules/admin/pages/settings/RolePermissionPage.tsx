@@ -450,7 +450,7 @@ const UsersTab: React.FC = () => {
                 <Button size="small" variant="outlined" startIcon={<Refresh sx={{ fontSize: 14 }} />} onClick={() => refetch()}
                     sx={{ textTransform: 'none', borderColor: '#e0e0e0', color: '#555' }}>Làm mới</Button>
                 <Button variant="contained" startIcon={<Add sx={{ fontSize: 16 }} />} onClick={() => setCreateOpen(true)}
-                    sx={{ textTransform: 'none', fontWeight: 700, bgcolor: '#16a34a', '&:hover': { bgcolor: '#15803d' } }}>
+                    sx={{ textTransform: 'none', fontWeight: 700, bgcolor: '#2563eb', '&:hover': { bgcolor: '#1d4ed8' } }}>
                     Tạo tài khoản
                 </Button>
             </Box>
@@ -527,13 +527,13 @@ const UsersTab: React.FC = () => {
                                             <TableCell>
                                                 <Box sx={{ display: 'flex', gap: 0.5 }}>
                                                     <Tooltip title="Chỉnh sửa">
-                                                        <IconButton size="small" onClick={() => setEditUser(u)} sx={{ color: '#2563eb', '&:hover': { bgcolor: '#eff6ff' } }}>
+                                                        <IconButton size="small" onClick={() => setEditUser(u)} sx={{ color: '#f59e0b', '&:hover': { bgcolor: '#fef3c7' } }}>
                                                             <Edit sx={{ fontSize: 16 }} />
                                                         </IconButton>
                                                     </Tooltip>
                                                     <Tooltip title={u.active !== false ? 'Khóa tài khoản' : 'Kích hoạt tài khoản'}>
                                                         <IconButton size="small" onClick={() => toggleActive(u)} disabled={togglingId === u.id}
-                                                            sx={{ color: u.active !== false ? '#dc2626' : '#16a34a', '&:hover': { bgcolor: u.active !== false ? '#fef2f2' : '#f0fdf4' } }}>
+                                                            sx={{ color: u.active !== false ? '#ef4444' : '#22c55e', '&:hover': { bgcolor: u.active !== false ? '#fef2f2' : '#f0fdf4' } }}>
                                                             {togglingId === u.id ? <CircularProgress size={14} /> : u.active !== false ? <Lock sx={{ fontSize: 16 }} /> : <LockOpen sx={{ fontSize: 16 }} />}
                                                         </IconButton>
                                                     </Tooltip>

@@ -4,13 +4,12 @@ import { useNavigate } from 'react-router-dom';
 import {
     Box, Container, Grid, Typography, Paper, Button, TextField,
     Divider, FormControl, InputLabel, Select, MenuItem, Alert,
-    CircularProgress, Radio, RadioGroup, FormControlLabel, Chip,
-    Collapse,
+    CircularProgress, Radio, RadioGroup, Collapse,
 } from '@mui/material';
 import { SelectChangeEvent } from '@mui/material/Select';
 import {
     ArrowBack, ShoppingCart, LocalShipping, Security,
-    ExpandMore, ExpandLess, CheckCircleOutline,
+    ExpandMore, ExpandLess, CheckCircleOutline, Lock
 } from '@mui/icons-material';
 import { useCartContext } from '../../../store/CartContext';
 import { useCreateOrder } from '../hooks/useOrders';
@@ -38,7 +37,6 @@ interface CheckoutFormData {
     note: string;
 }
 
-// Unified cart item type that matches what CartContext provides
 interface CartItemType {
     id: string;
     title?: string;
@@ -74,7 +72,6 @@ const PAYMENT_OPTIONS = [
 
 const CheckoutPage: React.FC = () => {
     const navigate = useNavigate();
-    // Cast items to our unified type to avoid CartItem type conflicts
     const { items: rawItems, totalPrice, totalItems, clearCart, appliedPromotion } = useCartContext();
     const items = rawItems as unknown as CartItemType[];
     const { user } = useCurrentUser();
@@ -91,7 +88,6 @@ const CheckoutPage: React.FC = () => {
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
 
-    // Prefill form with user data when available
     useEffect(() => {
         if (user) {
             setForm(f => ({
@@ -173,27 +169,29 @@ const CheckoutPage: React.FC = () => {
 
     if (items.length === 0) {
         return (
-            <Box sx={{ bgcolor: '#f7f7f8', minHeight: '80vh', display: 'flex', alignItems: 'center' }}>
+            <Box sx={{ bgcolor: '#fafafb', minHeight: '80vh', display: 'flex', alignItems: 'center' }}>
                 <Container maxWidth="sm" sx={{ textAlign: 'center', py: 6 }}>
-                    <Typography fontSize={72} mb={2}>🛒</Typography>
-                    <Typography variant="h5" fontWeight={700} mb={1}>Giỏ hàng trống</Typography>
+                    <Typography fontSize={80} mb={3}>🛒</Typography>
+                    <Typography variant="h4" sx={{ fontFamily: '"Playfair Display", serif', fontWeight: 850, mb: 1.5, color: '#1a1a2e' }}>Giỏ hàng trống</Typography>
                     <Typography color="text.secondary" mb={4}>
-                        Bạn chưa có sản phẩm nào trong giỏ hàng
+                        Bạn chưa có sản phẩm nào trong giỏ hàng để tiếp tục thanh toán.
                     </Typography>
                     <Button
                         variant="contained"
                         onClick={() => navigate('/shop')}
                         startIcon={<ArrowBack />}
                         sx={{
-                            bgcolor: '#d32f2f',
+                            bgcolor: '#1a1a2e',
+                            color: '#ffffff',
                             textTransform: 'none',
                             fontWeight: 700,
-                            borderRadius: 2,
+                            borderRadius: '10px',
                             px: 4,
-                            '&:hover': { bgcolor: '#b71c1c' },
+                            py: 1.5,
+                            '&:hover': { bgcolor: '#f5a623', color: '#1a1a2e' },
                         }}
                     >
-                        Tiếp tục mua sắm
+                        Quay lại Trang chủ
                     </Button>
                 </Container>
             </Box>
@@ -201,55 +199,48 @@ const CheckoutPage: React.FC = () => {
     }
 
     return (
-        <Box sx={{ bgcolor: '#f7f7f8', minHeight: '100vh' }}>
-            {/* Compact top bar */}
-            <Box sx={{ bgcolor: '#fff', borderBottom: '1px solid #f0f0f0', py: 1.5 }}>
+        <Box sx={{ bgcolor: '#fafafb', minHeight: '100vh', pb: 6 }}>
+            {/* Compact Header */}
+            <Box sx={{ bgcolor: '#ffffff', borderBottom: '1px solid #eef0f2', py: 2 }}>
                 <Container maxWidth="lg">
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                         <Button
                             startIcon={<ArrowBack sx={{ fontSize: 16 }} />}
                             onClick={() => navigate('/cart')}
-                            sx={{ color: '#666', textTransform: 'none', fontWeight: 500, fontSize: 13 }}
+                            sx={{ color: '#1a1a2e', textTransform: 'none', fontWeight: 600, fontSize: 13, '&:hover': { color: '#f5a623' } }}
                         >
                             Quay lại giỏ hàng
                         </Button>
-                        <Divider orientation="vertical" flexItem />
-                        <Typography variant="h6" fontWeight={800} sx={{ letterSpacing: '-0.3px' }}>
-                            Thanh toán
+                        <Divider orientation="vertical" flexItem sx={{ borderColor: '#eef0f2' }} />
+                        <Typography variant="h6" sx={{ fontFamily: '"Playfair Display", serif', fontWeight: 900, color: '#1a1a2e' }}>
+                            Thông tin thanh toán
                         </Typography>
-                        <Chip
-                            label={`${totalItems} sản phẩm`}
-                            size="small"
-                            sx={{ bgcolor: '#ffebee', color: '#d32f2f', fontWeight: 700, ml: 'auto' }}
-                        />
                     </Box>
                 </Container>
             </Box>
 
-            <Container maxWidth="lg" sx={{ py: 3 }}>
+            <Container maxWidth="lg" sx={{ mt: 4 }}>
                 {createOrder.isError && (
                     <Alert
                         severity="error"
-                        sx={{ mb: 2.5, borderRadius: 2 }}
-                        onClose={() => { }}
+                        sx={{ mb: 3, borderRadius: '8px' }}
                     >
-                        Đặt hàng thất bại. Vui lòng kiểm tra lại thông tin và thử lại.
+                        Đặt hàng thất bại. Vui lòng kiểm tra lại thông tin giao nhận và thử lại.
                     </Alert>
                 )}
 
-                {/* MUI v6 Grid2 — use "size" prop instead of "item xs md" */}
-                <Grid container spacing={3}>
-                    {/* ── LEFT: Form ── */}
+                <Grid container spacing={4}>
+                    {/* ── LEFT: Delivery Form & Payment ── */}
                     <Grid size={{ xs: 12, md: 7 }}>
                         {/* Shipping Info */}
                         <Paper
                             elevation={0}
-                            sx={{ borderRadius: 3, p: 3, mb: 2.5, border: '1px solid #f0f0f0' }}
+                            sx={{ borderRadius: '12px', p: 3, mb: 3, border: '1px solid #eef0f2', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}
                         >
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2.5 }}>
-                                <LocalShipping sx={{ color: '#d32f2f', fontSize: 22 }} />
-                                <Typography variant="h6" fontWeight={700}>
-                                    Thông tin giao hàng
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 3 }}>
+                                <LocalShipping sx={{ color: '#1a1a2e', fontSize: 22 }} />
+                                <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#1a1a2e' }}>
+                                    Thông tin giao nhận hàng
                                 </Typography>
                             </Box>
 
@@ -257,17 +248,16 @@ const CheckoutPage: React.FC = () => {
                                 <Grid size={{ xs: 12, sm: 6 }}>
                                     <TextField
                                         fullWidth
-                                        label="Họ và tên *"
-                                        size="small"
+                                        label="Họ và tên người nhận *"
+                                        size="medium"
                                         value={form.shippingName}
                                         onChange={handleTextChange('shippingName')}
                                         error={!!errors.shippingName}
                                         helperText={errors.shippingName}
                                         sx={{
-                                            '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                                borderColor: '#d32f2f',
-                                            },
-                                            '& .MuiInputLabel-root.Mui-focused': { color: '#d32f2f' },
+                                            '& .MuiOutlinedInput-root': { borderRadius: '8px' },
+                                            '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#f5a623' },
+                                            '& .MuiInputLabel-root.Mui-focused': { color: '#1a1a2e' },
                                         }}
                                     />
                                 </Grid>
@@ -275,49 +265,46 @@ const CheckoutPage: React.FC = () => {
                                     <TextField
                                         fullWidth
                                         label="Số điện thoại *"
-                                        size="small"
+                                        size="medium"
                                         value={form.shippingPhone}
                                         onChange={handleTextChange('shippingPhone')}
                                         error={!!errors.shippingPhone}
                                         helperText={errors.shippingPhone}
                                         inputProps={{ inputMode: 'tel' }}
                                         sx={{
-                                            '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                                borderColor: '#d32f2f',
-                                            },
-                                            '& .MuiInputLabel-root.Mui-focused': { color: '#d32f2f' },
+                                            '& .MuiOutlinedInput-root': { borderRadius: '8px' },
+                                            '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#f5a623' },
+                                            '& .MuiInputLabel-root.Mui-focused': { color: '#1a1a2e' },
                                         }}
                                     />
                                 </Grid>
                                 <Grid size={{ xs: 12 }}>
                                     <TextField
                                         fullWidth
-                                        label="Địa chỉ giao hàng *"
-                                        size="small"
+                                        label="Địa chỉ nhận hàng chi tiết *"
+                                        size="medium"
                                         value={form.shippingAddress}
                                         onChange={handleTextChange('shippingAddress')}
                                         error={!!errors.shippingAddress}
                                         helperText={errors.shippingAddress}
                                         placeholder="Số nhà, tên đường, phường/xã..."
                                         sx={{
-                                            '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                                borderColor: '#d32f2f',
-                                            },
-                                            '& .MuiInputLabel-root.Mui-focused': { color: '#d32f2f' },
+                                            '& .MuiOutlinedInput-root': { borderRadius: '8px' },
+                                            '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#f5a623' },
+                                            '& .MuiInputLabel-root.Mui-focused': { color: '#1a1a2e' },
                                         }}
                                     />
                                 </Grid>
                                 <Grid size={{ xs: 12, sm: 6 }}>
-                                    <FormControl fullWidth size="small">
-                                        <InputLabel>Tỉnh / Thành phố</InputLabel>
+                                    <FormControl fullWidth size="medium">
+                                        <InputLabel sx={{ '&.Mui-focused': { color: '#1a1a2e' } }}>Tỉnh / Thành phố</InputLabel>
                                         <Select
                                             value={form.provinceCode}
                                             onChange={handleSelectChange('provinceCode')}
                                             label="Tỉnh / Thành phố"
                                             sx={{
-                                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                                    borderColor: '#d32f2f',
-                                                },
+                                                borderRadius: '8px',
+                                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#f5a623' },
                                             }}
                                         >
                                             {PROVINCES.map(p => (
@@ -332,17 +319,16 @@ const CheckoutPage: React.FC = () => {
                                     <TextField
                                         fullWidth
                                         label="Ghi chú đơn hàng"
-                                        size="small"
+                                        size="medium"
                                         multiline
-                                        rows={2}
+                                        rows={3}
                                         value={form.note}
                                         onChange={handleTextChange('note')}
-                                        placeholder="Ghi chú thêm cho người giao hàng..."
+                                        placeholder="Ghi chú thêm cho người giao hàng (nếu có)..."
                                         sx={{
-                                            '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                                borderColor: '#d32f2f',
-                                            },
-                                            '& .MuiInputLabel-root.Mui-focused': { color: '#d32f2f' },
+                                            '& .MuiOutlinedInput-root': { borderRadius: '8px' },
+                                            '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#f5a623' },
+                                            '& .MuiInputLabel-root.Mui-focused': { color: '#1a1a2e' },
                                         }}
                                     />
                                 </Grid>
@@ -352,11 +338,11 @@ const CheckoutPage: React.FC = () => {
                         {/* Payment Methods */}
                         <Paper
                             elevation={0}
-                            sx={{ borderRadius: 3, p: 3, border: '1px solid #f0f0f0' }}
+                            sx={{ borderRadius: '12px', p: 3, border: '1px solid #eef0f2', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}
                         >
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2.5 }}>
-                                <Security sx={{ color: '#d32f2f', fontSize: 22 }} />
-                                <Typography variant="h6" fontWeight={700}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 3 }}>
+                                <Security sx={{ color: '#1a1a2e', fontSize: 22 }} />
+                                <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#1a1a2e' }}>
                                     Phương thức thanh toán
                                 </Typography>
                             </Box>
@@ -369,27 +355,27 @@ const CheckoutPage: React.FC = () => {
                                         sx={{
                                             display: 'flex',
                                             alignItems: 'center',
-                                            gap: 1.5,
-                                            p: 1.5,
-                                            mb: 1,
-                                            borderRadius: 2,
+                                            gap: 2,
+                                            p: 2,
+                                            mb: 1.5,
+                                            borderRadius: '8px',
                                             border: form.paymentMethod === opt.value
-                                                ? '1.5px solid #d32f2f'
-                                                : '1.5px solid #e0e0e0',
-                                            bgcolor: form.paymentMethod === opt.value ? '#ffebee' : '#fff',
+                                                ? '2px solid #f5a623'
+                                                : '1px solid #eef0f2',
+                                            bgcolor: form.paymentMethod === opt.value ? 'rgba(245, 166, 35, 0.05)' : '#ffffff',
                                             cursor: 'pointer',
-                                            transition: 'all 0.15s ease',
-                                            '&:hover': { borderColor: '#d32f2f', bgcolor: '#fff5f5' },
+                                            transition: 'all 0.2s ease',
+                                            '&:hover': { borderColor: '#f5a623', bgcolor: 'rgba(245, 166, 35, 0.03)' },
                                         }}
                                     >
                                         <Radio
                                             value={opt.value}
-                                            size="small"
-                                            sx={{ '&.Mui-checked': { color: '#d32f2f' }, p: 0 }}
+                                            size="medium"
+                                            sx={{ '&.Mui-checked': { color: '#f5a623' }, p: 0 }}
                                         />
-                                        <Typography fontSize={22}>{opt.icon}</Typography>
+                                        <Typography fontSize={24}>{opt.icon}</Typography>
                                         <Box sx={{ flex: 1 }}>
-                                            <Typography variant="body2" fontWeight={600}>
+                                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#1a1a2e' }}>
                                                 {opt.label}
                                             </Typography>
                                             <Typography variant="caption" color="text.secondary">
@@ -397,7 +383,7 @@ const CheckoutPage: React.FC = () => {
                                             </Typography>
                                         </Box>
                                         {form.paymentMethod === opt.value && (
-                                            <CheckCircleOutline sx={{ color: '#d32f2f', fontSize: 20 }} />
+                                            <CheckCircleOutline sx={{ color: '#f5a623', fontSize: 22 }} />
                                         )}
                                     </Box>
                                 ))}
@@ -405,34 +391,35 @@ const CheckoutPage: React.FC = () => {
                         </Paper>
                     </Grid>
 
-                    {/* ── RIGHT: Summary ── */}
+                    {/* ── RIGHT: Summary Box ── */}
                     <Grid size={{ xs: 12, md: 5 }}>
                         <Paper
                             elevation={0}
                             sx={{
-                                borderRadius: 3,
-                                border: '1px solid #f0f0f0',
+                                borderRadius: '12px',
+                                border: '1px solid #eef0f2',
                                 position: 'sticky',
-                                top: 80,
+                                top: 100,
                                 overflow: 'hidden',
+                                boxShadow: '0 8px 30px rgba(26,26,46,0.04)'
                             }}
                         >
-                            {/* Order items header (collapsible on mobile) */}
+                            {/* Order summary header */}
                             <Box
                                 sx={{
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'space-between',
                                     px: 3,
-                                    py: 2,
-                                    bgcolor: '#fafafa',
-                                    borderBottom: '1px solid #f0f0f0',
+                                    py: 2.2,
+                                    bgcolor: '#f8f9fa',
+                                    borderBottom: '1px solid #eef0f2',
                                     cursor: { xs: 'pointer', md: 'default' },
                                 }}
                                 onClick={() => setOrderSummaryOpen(v => !v)}
                             >
-                                <Typography variant="h6" fontWeight={800}>
-                                    Đơn hàng ({totalItems} sản phẩm)
+                                <Typography variant="subtitle1" sx={{ fontFamily: '"Playfair Display", serif', fontWeight: 900, color: '#1a1a2e' }}>
+                                    Đơn hàng của bạn ({totalItems} sản phẩm)
                                 </Typography>
                                 <Box sx={{ display: { xs: 'flex', md: 'none' } }}>
                                     {orderSummaryOpen ? <ExpandLess /> : <ExpandMore />}
@@ -450,63 +437,63 @@ const CheckoutPage: React.FC = () => {
                             </Box>
 
                             {/* Price breakdown */}
-                            <Box sx={{ px: 3, py: 2.5 }}>
-                                {/* Free ship notice */}
+                            <Box sx={{ px: 3, py: 3 }}>
                                 <Box sx={{
-                                    p: 1.5,
-                                    borderRadius: 2,
-                                    mb: 2,
-                                    bgcolor: shipFee === 0 ? '#e8f5e9' : '#fff8e1',
+                                    p: 1.8,
+                                    borderRadius: '8px',
+                                    mb: 2.5,
+                                    bgcolor: shipFee === 0 ? 'rgba(46, 125, 50, 0.06)' : 'rgba(245, 166, 35, 0.08)',
                                     display: 'flex',
-                                    gap: 1,
+                                    gap: 1.2,
                                     alignItems: 'center',
                                 }}>
                                     <LocalShipping sx={{
                                         fontSize: 18,
-                                        color: shipFee === 0 ? '#2e7d32' : '#f57c00',
+                                        color: shipFee === 0 ? '#2e7d32' : '#db941e',
                                     }} />
                                     <Typography
                                         variant="caption"
-                                        color={shipFee === 0 ? '#2e7d32' : '#f57c00'}
-                                        fontWeight={600}
+                                        color={shipFee === 0 ? '#2e7d32' : '#db941e'}
+                                        sx={{ fontWeight: 700 }}
                                     >
                                         {shipFee === 0
-                                            ? '🎉 Bạn được miễn phí vận chuyển!'
-                                            : `Mua thêm ${fmt(FREE_SHIP - totalPrice)} để miễn phí ship`}
+                                            ? 'Ưu đãi: Miễn phí giao hàng toàn quốc!'
+                                            : `Mua thêm ${fmt(FREE_SHIP - totalPrice)} để được freeship`}
                                     </Typography>
                                 </Box>
 
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
                                     <Typography variant="body2" color="text.secondary">Tạm tính</Typography>
-                                    <Typography variant="body2" fontWeight={600}>{fmt(totalPrice)}</Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#1a1a2e' }}>{fmt(totalPrice)}</Typography>
                                 </Box>
+                                
                                 {discountAmount > 0 && (
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                                        <Typography variant="body2" color="#d32f2f">Giảm giá ({appliedPromotion?.code})</Typography>
-                                        <Typography variant="body2" fontWeight={600} color="#d32f2f">-{fmt(discountAmount)}</Typography>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
+                                        <Typography variant="body2" color="text.secondary">Mã giảm giá ({appliedPromotion?.code})</Typography>
+                                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#ff4d4f' }}>-{fmt(discountAmount)}</Typography>
                                     </Box>
                                 )}
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                                
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
                                     <Typography variant="body2" color="text.secondary">Phí vận chuyển</Typography>
                                     <Typography
                                         variant="body2"
-                                        fontWeight={600}
-                                        color={shipFee === 0 ? '#2e7d32' : 'text.primary'}
+                                        sx={{ fontWeight: 700, color: shipFee === 0 ? '#2e7d32' : '#1a1a2e' }}
                                     >
                                         {shipFee === 0 ? 'Miễn phí' : fmt(shipFee)}
                                     </Typography>
                                 </Box>
 
-                                <Divider sx={{ my: 1.5 }} />
+                                <Divider sx={{ my: 2.5, borderColor: '#eef0f2' }} />
 
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2.5 }}>
-                                    <Typography variant="body1" fontWeight={700}>Tổng cộng</Typography>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3.5 }}>
+                                    <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#1a1a2e' }}>Tổng cộng</Typography>
                                     <Box sx={{ textAlign: 'right' }}>
-                                        <Typography variant="h5" fontWeight={900} color="#d32f2f" lineHeight={1}>
+                                        <Typography variant="h5" sx={{ fontWeight: 900, color: '#1a1a2e', lineHeight: 1.1 }}>
                                             {fmt(finalPrice)}
                                         </Typography>
-                                        <Typography variant="caption" color="text.secondary">
-                                            Đã bao gồm VAT
+                                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                                            Đã bao gồm VAT & phí dịch vụ
                                         </Typography>
                                     </Box>
                                 </Box>
@@ -523,29 +510,31 @@ const CheckoutPage: React.FC = () => {
                                             : <ShoppingCart />
                                     }
                                     sx={{
-                                        bgcolor: '#d32f2f',
+                                        bgcolor: '#1a1a2e',
+                                        color: '#ffffff',
                                         textTransform: 'none',
-                                        fontWeight: 800,
-                                        py: 1.6,
-                                        fontSize: 15,
-                                        borderRadius: 2.5,
-                                        '&:hover': { bgcolor: '#b71c1c' },
-                                        '&:disabled': { bgcolor: '#e57373', color: '#fff' },
+                                        fontWeight: 700,
+                                        py: 1.8,
+                                        fontSize: '0.95rem',
+                                        borderRadius: '8px',
+                                        boxShadow: '0 4px 12px rgba(26,26,46,0.15)',
+                                        '&:hover': { bgcolor: '#f5a623', color: '#1a1a2e' },
+                                        '&:disabled': { bgcolor: '#f0f0f2', color: '#bbb' },
                                     }}
                                 >
-                                    {createOrder.isPending ? 'Đang xử lý...' : 'Đặt hàng ngay'}
+                                    {createOrder.isPending ? 'Đang xử lý đặt hàng...' : 'Xác nhận Đặt hàng'}
                                 </Button>
 
                                 <Box sx={{
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    gap: 0.5,
-                                    mt: 1.5,
+                                    gap: 0.8,
+                                    mt: 2,
                                 }}>
-                                    <Security sx={{ fontSize: 14, color: '#999' }} />
-                                    <Typography variant="caption" color="text.secondary">
-                                        Thanh toán được bảo mật 100%
+                                    <Lock sx={{ fontSize: 14, color: '#8c9ba5' }} />
+                                    <Typography variant="caption" sx={{ color: '#8c9ba5', fontWeight: 500 }}>
+                                        Mọi giao dịch được mã hóa bảo mật tuyệt đối
                                     </Typography>
                                 </Box>
                             </Box>
@@ -569,20 +558,20 @@ const OrderItemsList: React.FC<{ items: CartItemType[] }> = ({ items }) => (
                     sx={{
                         display: 'flex',
                         gap: 1.5,
-                        mb: 1.5,
-                        pb: 1.5,
-                        borderBottom: '1px solid #f5f5f5',
+                        mb: 2,
+                        pb: 2,
+                        borderBottom: '1px solid #eef0f2',
                         '&:last-child': { mb: 0, pb: 0, borderBottom: 'none' },
                     }}
                 >
                     <Box sx={{
                         width: 52,
                         height: 68,
-                        bgcolor: '#f9f9f9',
-                        borderRadius: 1.5,
+                        bgcolor: '#ffffff',
+                        borderRadius: '6px',
                         overflow: 'hidden',
                         flexShrink: 0,
-                        border: '1px solid #f0f0f0',
+                        border: '1px solid #eef0f2',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -602,7 +591,6 @@ const OrderItemsList: React.FC<{ items: CartItemType[] }> = ({ items }) => (
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Typography
                             variant="body2"
-                            fontWeight={600}
                             sx={{
                                 display: '-webkit-box',
                                 WebkitLineClamp: 2,
@@ -610,20 +598,20 @@ const OrderItemsList: React.FC<{ items: CartItemType[] }> = ({ items }) => (
                                 overflow: 'hidden',
                                 lineHeight: 1.4,
                                 mb: 0.5,
-                                fontSize: 12.5,
+                                fontSize: '0.8rem',
+                                fontWeight: 700,
+                                color: '#1a1a2e'
                             }}
                         >
                             {title}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                            x{item.qty}
+                            Số lượng: {item.qty}
                         </Typography>
                     </Box>
                     <Typography
                         variant="body2"
-                        fontWeight={700}
-                        color="#d32f2f"
-                        sx={{ flexShrink: 0, fontSize: 13 }}
+                        sx={{ flexShrink: 0, fontSize: '0.85rem', fontWeight: 800, color: '#1a1a2e' }}
                     >
                         {fmt(item.price * item.qty)}
                     </Typography>

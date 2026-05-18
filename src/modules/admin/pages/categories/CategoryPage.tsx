@@ -255,10 +255,11 @@ const CategoryFormDialog: React.FC<CategoryFormProps> = ({
                     sx={{
                         textTransform: 'none',
                         fontWeight: 700,
-                        bgcolor: '#1976d2',
+                        bgcolor: '#2563eb',
                         borderRadius: 1.5,
                         px: 3,
-                        '&:hover': { bgcolor: '#1565c0' },
+                        height: 36,
+                        '&:hover': { bgcolor: '#1d4ed8' },
                     }}
                 >
                     {saving ? 'Đang lưu...' : editData ? 'Cập nhật' : 'Tạo danh mục'}
@@ -319,10 +320,11 @@ const ToggleActiveDialog: React.FC<ConfirmDialogProps> = ({
                     textTransform: 'none',
                     fontWeight: 700,
                     borderRadius: 1.5,
-                    bgcolor: category?.isActive ? '#ef5350' : '#2e7d32',
+                    bgcolor: category?.isActive ? '#ef4444' : '#16a34a',
                     '&:hover': {
-                        bgcolor: category?.isActive ? '#d32f2f' : '#1b5e20',
+                        bgcolor: category?.isActive ? '#dc2626' : '#15803d',
                     },
+                    height: 36,
                 }}
             >
                 {loading ? 'Đang xử lý...' : category?.isActive ? 'Ẩn danh mục' : 'Kích hoạt'}
@@ -580,7 +582,7 @@ const CategoryPage: React.FC = () => {
                                 <IconButton
                                     size="small"
                                     onClick={() => handleOpenEdit(cat)}
-                                    sx={{ '&:hover': { color: '#1976d2', bgcolor: '#e3f2fd' } }}
+                                    sx={{ color: '#f59e0b', '&:hover': { bgcolor: '#fef3c7' } }}
                                 >
                                     <Edit sx={{ fontSize: 15 }} />
                                 </IconButton>
@@ -590,9 +592,9 @@ const CategoryPage: React.FC = () => {
                                     size="small"
                                     onClick={() => setToggleTarget(cat)}
                                     sx={{
+                                        color: cat.isActive ? '#ef4444' : '#22c55e',
                                         '&:hover': {
-                                            color: cat.isActive ? '#ef5350' : '#2e7d32',
-                                            bgcolor: cat.isActive ? '#ffebee' : '#e8f5e9',
+                                            bgcolor: cat.isActive ? '#fef2f2' : '#f0fdf4',
                                         },
                                     }}
                                 >
@@ -650,10 +652,12 @@ const CategoryPage: React.FC = () => {
                         startIcon={<Add />}
                         onClick={handleOpenCreate}
                         sx={{
-                            bgcolor: '#1976d2',
+                            bgcolor: '#2563eb',
                             textTransform: 'none',
                             fontWeight: 700,
-                            '&:hover': { bgcolor: '#1565c0' },
+                            borderRadius: 1.5,
+                            height: 40,
+                            '&:hover': { bgcolor: '#1d4ed8' },
                         }}
                     >
                         Thêm danh mục
@@ -745,10 +749,10 @@ const CategoryPage: React.FC = () => {
                                 borderRadius: 0,
                                 fontSize: 12,
                                 fontWeight: 600,
-                                bgcolor: filterActive === opt.value ? '#1976d2' : 'transparent',
+                                bgcolor: filterActive === opt.value ? '#2563eb' : 'transparent',
                                 color: filterActive === opt.value ? '#fff' : '#555',
                                 '&:hover': {
-                                    bgcolor: filterActive === opt.value ? '#1565c0' : '#f5f5f5',
+                                    bgcolor: filterActive === opt.value ? '#1d4ed8' : '#f5f5f5',
                                 },
                             }}
                         >

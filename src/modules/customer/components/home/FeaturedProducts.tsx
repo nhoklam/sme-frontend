@@ -1,237 +1,171 @@
-// src/modules/customer/components/home/FeaturedProducts.tsx
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Button, Typography, Skeleton, Tabs, Tab } from '@mui/material';
-import { ChevronLeft, ChevronRight, LocalFireDepartment, FiberNew } from '@mui/icons-material';
-import ProductCard from '../products/ProductCard';
-import { useFeaturedProducts, useNewArrivals } from '../../hooks/useProducts';
+import { Box, Typography, Grid, Tabs, Tab } from '@mui/material';
+import ProductCard from '../../../../components/common/ProductCard';
+import { useCartContext } from '../../../../store/CartContext';
 
-// ─── Section Header ───────────────────────────────────────────────────────────
-interface SectionHeaderProps {
-    title: string;
-    subtitle?: string;
-    icon?: React.ReactNode;
-    accentColor?: string;
-    onViewAll?: () => void;
-}
+// MOCK DATA for Featured Products
+const MOCK_PRODUCTS = [
+    {
+        id: '1',
+        title: 'Đắc Nhân Tâm (Khổ Lớn)',
+        author: 'Dale Carnegie',
+        coverImage: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?q=80&w=600&auto=format&fit=crop',
+        price: 86000,
+        originalPrice: 108000,
+        rating: 4.8,
+        reviewCount: 342,
+        badges: ['bestseller', 'sale'] as const,
+        discountPercent: 20,
+        category: 'Kỹ năng sống'
+    },
+    {
+        id: '2',
+        title: 'Nhà Giả Kim',
+        author: 'Paulo Coelho',
+        coverImage: 'https://images.unsplash.com/photo-1589829085413-56de8ae18c73?q=80&w=600&auto=format&fit=crop',
+        price: 79000,
+        rating: 4.9,
+        reviewCount: 1250,
+        badges: ['bestseller'] as const,
+        category: 'Văn học'
+    },
+    {
+        id: '3',
+        title: 'Tâm Lý Học Tội Phạm',
+        author: 'Stanton E. Samenow',
+        coverImage: 'https://images.unsplash.com/photo-1587876931567-564ce588bfbd?q=80&w=600&auto=format&fit=crop',
+        price: 135000,
+        originalPrice: 150000,
+        rating: 4.5,
+        reviewCount: 89,
+        badges: ['new'] as const,
+        category: 'Tâm lý học'
+    },
+    {
+        id: '4',
+        title: 'Dạy Con Làm Giàu (Tập 1)',
+        author: 'Robert T. Kiyosaki',
+        coverImage: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?q=80&w=600&auto=format&fit=crop',
+        price: 95000,
+        rating: 4.7,
+        reviewCount: 456,
+        badges: [] as const,
+        category: 'Kinh tế'
+    },
+    {
+        id: '5',
+        title: 'Nghệ Thuật Tinh Tế Của Việc Đếch Quan Tâm',
+        author: 'Mark Manson',
+        coverImage: 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?q=80&w=600&auto=format&fit=crop',
+        price: 85000,
+        originalPrice: 100000,
+        rating: 4.6,
+        reviewCount: 210,
+        badges: ['sale'] as const,
+        discountPercent: 15,
+        category: 'Kỹ năng sống'
+    },
+    {
+        id: '6',
+        title: 'Súng, Vi Trùng Và Thép',
+        author: 'Jared Diamond',
+        coverImage: 'https://images.unsplash.com/photo-1532012197267-da84d127e765?q=80&w=600&auto=format&fit=crop',
+        price: 180000,
+        rating: 4.9,
+        reviewCount: 520,
+        badges: [] as const,
+        category: 'Lịch sử & Địa lý'
+    },
+    {
+        id: '7',
+        title: 'Sapiens: Lược Sử Loài Người',
+        author: 'Yuval Noah Harari',
+        coverImage: 'https://images.unsplash.com/photo-1495640388908-05fa85288e61?q=80&w=600&auto=format&fit=crop',
+        price: 195000,
+        rating: 4.8,
+        reviewCount: 630,
+        badges: ['bestseller'] as const,
+        category: 'Lịch sử & Địa lý'
+    },
+    {
+        id: '8',
+        title: 'Hai Số Phận',
+        author: 'Jeffrey Archer',
+        coverImage: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?q=80&w=600&auto=format&fit=crop',
+        price: 120000,
+        rating: 4.7,
+        reviewCount: 150,
+        badges: ['out_of_stock'] as const,
+        category: 'Văn học'
+    }
+];
 
-const SectionHeader: React.FC<SectionHeaderProps> = ({
-    title, subtitle, icon, accentColor = '#e8401c', onViewAll,
-}) => (
-    <Box sx={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'flex-end',
-        mb: 0,
-        pb: 1.25,
-        borderBottom: `3px solid ${accentColor}`,
-        position: 'relative',
-    }}>
-        <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                {icon && (
-                    <Box sx={{ color: accentColor, display: 'flex', alignItems: 'center' }}>
-                        {icon}
-                    </Box>
-                )}
-                <Typography
-                    fontWeight={800}
-                    sx={{
-                        fontSize: 15,
-                        letterSpacing: '0.3px',
-                        color: '#1a1a1a',
-                        textTransform: 'uppercase',
-                        fontFamily: '"Segoe UI", sans-serif',
-                    }}
-                >
-                    {title}
-                </Typography>
-            </Box>
-            {subtitle && (
-                <Typography sx={{ fontSize: 12, color: '#888', mt: 0.25, fontFamily: '"Segoe UI", sans-serif' }}>
-                    {subtitle}
-                </Typography>
-            )}
-        </Box>
-        {onViewAll && (
-            <Typography
-                onClick={onViewAll}
-                sx={{
-                    fontSize: 12.5,
-                    fontWeight: 600,
-                    color: accentColor,
-                    cursor: 'pointer',
-                    mb: 0.25,
-                    fontFamily: '"Segoe UI", sans-serif',
-                    '&:hover': { textDecoration: 'underline' },
-                }}
-            >
-                Xem tất cả ›
-            </Typography>
-        )}
-    </Box>
-);
+const TABS = ['Tất cả', 'Văn học', 'Kinh tế', 'Kỹ năng sống'];
 
-// ─── Product Card Skeleton ─────────────────────────────────────────────────────
-const ProductCardSkeleton = () => (
-    <Box sx={{ width: 185, flexShrink: 0 }}>
-        <Skeleton variant="rectangular" width={185} height={185} sx={{ borderRadius: 1.5 }} />
-        <Box sx={{ pt: 1.25, px: 0.25 }}>
-            <Skeleton width="55%" height={13} sx={{ mb: 0.5 }} />
-            <Skeleton width="92%" height={17} sx={{ mb: 0.25 }} />
-            <Skeleton width="70%" height={17} sx={{ mb: 0.75 }} />
-            <Skeleton width="45%" height={20} sx={{ mb: 0.75 }} />
-            <Skeleton variant="rectangular" height={32} sx={{ borderRadius: 1.5 }} />
-        </Box>
-    </Box>
-);
+const FeaturedProducts = () => {
+    const navigate = useNavigate();
+    const { addToCart, openCart } = useCartContext();
+    const [activeTab, setActiveTab] = useState(0);
 
-// ─── Horizontal Scroll Row ─────────────────────────────────────────────────────
-interface HScrollProps {
-    products: any[];
-    isLoading: boolean;
-    skeletonCount?: number;
-}
-
-const HorizontalScroll: React.FC<HScrollProps> = ({ products, isLoading, skeletonCount = 6 }) => {
-    const scrollRef = useRef<HTMLDivElement>(null);
-
-    const scroll = (dir: 'left' | 'right') => {
-        if (scrollRef.current) {
-            scrollRef.current.scrollBy({
-                left: dir === 'left' ? -620 : 620,
-                behavior: 'smooth',
-            });
-        }
+    const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+        setActiveTab(newValue);
     };
 
-    return (
-        <Box sx={{ position: 'relative', mt: 1.5 }}>
-            {!isLoading && products.length > 5 && (
-                <>
-                    <Box
-                        onClick={() => scroll('left')}
-                        sx={{
-                            position: 'absolute', left: -14, top: '38%',
-                            transform: 'translateY(-50%)',
-                            zIndex: 3, width: 30, height: 30,
-                            bgcolor: '#fff', borderRadius: '50%',
-                            boxShadow: '0 2px 10px rgba(0,0,0,0.18)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            cursor: 'pointer', border: '1px solid #eee',
-                            '&:hover': {
-                                bgcolor: '#e8401c',
-                                borderColor: '#e8401c',
-                                '& svg': { color: '#fff' },
-                            },
-                            transition: 'all 0.15s',
-                        }}
-                    >
-                        <ChevronLeft sx={{ fontSize: 18, color: '#666', transition: 'color 0.15s' }} />
-                    </Box>
-                    <Box
-                        onClick={() => scroll('right')}
-                        sx={{
-                            position: 'absolute', right: -14, top: '38%',
-                            transform: 'translateY(-50%)',
-                            zIndex: 3, width: 30, height: 30,
-                            bgcolor: '#fff', borderRadius: '50%',
-                            boxShadow: '0 2px 10px rgba(0,0,0,0.18)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            cursor: 'pointer', border: '1px solid #eee',
-                            '&:hover': {
-                                bgcolor: '#e8401c',
-                                borderColor: '#e8401c',
-                                '& svg': { color: '#fff' },
-                            },
-                            transition: 'all 0.15s',
-                        }}
-                    >
-                        <ChevronRight sx={{ fontSize: 18, color: '#666', transition: 'color 0.15s' }} />
-                    </Box>
-                </>
-            )}
+    const filteredProducts = activeTab === 0 
+        ? MOCK_PRODUCTS 
+        : MOCK_PRODUCTS.filter(p => p.category === TABS[activeTab]);
 
-            <Box
-                ref={scrollRef}
-                sx={{
-                    display: 'flex',
-                    gap: '10px',
-                    overflowX: 'auto',
-                    scrollbarWidth: 'none',
-                    '&::-webkit-scrollbar': { display: 'none' },
-                    pb: 1,
-                }}
-            >
-                {isLoading
-                    ? Array.from({ length: skeletonCount }).map((_, i) => (
-                        <ProductCardSkeleton key={i} />
-                    ))
-                    : products.map(p => (
-                        <Box key={p.id} sx={{ flexShrink: 0 }}>
-                            <ProductCard product={p} />
-                        </Box>
-                    ))
-                }
+    return (
+        <Box sx={{ mb: 6 }}>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, mb: 4, borderBottom: '1px solid var(--color-border)' }}>
+                <Typography variant="h3" sx={{ fontSize: { xs: '1.5rem', md: '2rem' }, mb: { xs: 2, md: 0 } }}>
+                    Sản Phẩm Bán Chạy
+                </Typography>
+                <Tabs 
+                    value={activeTab} 
+                    onChange={handleTabChange}
+                    variant="scrollable"
+                    scrollButtons="auto"
+                    sx={{ 
+                        '& .MuiTab-root': { textTransform: 'none', fontWeight: 600, fontSize: '1rem', minWidth: 100 },
+                        '& .Mui-selected': { color: 'var(--color-secondary) !important' },
+                        '& .MuiTabs-indicator': { backgroundColor: 'var(--color-secondary)' }
+                    }}
+                >
+                    {TABS.map((tab, idx) => (
+                        <Tab key={idx} label={tab} />
+                    ))}
+                </Tabs>
             </Box>
+
+            <Grid container spacing={3}>
+                {filteredProducts.map((product) => (
+                    <Grid size={{ xs: 6, sm: 4, md: 3 }} key={product.id} sx={{ display: 'flex' }}>
+                        <ProductCard 
+                            {...product}
+                            onAddToCart={() => {
+                                addToCart({
+                                    id: product.id,
+                                    title: product.title,
+                                    author: product.author,
+                                    price: product.price,
+                                    oldPrice: product.originalPrice || 0,
+                                    img: product.coverImage,
+                                    images: [product.coverImage],
+                                    stock: 50,
+                                    category: product.category,
+                                    categoryId: 'featured'
+                                });
+                                openCart();
+                            }}
+                            onQuickView={(id) => navigate(`/product/${id}`)}
+                            onToggleWishlist={(id, status) => console.log('Toggle wishlist:', id, status)}
+                        />
+                    </Grid>
+                ))}
+            </Grid>
         </Box>
-    );
-};
-
-// ─── Main Component ────────────────────────────────────────────────────────────
-const FeaturedProducts: React.FC = () => {
-    const navigate = useNavigate();
-    const { products: featured, isLoading: loadingFeatured } = useFeaturedProducts();
-    const { products: newArrivals, isLoading: loadingNew } = useNewArrivals();
-
-    return (
-        <>
-            {/* ── Best Sellers ── */}
-            <Box sx={{
-                mb: 2,
-                bgcolor: '#fff',
-                borderRadius: 1.5,
-                border: '1px solid #ececec',
-                p: 2,
-                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-            }}>
-                <SectionHeader
-                    title="Sách bán chạy"
-                    subtitle="Được mua nhiều nhất trong tuần"
-                    icon={<LocalFireDepartment sx={{ fontSize: 18 }} />}
-                    accentColor="#e8401c"
-                    onViewAll={() => navigate('/shop')}
-                />
-                <HorizontalScroll
-                    products={featured}
-                    isLoading={loadingFeatured}
-                    skeletonCount={6}
-                />
-            </Box>
-
-            {/* ── New Arrivals ── */}
-            <Box sx={{
-                mb: 2,
-                bgcolor: '#fff',
-                borderRadius: 1.5,
-                border: '1px solid #ececec',
-                p: 2,
-                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-            }}>
-                <SectionHeader
-                    title="Sách mới về"
-                    subtitle="Cập nhật mới nhất hôm nay"
-                    icon={<FiberNew sx={{ fontSize: 20 }} />}
-                    accentColor="#1565c0"
-                    onViewAll={() => navigate('/shop')}
-                />
-                <HorizontalScroll
-                    products={newArrivals.map((p: any) => ({ ...p, badge: 'Mới' }))}
-                    isLoading={loadingNew}
-                    skeletonCount={5}
-                />
-            </Box>
-        </>
     );
 };
 

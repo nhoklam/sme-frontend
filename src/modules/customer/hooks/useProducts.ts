@@ -1,5 +1,6 @@
 // src/modules/customer/hooks/useProducts.ts
 import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import productService from '../../../services/productService';
 import { mapToDisplayProduct, mapToDisplayProducts, DisplayProduct } from '../utils/productMapper';
 
@@ -37,8 +38,12 @@ export const useProducts = (params: UseProductsParams): UseProductsResult => {
         staleTime: 2 * 60 * 1000, // 2 phút
     });
 
+    const products = useMemo(() => {
+        return data ? mapToDisplayProducts(data.content) : [];
+    }, [data]);
+
     return {
-        products: data ? mapToDisplayProducts(data.content) : [],
+        products,
         totalElements: data?.totalElements ?? 0,
         totalPages: data?.totalPages ?? 0,
         currentPage: data?.page ?? 0,
@@ -78,8 +83,12 @@ export const useFeaturedProducts = () => {
         staleTime: 3 * 60 * 1000,
     });
 
+    const products = useMemo(() => {
+        return data ? mapToDisplayProducts(data.content) : [];
+    }, [data]);
+
     return {
-        products: data ? mapToDisplayProducts(data.content) : [],
+        products,
         isLoading,
         isError,
     };
@@ -95,8 +104,12 @@ export const useNewArrivals = () => {
         staleTime: 3 * 60 * 1000,
     });
 
+    const products = useMemo(() => {
+        return data ? mapToDisplayProducts(data.content) : [];
+    }, [data]);
+
     return {
-        products: data ? mapToDisplayProducts(data.content) : [],
+        products,
         isLoading,
         isError,
     };

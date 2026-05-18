@@ -22,6 +22,10 @@ export interface DisplayProduct {
     description: string;
     img: string;
     images: string[];
+    sku?: string;
+    isbnBarcode?: string;
+    weight?: number;
+    unit?: string;
 }
 
 /**
@@ -46,6 +50,10 @@ export const mapToDisplayProduct = (p: ProductResponse): DisplayProduct => ({
     description: p.description ?? '',
     img: p.imageUrl ?? '',
     images: p.imageUrls && p.imageUrls.length > 0 ? p.imageUrls : (p.imageUrl ? [p.imageUrl] : []),
+    sku: p.sku,
+    isbnBarcode: p.isbnBarcode,
+    weight: p.weight,
+    unit: p.unit,
 });
 
 /**

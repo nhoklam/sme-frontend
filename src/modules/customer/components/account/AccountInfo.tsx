@@ -5,7 +5,7 @@ import {
     DialogContent, DialogActions, Divider, Snackbar,
 } from '@mui/material';
 import { Save, Lock } from '@mui/icons-material';
-import authService from '../../../../services/authService';
+import customerAuthService from '../../../../services/customerAuthService';
 
 interface Props {
     user: {
@@ -41,7 +41,7 @@ const AccountInfo: React.FC<Props> = ({ user }) => {
         if (!user?.id) return;
         setSaving(true);
         try {
-            await authService.updateProfile(user.id, {
+            await customerAuthService.updateProfile({
                 fullName: form.fullName,
                 email: form.email,
                 phone: form.phone,
@@ -61,7 +61,7 @@ const AccountInfo: React.FC<Props> = ({ user }) => {
         setPwSaving(true);
         setPwError('');
         try {
-            await authService.changePassword(pw.current, pw.newPw);
+            await customerAuthService.changePassword(pw.current, pw.newPw);
             setPwOpen(false);
             setPw({ current: '', newPw: '', confirm: '' });
             setSnack({ open: true, msg: 'Đổi mật khẩu thành công!', type: 'success' });
@@ -182,4 +182,4 @@ const AccountInfo: React.FC<Props> = ({ user }) => {
     );
 };
 
-export default AccountInfo;
+export default AccountInfo;
