@@ -6,7 +6,30 @@ const axiosInstance = axios.create({
 
 axiosInstance.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('accessToken');
+    let token = localStorage.getItem('accessToken');
+    
+    // Check Admin auth
+    if (!token) {
+      const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
+      if (userStr) {
+        try {
+          const userObj = JSON.parse(userStr);
+          token = userObj.accessToken;
+        } catch (_) { }
+      }
+    }
+    
+    // Check Customer auth
+    if (!token) {
+      const customerStr = localStorage.getItem('customer_auth');
+      if (customerStr) {
+        try {
+          const customerObj = JSON.parse(customerStr);
+          token = customerObj.accessToken;
+        } catch (_) { }
+      }
+    }
+
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -19,7 +42,6 @@ axiosInstance.interceptors.request.use(
 
 axiosInstance.interceptors.response.use(
   (response) => {
-    // Nếu BE bọc sẵn trong ApiResponse, ta chỉ return data thực sự bên trong
     return response.data;
   },
   (error) => {
@@ -27,7 +49,13 @@ axiosInstance.interceptors.response.use(
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
-      window.location.href = '/login';
+      localStorage.removeItem('customer_auth');
+
+      if (window.location.pathname.startsWith('/admin')) {
+        window.location.href = '/admin/login';
+      } else {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }

@@ -8,6 +8,7 @@ import { mapToDisplayProduct, mapToDisplayProducts, DisplayProduct } from '../ut
 interface UseProductsParams {
     keyword?: string;
     categoryId?: string;
+    sortBy?: string;
     page?: number;
     size?: number;
 }
@@ -32,6 +33,7 @@ export const useProducts = (params: UseProductsParams): UseProductsResult => {
             keyword: params.keyword,
             categoryId: params.categoryId,
             isActive: true,
+            sortBy: params.sortBy,
             page: params.page ?? 0,
             size: params.size ?? 20,
         }),
@@ -112,5 +114,37 @@ export const useNewArrivals = () => {
         products,
         isLoading,
         isError,
+    };
+};
+
+export const usePriceHistory = (productId: string) => {
+    const { data, isLoading, isError, error } = useQuery({
+        queryKey: ['priceHistory', productId],
+        queryFn: () => productService.getPriceHistory(productId),
+        enabled: !!productId,
+    });
+
+    return {
+        history: data ?? [],
+        isLoading,
+        isError,
+        error: error as Error | null,
+    };
+};
+
+export const useProductReviews = (productId: string, page = 0, size = 10) => {
+    const { data, isLoading, isError, error } = useQuery({
+        queryKey: ['product_reviews', productId, page, size],
+        queryFn: () => productService.getReviews(productId, page, size),
+        enabled: !!productId,
+    });
+
+    return {
+        reviews: data?.content ?? [],
+        totalElements: data?.totalElements ?? 0,
+        totalPages: data?.totalPages ?? 0,
+        isLoading,
+        isError,
+        error: error as Error | null,
     };
 };

@@ -13,18 +13,13 @@ import {
     Star, CheckCircle, ZoomIn, Close,
     ArrowBackIos, ArrowForwardIos,
 } from '@mui/icons-material';
-import { useProductDetail, useProducts } from '../hooks/useProducts';
+import { useProductDetail, useProducts, useProductReviews } from '../hooks/useProducts';
 import { useCartContext } from '../../../store/CartContext';
 import { fmt, calcDiscount } from '../../../utils/constants';
 import ProductCard from '../../../components/common/ProductCard';
 
-const REVIEWS = [
-    { id: 1, name: 'Nguyễn Minh Tuấn', avatar: 'N', rating: 5, date: '15/03/2025', comment: 'Sách rất hay, nội dung sâu sắc và ý nghĩa. Giao hàng nhanh, đóng gói cẩn thận.' },
-    { id: 2, name: 'Trần Thị Lan', avatar: 'T', rating: 5, date: '10/03/2025', comment: 'Đọc xong thấy thay đổi tư duy rất nhiều. Cuốn sách này xứng đáng với danh tiếng của nó!' },
-    { id: 3, name: 'Lê Văn Hùng', avatar: 'L', rating: 4, date: '05/03/2025', comment: 'Nội dung tốt, dịch khá ổn. Bìa sách đẹp, giấy tốt. Trừ 1 sao vì ship hơi lâu.' },
-];
 const RATING_DIST = [
-    { stars: 5, count: 85 }, { stars: 4, count: 10 }, { stars: 3, count: 3 }, { stars: 2, count: 1 }, { stars: 1, count: 1 },
+    { stars: 5, count: 0 }, { stars: 4, count: 0 }, { stars: 3, count: 0 }, { stars: 2, count: 0 }, { stars: 1, count: 0 },
 ];
 
 const TabPanel = ({ children, value, index }: any) =>
@@ -126,6 +121,7 @@ const ProductDetailPage = () => {
     const [qty, setQty] = useState(1);
     const [fav, setFav] = useState(false);
     const [tab, setTab] = useState(0);
+    const [showFullDesc, setShowFullDesc] = useState(false);
 
     // Sách liên quan — lấy theo cùng categoryId
     const { products: relatedProducts } = useProducts({
@@ -134,7 +130,8 @@ const ProductDetailPage = () => {
     });
     const related = relatedProducts.filter(p => p.id !== product?.id).slice(0, 4);
 
-    const totalReviews = RATING_DIST.reduce((s, r) => s + r.count, 0);
+    // Lấy reviews thực tế
+    const { reviews, totalElements: totalReviews } = useProductReviews(id ?? '');
 
     if (isLoading) {
         return (
@@ -181,7 +178,12 @@ const ProductDetailPage = () => {
             <Container maxWidth="lg" sx={{ py: 3 }}>
                 <Breadcrumbs sx={{ mb: 3, fontSize: 13, '& .MuiBreadcrumbs-separator': { color: 'text.secondary' } }}>
                     <Link underline="hover" color="inherit" onClick={() => navigate('/')} sx={{ cursor: 'pointer', fontWeight: 500 }}>Trang chủ</Link>
-                    <Link underline="hover" color="inherit" onClick={() => navigate('/shop')} sx={{ cursor: 'pointer', fontWeight: 500 }}>
+                    <Link
+                        underline="hover"
+                        color="inherit"
+                        onClick={() => navigate(`/shop?category=${encodeURIComponent(product.category || '')}`)}
+                        sx={{ cursor: 'pointer', fontWeight: 500 }}
+                    >
                         {product.category || 'Sách'}
                     </Link>
                     <Typography fontSize={13} color="text.primary" fontWeight={600} noWrap sx={{ maxWidth: 260 }}>{product.title}</Typography>
@@ -248,8 +250,10 @@ const ProductDetailPage = () => {
                                     label="Chính hãng" size="small" sx={{ bgcolor: 'rgba(245, 166, 35, 0.08)', color: 'var(--color-secondary, #f5a623)', fontWeight: 600, fontSize: 11 }} />
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                     <Star sx={{ color: 'var(--color-secondary, #f5a623)', fontSize: 18 }} />
-                                    <Typography variant="body2" fontWeight={700}>4.8</Typography>
-                                    <Typography variant="body2" color="text.secondary">({totalReviews} đánh giá)</Typography>
+                                    <Typography variant="body2" fontWeight={700}>{product.rating?.toFixed(1) || '0.0'}</Typography>
+                                    <Typography variant="body2" color="text.secondary">({product.reviewCount || 0} đánh giá)</Typography>
+                                    <Typography variant="body2" color="text.secondary" sx={{ mx: 0.5 }}>|</Typography>
+                                    <Typography variant="body2" color="text.secondary">Đã bán {product.sold || 0}</Typography>
                                 </Box>
                             </Box>
 
@@ -286,7 +290,7 @@ const ProductDetailPage = () => {
                                     <Typography sx={{ px: 2.5, minWidth: 40, textAlign: 'center', fontWeight: 800, fontSize: 16 }}>{qty}</Typography>
                                     <IconButton size="small" onClick={() => setQty(Math.min(product.stock, qty + 1))} sx={{ bgcolor: '#f8f9fa', '&:hover': { bgcolor: '#edf2f7' } }}><Add fontSize="small" /></IconButton>
                                 </Box>
-                                <Typography variant="body2" color="text.secondary">(Có sẵn {product.stock} sản phẩm trong kho)</Typography>
+                                <Typography variant="body2" color="text.secondary">(Còn {product.stock})</Typography>
                             </Box>
 
                             <Box sx={{ display: 'flex', gap: 2.5, mb: 4, flexWrap: 'wrap' }}>
@@ -377,7 +381,6 @@ const ProductDetailPage = () => {
                                             <TableBody>
                                                 {[
                                                     ['Mã sản phẩm (SKU)', product.sku || 'Đang cập nhật'],
-                                                    ['Mã ISBN / Barcode', product.isbnBarcode || 'Đang cập nhật'],
                                                     ['Tác giả', product.author || 'Nhiều tác giả'],
                                                     ['Nhà xuất bản', product.publisher || 'Nhà Xuất Bản Trẻ'],
                                                     ['Năm xuất bản', product.year || '2024'],
@@ -396,9 +399,27 @@ const ProductDetailPage = () => {
                                 </Grid>
                                 <Grid size={{ xs: 12, md: 6 }}>
                                     <Typography variant="h6" fontWeight={700} sx={{ mb: 2.5, fontFamily: '"Playfair Display", serif', color: 'var(--color-primary, #0a192f)' }}>Giới thiệu sách</Typography>
-                                    <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.9, whiteSpace: 'pre-line' }}>
-                                        {product.description || 'Chưa có mô tả chi tiết cho cuốn sách này.'}
-                                    </Typography>
+                                    <Box>
+                                        <Typography variant="body1" color="text.secondary" sx={{ 
+                                            lineHeight: 1.9, 
+                                            whiteSpace: 'pre-line',
+                                            display: '-webkit-box',
+                                            WebkitLineClamp: showFullDesc ? 'unset' : 6,
+                                            WebkitBoxOrient: 'vertical',
+                                            overflow: 'hidden'
+                                        }}>
+                                            {product.description || 'Chưa có mô tả chi tiết cho cuốn sách này.'}
+                                        </Typography>
+                                        {product.description && product.description.length > 300 && (
+                                            <Button 
+                                                onClick={() => setShowFullDesc(!showFullDesc)} 
+                                                sx={{ mt: 1, p: 0, textTransform: 'none', fontWeight: 600, color: 'var(--color-secondary, #f5a623)', '&:hover': { bgcolor: 'transparent', textDecoration: 'underline' } }}
+                                                disableRipple
+                                            >
+                                                {showFullDesc ? 'Thu gọn' : 'Xem thêm'}
+                                            </Button>
+                                        )}
+                                    </Box>
                                 </Grid>
                             </Grid>
                         </TabPanel>
@@ -407,25 +428,34 @@ const ProductDetailPage = () => {
                             <Grid container spacing={4}>
                                 <Grid size={{ xs: 12, md: 4 }}>
                                     <Box sx={{ textAlign: 'center', p: 4, bgcolor: 'rgba(245, 166, 35, 0.03)', border: '1px solid rgba(245, 166, 35, 0.12)', borderRadius: 3 }}>
-                                        <Typography variant="h2" fontWeight={900} color="var(--color-secondary, #f5a623)">4.8</Typography>
-                                        <Rating value={4.8} readOnly precision={0.1} sx={{ my: 1, color: 'var(--color-secondary, #f5a623)' }} />
-                                        <Typography variant="body2" color="text.secondary" fontWeight={500}>{totalReviews} đánh giá thực tế</Typography>
+                                        <Typography variant="h2" fontWeight={900} color="var(--color-secondary, #f5a623)">{product.rating?.toFixed(1) || '0.0'}</Typography>
+                                        <Rating value={product.rating || 0} readOnly precision={0.1} sx={{ my: 1, color: 'var(--color-secondary, #f5a623)' }} />
+                                        <Typography variant="body2" color="text.secondary" fontWeight={500}>{product.reviewCount || 0} đánh giá thực tế</Typography>
                                     </Box>
                                 </Grid>
                                 <Grid size={{ xs: 12, md: 8 }}>
-                                    {REVIEWS.map((r) => (
+                                    {reviews.length > 0 ? reviews.map((r: any) => (
                                         <Box key={r.id} sx={{ mb: 3, pb: 3, borderBottom: '1px solid #eef2f6', '&:last-child': { borderBottom: 'none', pb: 0 } }}>
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1.5 }}>
-                                                <Avatar sx={{ width: 40, height: 40, bgcolor: 'var(--color-primary, #0a192f)', fontSize: 15, fontWeight: 700 }}>{r.avatar}</Avatar>
+                                                <Avatar sx={{ width: 40, height: 40, bgcolor: 'var(--color-primary, #0a192f)', fontSize: 15, fontWeight: 700 }}>{r.customerName?.[0] || 'U'}</Avatar>
                                                 <Box>
-                                                    <Typography variant="body1" fontWeight={700} color="var(--color-primary, #0a192f)">{r.name}</Typography>
-                                                    <Typography variant="caption" color="text.secondary">{r.date}</Typography>
+                                                    <Typography variant="body1" fontWeight={700} color="var(--color-primary, #0a192f)">{r.customerName}</Typography>
+                                                    <Typography variant="caption" color="text.secondary">{new Date(r.createdAt).toLocaleDateString('vi-VN')}</Typography>
                                                 </Box>
                                                 <Rating value={r.rating} readOnly size="small" sx={{ ml: 'auto', color: 'var(--color-secondary, #f5a623)' }} />
                                             </Box>
-                                            <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.7 }}>{r.comment}</Typography>
+                                            <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.7, mb: r.imageUrls?.length ? 1.5 : 0 }}>{r.comment}</Typography>
+                                            {r.imageUrls && r.imageUrls.length > 0 && (
+                                                <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: 1 }}>
+                                                    {r.imageUrls.map((img: string, idx: number) => (
+                                                        <Box key={idx} component="img" src={img} alt="review image" sx={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 2, border: '1px solid #eef2f6' }} />
+                                                    ))}
+                                                </Box>
+                                            )}
                                         </Box>
-                                    ))}
+                                    )) : (
+                                        <Typography variant="body1" color="text.secondary">Chưa có đánh giá nào cho sản phẩm này.</Typography>
+                                    )}
                                 </Grid>
                             </Grid>
                         </TabPanel>

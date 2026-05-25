@@ -33,7 +33,7 @@ export const productApi = {
     });
   },
 
-  createReview: async (productId: string, data: { orderId: string; rating: number; comment?: string }) => {
+  createReview: async (productId: string, data: { orderId: string; rating: number; comment?: string; imageUrls?: string[] }) => {
     return axiosInstance.post<any, ApiResponse<ProductReview>>(`/products/${productId}/reviews`, data);
   }
 };

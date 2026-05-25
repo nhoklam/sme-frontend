@@ -109,7 +109,6 @@ const CategoryDropdown: React.FC = () => {
                                             bgcolor: isHovered ? 'rgba(245, 166, 35, 0.06)' : 'transparent',
                                             color: isHovered ? '#f5a623' : '#1a1a2e',
                                             borderLeft: isHovered ? '4px solid #f5a623' : '4px solid transparent',
-                                            // Dịch chuyển nhẹ padding để bù đắp viền trái, tránh bị lệch chữ
                                             paddingLeft: isHovered ? '16px' : '20px',
                                             '&:hover': {
                                                 bgcolor: 'rgba(245, 166, 35, 0.08)',

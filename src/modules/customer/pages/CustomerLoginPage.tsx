@@ -18,14 +18,14 @@ import {
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import GoogleIcon from '@mui/icons-material/Google';
-import LocalLibraryIcon from '@mui/icons-material/LocalLibrary';
+import AutoStoriesIcon from '@mui/icons-material/AutoStories';
 import customerAuthService from '../../../services/customerAuthService';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 
 const CustomerLoginPage: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    
+
     // Check if we came from somewhere, to redirect back
     const from = (location.state as any)?.from?.pathname || '/';
 
@@ -82,58 +82,125 @@ const CustomerLoginPage: React.FC = () => {
         setError(null);
     };
 
+    const textFieldStyle = {
+        '& .MuiOutlinedInput-root': {
+            color: '#1a1a2e',
+            backgroundColor: '#f9fafc',
+            borderRadius: '8px',
+            transition: 'all 0.3s ease',
+            '& fieldset': { borderColor: 'rgba(0, 0, 0, 0.12)' },
+            '&:hover fieldset': { borderColor: 'rgba(245, 166, 35, 0.5)' },
+            '&.Mui-focused fieldset': { borderColor: '#f5a623', boxShadow: '0 0 8px rgba(245, 166, 35, 0.15)' },
+        },
+        '& .MuiInputLabel-root': {
+            color: 'rgba(26, 26, 46, 0.6)',
+            fontSize: '14px',
+            '&.Mui-focused': { color: '#f5a623' },
+        },
+        '& .MuiFormHelperText-root': {
+            color: 'rgba(26, 26, 46, 0.5)',
+        }
+    };
+
     return (
-        <Box sx={{ 
-            minHeight: 'calc(100vh - 130px)', 
-            display: 'flex', 
-            alignItems: 'center', 
+        <Box sx={{
+            minHeight: 'calc(100vh - 130px)',
+            display: 'flex',
+            alignItems: 'center',
             justifyContent: 'center',
-            background: 'linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%)',
-            py: 4
+            background: 'radial-gradient(circle at 50% 50%, #fcfcfe 0%, #f4f5f8 100%)',
+            py: 6,
+            px: 2,
+            position: 'relative',
+            overflow: 'hidden',
+            '&::before': {
+                content: '""',
+                position: 'absolute',
+                top: '20%',
+                left: '20%',
+                width: '300px',
+                height: '300px',
+                background: 'radial-gradient(circle, rgba(245, 166, 35, 0.05) 0%, rgba(0,0,0,0) 70%)',
+                zIndex: 0,
+            },
+            '&::after': {
+                content: '""',
+                position: 'absolute',
+                bottom: '20%',
+                right: '20%',
+                width: '300px',
+                height: '300px',
+                background: 'radial-gradient(circle, rgba(245, 166, 35, 0.03) 0%, rgba(0,0,0,0) 70%)',
+                zIndex: 0,
+            }
         }}>
-            <Container maxWidth="xs">
-                <Fade in={true} timeout={800}>
-                    <Paper 
-                        elevation={16} 
+            <Container maxWidth="xs" sx={{ zIndex: 1, position: 'relative' }}>
+                <Fade in={true} timeout={1000}>
+                    <Paper
+                        elevation={24}
                         sx={{
-                            borderRadius: 3,
+                            borderRadius: '16px',
                             overflow: 'hidden',
                             bgcolor: '#ffffff',
+                            border: '1px solid rgba(0, 0, 0, 0.06)',
+                            boxShadow: '0 12px 40px rgba(0, 0, 0, 0.08)',
                             display: 'flex',
-                            flexDirection: 'column'
+                            flexDirection: 'column',
+                            color: '#1a1a2e',
+                            p: 1
                         }}
                     >
-                        {/* Header Area - Minimalist & Elegant */}
-                        <Box sx={{ pt: 4, pb: 1, px: 3, textAlign: 'center' }}>
-                            <LocalLibraryIcon sx={{ fontSize: 48, color: '#d32f2f', mb: 1 }} />
-                            <Typography variant="h5" fontWeight="800" color="#2c3e50" sx={{ letterSpacing: 0.5 }}>
-                                SME Bookstore
+                        {/* Header Area - Premium Bookly Branding */}
+                        <Box sx={{ pt: 4, pb: 2, px: 3, textAlign: 'center' }}>
+                            <Box sx={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: 64,
+                                height: 64,
+                                borderRadius: '50%',
+                                background: 'linear-gradient(135deg, rgba(245, 166, 35, 0.15) 0%, rgba(245, 166, 35, 0.03) 100%)',
+                                border: '1px solid rgba(245, 166, 35, 0.3)',
+                                mb: 2,
+                                boxShadow: '0 4px 12px rgba(245, 166, 35, 0.1)',
+                            }}>
+                                <AutoStoriesIcon sx={{ fontSize: 32, color: '#f5a623' }} />
+                            </Box>
+                            <Typography variant="h5" fontWeight="800" sx={{
+                                letterSpacing: '1.5px',
+                                color: '#1a1a2e',
+                                textTransform: 'uppercase'
+                            }}>
+                                Bookly Store
                             </Typography>
-                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                                Khám phá kho tàng tri thức
+                            <Typography variant="body2" sx={{ color: 'rgba(26, 26, 46, 0.6)', mt: 0.5, fontWeight: 400 }}>
+                                Khám phá tinh hoa tri thức & văn hóa
                             </Typography>
                         </Box>
 
-                        <Tabs 
-                            value={tabIndex} 
-                            onChange={handleTabChange} 
+                        <Tabs
+                            value={tabIndex}
+                            onChange={handleTabChange}
                             variant="fullWidth"
-                            textColor="primary"
-                            indicatorColor="primary"
                             sx={{
-                                borderBottom: 1, 
-                                borderColor: 'divider',
-                                '& .MuiTab-root': { 
-                                    textTransform: 'none', 
+                                borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
+                                px: 2,
+                                '& .MuiTab-root': {
+                                    textTransform: 'none',
                                     fontWeight: 600,
                                     fontSize: 15,
-                                    color: '#7f8c8d'
+                                    color: 'rgba(26, 26, 46, 0.5)',
+                                    transition: 'all 0.3s ease',
+                                    py: 2
                                 },
-                                '& .Mui-selected': { 
-                                    color: '#d32f2f !important' 
+                                '& .Mui-selected': {
+                                    color: '#f5a623 !important',
+                                    fontWeight: 700
                                 },
                                 '& .MuiTabs-indicator': {
-                                    backgroundColor: '#d32f2f'
+                                    backgroundColor: '#f5a623',
+                                    height: '2px',
+                                    boxShadow: '0 2px 8px rgba(245, 166, 35, 0.4)'
                                 }
                             }}
                         >
@@ -141,26 +208,26 @@ const CustomerLoginPage: React.FC = () => {
                             <Tab label="Đăng ký" />
                         </Tabs>
 
-                        <Box sx={{ p: 3, pt: 4 }}>
-                            <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                
+                        <Box sx={{ p: 3, pt: 3.5 }}>
+                            <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+
                                 <Collapse in={!isLogin} unmountOnExit timeout={400}>
-                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
                                         <TextField
                                             required={!isLogin}
                                             fullWidth
-                                            size="small"
                                             label="Họ và tên"
                                             value={fullName}
                                             onChange={(e) => setFullName(e.target.value)}
+                                            sx={textFieldStyle}
                                         />
                                         <TextField
                                             fullWidth
-                                            size="small"
                                             label="Email (Tùy chọn)"
                                             type="email"
                                             value={email}
                                             onChange={(e) => setEmail(e.target.value)}
+                                            sx={textFieldStyle}
                                         />
                                     </Box>
                                 </Collapse>
@@ -168,16 +235,16 @@ const CustomerLoginPage: React.FC = () => {
                                 <TextField
                                     required
                                     fullWidth
-                                    size={isLogin ? "medium" : "small"}
                                     label="Số điện thoại"
                                     value={phone}
                                     onChange={(e) => setPhone(e.target.value)}
                                     placeholder="VD: 0987654321"
+                                    sx={textFieldStyle}
                                 />
+
                                 <TextField
                                     required
                                     fullWidth
-                                    size={isLogin ? "medium" : "small"}
                                     label="Mật khẩu"
                                     type={showPassword ? 'text' : 'password'}
                                     value={password}
@@ -188,31 +255,38 @@ const CustomerLoginPage: React.FC = () => {
                                                 <IconButton
                                                     onClick={() => setShowPassword(!showPassword)}
                                                     edge="end"
+                                                    sx={{ color: 'rgba(26, 26, 46, 0.4)', '&:hover': { color: '#f5a623' } }}
                                                 >
                                                     {showPassword ? <VisibilityOff /> : <Visibility />}
                                                 </IconButton>
                                             </InputAdornment>
                                         ),
                                     }}
+                                    sx={textFieldStyle}
                                 />
 
                                 <Collapse in={!!error}>
-                                    <Typography color="error" variant="body2" sx={{ mt: 0, textAlign: 'center', fontWeight: 500 }}>
+                                    <Typography color="#d32f2f" variant="body2" sx={{ textAlign: 'center', fontWeight: 500 }}>
                                         {error}
                                     </Typography>
                                 </Collapse>
 
                                 <Collapse in={isLogin}>
                                     <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: -1 }}>
-                                        <Typography 
-                                            variant="body2" 
-                                            component={Link} 
+                                        <Typography
+                                            variant="body2"
+                                            component={Link}
                                             to="/forgot-password"
-                                            sx={{ 
-                                                color: '#d32f2f', 
+                                            sx={{
+                                                color: 'rgba(26, 26, 46, 0.6)',
                                                 textDecoration: 'none',
                                                 fontWeight: 500,
-                                                '&:hover': { textDecoration: 'underline' }
+                                                fontSize: '13px',
+                                                transition: 'color 0.2s',
+                                                '&:hover': {
+                                                    color: '#f5a623',
+                                                    textDecoration: 'underline'
+                                                }
                                             }}
                                         >
                                             Quên mật khẩu?
@@ -225,42 +299,60 @@ const CustomerLoginPage: React.FC = () => {
                                     fullWidth
                                     variant="contained"
                                     disabled={loading}
-                                    sx={{ 
-                                        mt: 1, 
-                                        py: 1.2, 
-                                        fontWeight: 700, 
+                                    sx={{
+                                        mt: 1,
+                                        py: 1.5,
+                                        fontWeight: 700,
                                         fontSize: 16,
-                                        borderRadius: 2,
+                                        borderRadius: '8px',
                                         textTransform: 'none',
-                                        bgcolor: '#d32f2f',
-                                        boxShadow: '0 4px 10px rgba(211,47,47,0.2)',
+                                        background: 'linear-gradient(135deg, #f5a623 0%, #d48b10 100%)',
+                                        color: '#0c0c16',
+                                        boxShadow: '0 4px 15px rgba(245, 166, 35, 0.2)',
+                                        transition: 'all 0.3s ease',
                                         '&:hover': {
-                                            bgcolor: '#b71c1c',
-                                            boxShadow: '0 6px 14px rgba(211,47,47,0.3)',
+                                            background: 'linear-gradient(135deg, #ffb83d 0%, #e0951a 100%)',
+                                            boxShadow: '0 6px 20px rgba(245, 166, 35, 0.3)',
+                                            transform: 'translateY(-1px)'
+                                        },
+                                        '&:active': {
+                                            transform: 'translateY(1px)'
+                                        },
+                                        '&.Mui-disabled': {
+                                            background: 'rgba(0, 0, 0, 0.12)',
+                                            color: 'rgba(0, 0, 0, 0.26)'
                                         }
                                     }}
                                 >
-                                    {loading ? <CircularProgress size={24} color="inherit" /> : (isLogin ? 'Đăng nhập' : 'Tạo tài khoản')}
+                                    {loading ? <CircularProgress size={24} sx={{ color: '#0c0c16' }} /> : (isLogin ? 'Đăng nhập' : 'Tạo tài khoản')}
                                 </Button>
 
-                                <Divider sx={{ my: 1, color: 'text.secondary', fontSize: 13, '&::before, &::after': { borderColor: '#eeeeee' } }}>
+                                <Divider sx={{
+                                    my: 1,
+                                    color: 'rgba(26, 26, 46, 0.4)',
+                                    fontSize: 12,
+                                    fontWeight: 500,
+                                    '&::before, &::after': { borderColor: 'rgba(0,0,0,0.06)' }
+                                }}>
                                     HOẶC
                                 </Divider>
 
                                 <Button
                                     fullWidth
                                     variant="outlined"
-                                    startIcon={<GoogleIcon />}
-                                    sx={{ 
-                                        py: 1, 
-                                        borderRadius: 2, 
-                                        textTransform: 'none', 
+                                    startIcon={<GoogleIcon sx={{ color: '#4285F4' }} />}
+                                    sx={{
+                                        py: 1.2,
+                                        borderRadius: '8px',
+                                        textTransform: 'none',
                                         fontWeight: 600,
-                                        color: '#424242',
-                                        borderColor: '#e0e0e0',
+                                        color: '#1a1a2e',
+                                        borderColor: 'rgba(0, 0, 0, 0.15)',
+                                        transition: 'all 0.3s',
                                         '&:hover': {
-                                            bgcolor: '#f5f5f5',
-                                            borderColor: '#bdbdbd'
+                                            bgcolor: 'rgba(0, 0, 0, 0.03)',
+                                            borderColor: 'rgba(245, 166, 35, 0.5)',
+                                            color: '#f5a623'
                                         }
                                     }}
                                     onClick={() => alert('Tính năng đăng nhập Google đang được phát triển')}

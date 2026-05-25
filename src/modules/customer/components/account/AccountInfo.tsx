@@ -7,17 +7,21 @@ import {
 import { Save, Lock } from '@mui/icons-material';
 import customerAuthService from '../../../../services/customerAuthService';
 
+import { Select, MenuItem, FormControl, InputLabel } from '@mui/material';
+
 interface Props {
     user: {
         id?: string;
         fullName?: string;
         email?: string;
-        phone?: string;
+        phoneNumber?: string;
+        gender?: string;
+        dateOfBirth?: string;
     };
 }
 
 const AccountInfo: React.FC<Props> = ({ user }) => {
-    const [form, setForm] = useState({ fullName: '', email: '', phone: '' });
+    const [form, setForm] = useState({ fullName: '', email: '', phoneNumber: '', gender: '', dateOfBirth: '' });
     const [saving, setSaving] = useState(false);
     const [snack, setSnack] = useState<{ open: boolean; msg: string; type: 'success' | 'error' }>({ open: false, msg: '', type: 'success' });
 
@@ -32,7 +36,9 @@ const AccountInfo: React.FC<Props> = ({ user }) => {
             setForm({
                 fullName: user.fullName || '',
                 email: user.email || '',
-                phone: user.phone || '',
+                phoneNumber: user.phoneNumber || '',
+                gender: user.gender || '',
+                dateOfBirth: user.dateOfBirth || '',
             });
         }
     }, [user]);
@@ -44,7 +50,9 @@ const AccountInfo: React.FC<Props> = ({ user }) => {
             await customerAuthService.updateProfile({
                 fullName: form.fullName,
                 email: form.email,
-                phone: form.phone,
+                phoneNumber: form.phoneNumber,
+                gender: form.gender,
+                dateOfBirth: form.dateOfBirth,
             });
             setSnack({ open: true, msg: 'Cập nhật thông tin thành công!', type: 'success' });
         } catch {
@@ -73,7 +81,7 @@ const AccountInfo: React.FC<Props> = ({ user }) => {
     };
 
     return (
-        <Box>
+        <Box sx={{ maxWidth: 800, mx: 'auto' }}>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 3 }}>
                 Thông tin cá nhân
             </Typography>
@@ -81,6 +89,7 @@ const AccountInfo: React.FC<Props> = ({ user }) => {
             <Grid container spacing={3}>
                 <Grid size={{ xs: 12, md: 6 }}>
                     <TextField
+                        size="small"
                         fullWidth label="Họ và tên"
                         value={form.fullName}
                         onChange={e => setForm(f => ({ ...f, fullName: e.target.value }))}
@@ -89,6 +98,7 @@ const AccountInfo: React.FC<Props> = ({ user }) => {
                 </Grid>
                 <Grid size={{ xs: 12, md: 6 }}>
                     <TextField
+                        size="small"
                         fullWidth label="Email"
                         value={form.email}
                         onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
@@ -97,10 +107,37 @@ const AccountInfo: React.FC<Props> = ({ user }) => {
                 </Grid>
                 <Grid size={{ xs: 12, md: 6 }}>
                     <TextField
+                        size="small"
                         fullWidth label="Số điện thoại"
-                        value={form.phone}
-                        onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                        value={form.phoneNumber}
+                        onChange={e => setForm(f => ({ ...f, phoneNumber: e.target.value }))}
                         variant="outlined" inputProps={{ inputMode: 'tel' }}
+                    />
+                </Grid>
+                <Grid size={{ xs: 12, md: 6 }}>
+                    <FormControl fullWidth variant="outlined" size="small">
+                        <InputLabel>Giới tính</InputLabel>
+                        <Select
+                            value={form.gender}
+                            onChange={e => setForm(f => ({ ...f, gender: e.target.value }))}
+                            label="Giới tính"
+                        >
+                            <MenuItem value=""><em>Không xác định</em></MenuItem>
+                            <MenuItem value="MALE">Nam</MenuItem>
+                            <MenuItem value="FEMALE">Nữ</MenuItem>
+                            <MenuItem value="OTHER">Khác</MenuItem>
+                        </Select>
+                    </FormControl>
+                </Grid>
+                <Grid size={{ xs: 12, md: 6 }}>
+                    <TextField
+                        size="small"
+                        fullWidth label="Ngày sinh"
+                        type="date"
+                        value={form.dateOfBirth}
+                        onChange={e => setForm(f => ({ ...f, dateOfBirth: e.target.value }))}
+                        variant="outlined"
+                        slotProps={{ inputLabel: { shrink: true } }}
                     />
                 </Grid>
                 <Grid size={{ xs: 12 }}>

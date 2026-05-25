@@ -5,14 +5,15 @@ import {
     TableCell, TableContainer, TableHead, TableRow,
     Chip, Dialog, DialogTitle, DialogContent, DialogActions,
     TextField, Grid, IconButton, Avatar, Card, CardContent,
-    Skeleton, Divider, InputAdornment
+    Skeleton, Divider, InputAdornment, Select, MenuItem, FormControl
 } from '@mui/material';
-import { 
+import {
     AccessTime, PlayArrow, Stop, Search, FilterList,
-    AttachMoney, LocalAtm, AccountBalanceWallet, 
-    Close, MoreVert
+    AttachMoney, LocalAtm, AccountBalanceWallet,
+    Close, MoreVert, CheckCircleOutline
 } from '@mui/icons-material';
 import shiftService, { PosShift } from '../../../../services/shiftService';
+import authService from '../../../../services/authService';
 import toast from 'react-hot-toast';
 
 const fmt = (n: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n ?? 0);
@@ -40,19 +41,24 @@ export default function ShiftListPage() {
     const [shifts, setShifts] = useState<PosShift[]>([]);
     const [loading, setLoading] = useState(true);
     const [keyword, setKeyword] = useState('');
-    
+
+    const currentUser = authService.getCurrentUser()?.user;
+    const isAdmin = currentUser?.role === 'ROLE_ADMIN';
+
     const [openModal, setOpenModal] = useState(false);
     const [actionType, setActionType] = useState<'OPEN' | 'CLOSE'>('OPEN');
     const [selectedShift, setSelectedShift] = useState<PosShift | null>(null);
     const [cashAmount, setCashAmount] = useState<string>('');
     const [note, setNote] = useState('');
 
+    const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
+
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
-            const data = await shiftService.getAll({ page: 0, size: 50 });
-            // data is now a PageResponse or List depending on implementation, but I mapped it to ShiftResponse[] in service
-            setShifts(Array.isArray(data) ? data : (data as any).content || []);
+            const data = await shiftService.getAll({ page: 0, size: 50, warehouseId: selectedWarehouseId || undefined });
+            const content = (data as any)?.content || (Array.isArray(data) ? data : []);
+            setShifts(content);
         } catch (e) {
             toast.error('Không thể tải danh sách ca làm việc');
             setShifts([]);
@@ -77,12 +83,27 @@ export default function ShiftListPage() {
         setOpenModal(true);
     };
 
+    const handleApproveShift = async (shift: PosShift) => {
+        try {
+            await shiftService.approveShift(shift.id);
+            toast.success('Đã duyệt ca thành công!');
+            loadData();
+        } catch (e: any) {
+            toast.error(e.response?.data?.message || 'Có lỗi xảy ra khi duyệt.');
+        }
+    };
+
     const handleSubmit = async () => {
         try {
             if (actionType === 'OPEN') {
-                await shiftService.openShift('W01', Number(cashAmount));
+                await shiftService.openShift(currentUser?.warehouseId || 'W01', Number(cashAmount));
                 toast.success('Mở ca làm việc thành công!');
             } else {
+                const diff = (selectedShift?.theoreticalCash || 0) - Number(cashAmount);
+                if (diff !== 0 && (!note || note.trim() === '')) {
+                    toast.error('Bắt buộc phải nhập ghi chú khi có chênh lệch tiền mặt!');
+                    return;
+                }
                 await shiftService.closeShift(selectedShift!.id, Number(cashAmount), note);
                 toast.success('Đã đóng ca và gửi yêu cầu đối soát!');
             }
@@ -108,47 +129,49 @@ export default function ShiftListPage() {
                         Theo dõi dòng tiền mặt, doanh thu theo ca và đối soát cuối ngày
                     </Typography>
                 </Box>
-                <Button 
-                    variant="contained" 
-                    startIcon={<PlayArrow />} 
-                    onClick={handleOpenShift}
-                    sx={{ 
-                        bgcolor: '#1976d2', fontWeight: 700, px: 2.5, py: 1, 
-                        borderRadius: 2, textTransform: 'none', boxShadow: '0 4px 12px rgba(25,118,210,0.2)'
-                    }}
-                >
-                    Mở Ca Mới
-                </Button>
+                {!isAdmin && (
+                    <Button
+                        variant="contained"
+                        startIcon={<PlayArrow />}
+                        onClick={handleOpenShift}
+                        sx={{
+                            bgcolor: '#1976d2', fontWeight: 700, px: 2.5, py: 1,
+                            borderRadius: 2, textTransform: 'none', boxShadow: '0 4px 12px rgba(25,118,210,0.2)'
+                        }}
+                    >
+                        Mở Ca Mới
+                    </Button>
+                )}
             </Box>
 
             {/* Stats */}
             <Grid container spacing={2.5} sx={{ mb: 4 }}>
                 <Grid size={{ xs: 12, sm: 4 }}>
-                    <ShiftStatCard 
-                        title="Ca đang hoạt động" 
-                        value={activeShifts} 
+                    <ShiftStatCard
+                        title="Ca đang hoạt động"
+                        value={activeShifts}
                         sub="Số thu ngân đang trong phiên bán hàng"
-                        icon={<AccessTime />} 
+                        icon={<AccessTime />}
                         color="#1976d2"
                         loading={loading}
                     />
                 </Grid>
                 <Grid size={{ xs: 12, sm: 4 }}>
-                    <ShiftStatCard 
-                        title="Doanh thu tổng" 
-                        value={fmt(totalRevenue)} 
+                    <ShiftStatCard
+                        title="Doanh thu tổng"
+                        value={fmt(totalRevenue)}
                         sub="Tổng doanh số ghi nhận từ tất cả các ca"
-                        icon={<AttachMoney />} 
+                        icon={<AttachMoney />}
                         color="#2e7d32"
                         loading={loading}
                     />
                 </Grid>
                 <Grid size={{ xs: 12, sm: 4 }}>
-                    <ShiftStatCard 
-                        title="Tổng chênh lệch" 
-                        value={fmt(shifts.reduce((s, i) => s + (i.discrepancyAmount || 0), 0))} 
+                    <ShiftStatCard
+                        title="Tổng chênh lệch"
+                        value={fmt(shifts.reduce((s, i) => s + (i.discrepancyAmount || 0), 0))}
                         sub="Tổng số tiền chênh lệch đối soát"
-                        icon={<LocalAtm />} 
+                        icon={<LocalAtm />}
                         color="#d32f2f"
                         loading={loading}
                     />
@@ -159,8 +182,23 @@ export default function ShiftListPage() {
             <Paper elevation={0} sx={{ borderRadius: 3, border: '1px solid #f0f0f0', overflow: 'hidden' }}>
                 <Box sx={{ p: 2, borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Box sx={{ display: 'flex', gap: 1 }}>
-                        <TextField 
-                            size="small" placeholder="Tìm thu ngân..." 
+                        {isAdmin && (
+                            <FormControl size="small" sx={{ width: 200 }}>
+                                <Select
+                                    value={selectedWarehouseId}
+                                    onChange={(e) => setSelectedWarehouseId(e.target.value)}
+                                    displayEmpty
+                                    sx={{ borderRadius: 2, bgcolor: '#f9fafb' }}
+                                >
+                                    <MenuItem value="">Tất cả chi nhánh</MenuItem>
+                                    {currentUser?.warehouses?.map((w: any) => (
+                                        <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        )}
+                        <TextField
+                            size="small" placeholder="Tìm thu ngân..."
                             value={keyword} onChange={e => setKeyword(e.target.value)}
                             sx={{ width: 240, '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: '#f9fafb' } }}
                             slotProps={{
@@ -177,7 +215,7 @@ export default function ShiftListPage() {
                         HIỂN THỊ {shifts.length} PHIÊN LÀM VIỆC
                     </Typography>
                 </Box>
-                
+
                 <TableContainer>
                     <Table>
                         <TableHead>
@@ -209,11 +247,11 @@ export default function ShiftListPage() {
                                         <TableCell>
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                                                 <Avatar sx={{ width: 32, height: 32, bgcolor: '#e3f2fd', color: '#1976d2', fontSize: 13, fontWeight: 700 }}>
-                                                    {s.cashierId.slice(-2)}
+                                                    {(s.cashierName || s.cashierId || '?').charAt(0).toUpperCase()}
                                                 </Avatar>
                                                 <Box>
-                                                    <Typography variant="body2" fontWeight={700} color="#1a1a2e">{s.cashierId}</Typography>
-                                                    <Typography variant="caption" color="text.secondary">Kho: {s.warehouseId}</Typography>
+                                                    <Typography variant="body2" fontWeight={700} color="#1a1a2e">{s.cashierName || s.cashierId}</Typography>
+                                                    <Typography variant="caption" color="text.secondary">{s.warehouseName || s.warehouseId}</Typography>
                                                 </Box>
                                             </Box>
                                         </TableCell>
@@ -241,35 +279,45 @@ export default function ShiftListPage() {
                                             </Typography>
                                         </TableCell>
                                         <TableCell align="center">
-                                            <Chip 
-                                                label={s.status === 'OPEN' ? 'Đang mở' : s.status === 'APPROVED' ? 'Đã duyệt' : 'Chờ duyệt'} 
+                                            <Chip
+                                                label={s.status === 'OPEN' ? 'Đang mở' : s.status === 'MANAGER_APPROVED' ? 'Đã duyệt' : 'Chờ duyệt'}
                                                 size="small"
-                                                sx={{ 
+                                                sx={{
                                                     fontWeight: 800, fontSize: 10,
-                                                    bgcolor: s.status === 'OPEN' ? '#e8f5e9' : s.status === 'APPROVED' ? '#e3f2fd' : '#fff3e0',
-                                                    color: s.status === 'OPEN' ? '#2e7d32' : s.status === 'APPROVED' ? '#1976d2' : '#ed6c02',
+                                                    bgcolor: s.status === 'OPEN' ? '#e8f5e9' : s.status === 'MANAGER_APPROVED' ? '#e3f2fd' : '#fff3e0',
+                                                    color: s.status === 'OPEN' ? '#2e7d32' : s.status === 'MANAGER_APPROVED' ? '#1976d2' : '#ed6c02',
                                                     border: '1px solid',
-                                                    borderColor: s.status === 'OPEN' ? '#c8e6c9' : s.status === 'APPROVED' ? '#bbdefb' : '#ffe0b2'
+                                                    borderColor: s.status === 'OPEN' ? '#c8e6c9' : s.status === 'MANAGER_APPROVED' ? '#bbdefb' : '#ffe0b2'
                                                 }}
                                             />
                                         </TableCell>
                                         <TableCell align="center">
                                             <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5 }}>
-                                                <Button 
+                                                <Button
                                                     size="small" variant="outlined" disableElevation
                                                     onClick={() => navigate(`/admin/shifts/${s.id}`)}
-                                                    sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, fontSize: 12 }}
+                                                    sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, fontSize: 11, minWidth: 0, px: 1.5, py: 0.5 }}
                                                 >
                                                     Chi tiết
                                                 </Button>
-                                                {s.status === 'OPEN' && (
-                                                    <Button 
+                                                {s.status === 'OPEN' && !isAdmin && (
+                                                    <Button
                                                         size="small" variant="contained" color="error" disableElevation
                                                         startIcon={<Stop sx={{ fontSize: 14 }} />}
                                                         onClick={(e) => { e.stopPropagation(); handleCloseShift(s); }}
-                                                        sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, fontSize: 12 }}
+                                                        sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, fontSize: 11, minWidth: 0, px: 1.5, py: 0.5 }}
                                                     >
                                                         Đóng ca
+                                                    </Button>
+                                                )}
+                                                {s.status === 'CLOSED' && isAdmin && (
+                                                    <Button
+                                                        size="small" variant="contained" color="primary" disableElevation
+                                                        startIcon={<CheckCircleOutline sx={{ fontSize: 14 }} />}
+                                                        onClick={(e) => { e.stopPropagation(); handleApproveShift(s); }}
+                                                        sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, fontSize: 11, minWidth: 0, px: 1.5, py: 0.5 }}
+                                                    >
+                                                        Duyệt
                                                     </Button>
                                                 )}
                                             </Box>
@@ -298,7 +346,7 @@ export default function ShiftListPage() {
                             <Typography variant="h5" fontWeight={900} color="#1976d2">{fmt(selectedShift.theoreticalCash)}</Typography>
                         </Box>
                     )}
-                    
+
                     <Typography variant="caption" fontWeight={700} color="#555" display="block" mb={1}>
                         {actionType === 'OPEN' ? 'SỐ TIỀN MẶT ĐẦU CA (VỐN):' : 'KIỂM KÊ TIỀN MẶT THỰC TẾ TRONG KÉT:'}
                     </Typography>
@@ -313,7 +361,7 @@ export default function ShiftListPage() {
                         }}
                         sx={{ mb: 2, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
                     />
-                    
+
                     {actionType === 'CLOSE' && (
                         <>
                             <Typography variant="caption" fontWeight={700} color="#555" display="block" mb={1}>GHI CHÚ CHÊNH LỆCH:</Typography>
@@ -328,13 +376,13 @@ export default function ShiftListPage() {
                 </DialogContent>
                 <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
                     <Button onClick={() => setOpenModal(false)} sx={{ textTransform: 'none', fontWeight: 700, color: '#888' }}>Hủy</Button>
-                    <Button 
-                        variant="contained" 
+                    <Button
+                        variant="contained"
                         fullWidth
                         color={actionType === 'OPEN' ? 'success' : 'error'}
-                        onClick={handleSubmit} 
+                        onClick={handleSubmit}
                         disabled={!cashAmount}
-                        sx={{ 
+                        sx={{
                             textTransform: 'none', fontWeight: 900, borderRadius: 2, py: 1,
                             bgcolor: actionType === 'OPEN' ? '#2e7d32' : '#d32f2f'
                         }}

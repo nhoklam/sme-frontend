@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
     Card, CardMedia, CardContent, Typography, Box, 
-    IconButton, Button, Skeleton, Chip, useTheme
+    IconButton, Skeleton, Chip, useTheme
 } from '@mui/material';
-import { ShoppingCartOutlined, VisibilityOutlined, Star, FavoriteBorder, Favorite } from '@mui/icons-material';
+import { ShoppingCartOutlined, FavoriteBorder, Favorite } from '@mui/icons-material';
 
 export interface ProductCardProps {
     id: string;
@@ -13,8 +13,8 @@ export interface ProductCardProps {
     coverImage: string;
     price: number;
     originalPrice?: number;
-    rating: number;
-    reviewCount: number;
+    rating?: number;
+    reviewCount?: number;
     badges?: ReadonlyArray<'bestseller' | 'new' | 'sale' | 'out_of_stock'>;
     discountPercent?: number;
     isLoading?: boolean;
@@ -25,8 +25,8 @@ export interface ProductCardProps {
 
 const ProductCard: React.FC<ProductCardProps> = ({
     id, title, author, coverImage, price, originalPrice, 
-    rating, reviewCount, badges = [], discountPercent, 
-    isLoading = false, onAddToCart, onQuickView, onToggleWishlist
+    badges = [], discountPercent, 
+    isLoading = false, onAddToCart, onToggleWishlist
 }) => {
     const theme = useTheme();
     const navigate = useNavigate();
@@ -50,19 +50,19 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
     if (isLoading) {
         return (
-            <Card sx={{ width: '100%', borderRadius: '12px', boxShadow: 'none', border: '1px solid var(--color-border)' }}>
-                <Skeleton variant="rectangular" sx={{ width: '100%', paddingTop: '150%' }} />
-                <CardContent>
-                    <Skeleton variant="text" height={24} width="80%" />
-                    <Skeleton variant="text" height={20} width="60%" />
-                    <Skeleton variant="text" height={24} width="40%" sx={{ mt: 2 }} />
+            <Card sx={{ width: '100%', borderRadius: '8px', boxShadow: 'none', border: '1px solid #f0f0f0' }}>
+                <Skeleton variant="rectangular" sx={{ width: '100%', paddingTop: '120%' }} />
+                <CardContent sx={{ p: 1.5 }}>
+                    <Skeleton variant="text" height={20} width="80%" />
+                    <Skeleton variant="text" height={16} width="60%" />
+                    <Skeleton variant="text" height={24} width="50%" sx={{ mt: 1 }} />
                 </CardContent>
             </Card>
         );
     }
 
     const isOutOfStock = badges.includes('out_of_stock');
-    const fallbackImage = 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=500&auto=format&fit=crop&q=80';
+    const fallbackImage = 'https://placehold.co/300x400/f8f8f8/999?text=📚';
     const displayImage = imgError || !coverImage ? fallbackImage : coverImage;
 
     return (
@@ -72,44 +72,45 @@ const ProductCard: React.FC<ProductCardProps> = ({
             onClick={handleCardClick}
             sx={{ 
                 width: '100%', 
-                position: 'relative',
+                height: '100%',
                 display: 'flex',
                 flexDirection: 'column',
-                height: '100%',
+                position: 'relative',
                 cursor: 'pointer',
-                borderRadius: '12px',
+                borderRadius: '8px',
                 border: '1px solid transparent',
-                transition: 'all 0.3s ease',
+                boxShadow: 'none',
+                transition: 'all 0.2s ease',
+                bgcolor: '#fff',
                 '&:hover': {
-                    borderColor: 'var(--color-border)',
-                    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.08)',
-                    transform: 'translateY(-4px)',
+                    borderColor: '#f0f0f0',
+                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
+                    transform: 'translateY(-2px)',
                 }
             }}
         >
-            {/* Badges */}
-            <Box sx={{ position: 'absolute', top: 12, left: 12, display: 'flex', flexDirection: 'column', gap: 1, zIndex: 2 }}>
-                {badges.includes('bestseller') && <Chip label="Bán chạy" size="small" sx={{ bgcolor: theme.palette.error.main, color: 'white', fontWeight: 600, fontSize: '0.7rem' }} />}
-                {badges.includes('new') && <Chip label="Mới" size="small" sx={{ bgcolor: theme.palette.success.main, color: 'white', fontWeight: 600, fontSize: '0.7rem' }} />}
-                {badges.includes('sale') && discountPercent && <Chip label={`-${discountPercent}%`} size="small" sx={{ bgcolor: theme.palette.warning.main, color: 'white', fontWeight: 600, fontSize: '0.7rem' }} />}
-                {isOutOfStock && <Chip label="Hết hàng" size="small" sx={{ bgcolor: theme.palette.grey[600], color: 'white', fontWeight: 600, fontSize: '0.7rem' }} />}
+            {/* Top Badges */}
+            <Box sx={{ position: 'absolute', top: 8, left: 8, display: 'flex', flexDirection: 'column', gap: 0.5, zIndex: 2 }}>
+                {badges.includes('bestseller') && <Chip label="Bán chạy" size="small" sx={{ bgcolor: theme.palette.error.main, color: 'white', fontWeight: 700, fontSize: '0.65rem', height: 20 }} />}
+                {badges.includes('new') && <Chip label="Mới" size="small" sx={{ bgcolor: theme.palette.success.main, color: 'white', fontWeight: 700, fontSize: '0.65rem', height: 20 }} />}
+                {isOutOfStock && <Chip label="Hết hàng" size="small" sx={{ bgcolor: theme.palette.grey[600], color: 'white', fontWeight: 700, fontSize: '0.65rem', height: 20 }} />}
             </Box>
 
             {/* Wishlist Icon */}
             <IconButton 
                 onClick={handleWishlistClick}
                 sx={{ 
-                    position: 'absolute', top: 8, right: 8, zIndex: 2, 
-                    bgcolor: 'rgba(255,255,255,0.85)',
-                    '&:hover': { bgcolor: 'white' }
+                    position: 'absolute', top: 4, right: 4, zIndex: 2, 
+                    color: isWishlisted ? 'var(--color-error)' : '#ccc',
+                    '&:hover': { color: 'var(--color-error)', bgcolor: 'rgba(255,255,255,0.9)' }
                 }}
                 size="small"
             >
-                {isWishlisted ? <Favorite color="error" fontSize="small" /> : <FavoriteBorder fontSize="small" color="action" />}
+                {isWishlisted ? <Favorite fontSize="small" /> : <FavoriteBorder fontSize="small" />}
             </IconButton>
 
-            {/* Image Container (2:3 aspect ratio) */}
-            <Box sx={{ position: 'relative', width: '100%', paddingTop: '150%', overflow: 'hidden', bgcolor: '#ffffff' }}>
+            {/* Image Container */}
+            <Box sx={{ position: 'relative', width: '100%', paddingTop: '110%', overflow: 'hidden', bgcolor: '#f8f8f8', borderRadius: '8px 8px 0 0' }}>
                 <CardMedia
                     component="img"
                     image={displayImage}
@@ -118,95 +119,85 @@ const ProductCard: React.FC<ProductCardProps> = ({
                     sx={{
                         position: 'absolute',
                         top: 0, left: 0, width: '100%', height: '100%',
-                        objectFit: 'contain', // Đảm bảo bìa sách không bị xén
-                        padding: '12px',      // Khoảng thở để bìa sách trọn vẹn
-                        transition: 'transform 0.4s ease',
-                        transform: isHovered ? 'scale(1.04)' : 'scale(1)',
-                        opacity: isOutOfStock ? 0.5 : 1
+                        objectFit: 'contain',
+                        padding: '16px',
+                        transition: 'transform 0.3s ease',
+                        transform: isHovered ? 'scale(1.03)' : 'scale(1)',
+                        opacity: isOutOfStock ? 0.6 : 1
                     }}
                 />
-                
-                {/* Quick View Overlay */}
-                <Box sx={{
-                    position: 'absolute',
-                    bottom: 0, left: 0, width: '100%',
-                    bgcolor: 'rgba(255,255,255,0.95)',
-                    transform: isHovered ? 'translateY(0)' : 'translateY(100%)',
-                    transition: 'transform 0.3s ease',
-                    display: 'flex', justifyContent: 'center', p: 1, zIndex: 2
-                }}>
-                    <Button 
-                        startIcon={<VisibilityOutlined />} 
-                        variant="text" 
-                        color="primary"
-                        fullWidth
-                        onClick={(e) => { e.stopPropagation(); if(onQuickView) onQuickView(id); }}
-                    >
-                        Xem nhanh
-                    </Button>
-                </Box>
             </Box>
 
-            <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', p: 2, '&:last-child': { pb: 2 } }}>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5, fontSize: '0.8rem' }}>
+            <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                {/* Author */}
+                <Typography variant="body2" sx={{ color: '#888', fontSize: '0.75rem', mb: 0.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {author}
                 </Typography>
                 
+                {/* Title */}
                 <Typography 
-                    variant="h6" 
                     sx={{ 
-                        fontSize: '1rem', 
-                        lineHeight: 1.3, 
+                        fontSize: '0.85rem', 
+                        fontWeight: 600,
+                        lineHeight: 1.4, 
                         mb: 1,
+                        color: '#333',
                         display: '-webkit-box',
                         WebkitLineClamp: 2,
                         WebkitBoxOrient: 'vertical',
                         overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        height: '2.6em' // Fixed height for 2 lines
+                        height: '2.8em' // 2 lines
                     }}
                 >
                     {title}
                 </Typography>
 
-                {/* Rating */}
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5, gap: 0.5 }}>
-                    <Star sx={{ color: theme.palette.secondary.main, fontSize: '1rem' }} />
-                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.85rem' }}>{rating.toFixed(1)}</Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem' }}>({reviewCount})</Typography>
-                </Box>
-
-                <Box sx={{ mt: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', minHeight: '48px' }}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                        <Typography variant="subtitle1" color="primary" sx={{ fontWeight: 700, lineHeight: 1.2, mt: 0.5 }}>
-                            {formatPrice(price)}
-                        </Typography>
-                        {originalPrice && originalPrice > price ? (
-                            <Typography variant="body2" color="text.secondary" sx={{ textDecoration: 'line-through', fontSize: '0.8rem', mt: 0.5, lineHeight: 1 }}>
+                {/* Price Row (AlphaBooks style) */}
+                <Box sx={{ mt: 'auto', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
+                    {/* Current Price */}
+                    <Typography sx={{ color: '#C92127', fontWeight: 800, fontSize: '0.95rem' }}>
+                        {formatPrice(price)}
+                    </Typography>
+                    
+                    {/* Original Price & Discount */}
+                    {originalPrice && originalPrice > price && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                            <Typography sx={{ color: '#999', fontSize: '0.75rem', textDecoration: 'line-through' }}>
                                 {formatPrice(originalPrice)}
                             </Typography>
-                        ) : (
-                            <Typography variant="body2" sx={{ visibility: 'hidden', fontSize: '0.8rem', mt: 0.5, lineHeight: 1 }}>
-                                0
-                            </Typography>
-                        )}
-                    </Box>
-                    <IconButton 
-                        color="primary" 
-                        sx={{ 
-                            bgcolor: theme.palette.primary.main, 
-                            color: 'white',
-                            '&:hover': { bgcolor: theme.palette.primary.light },
-                            '&.Mui-disabled': { bgcolor: theme.palette.action.disabledBackground }
-                        }}
-                        size="small"
-                        disabled={isOutOfStock}
-                        onClick={(e) => { e.stopPropagation(); if(onAddToCart) onAddToCart(id); }}
-                    >
-                        <ShoppingCartOutlined fontSize="small" />
-                    </IconButton>
+                            {discountPercent && (
+                                <Box sx={{ 
+                                    bgcolor: '#FF9800', color: '#fff', fontSize: '0.65rem', fontWeight: 700, 
+                                    px: 0.6, py: 0.2, borderRadius: '4px', lineHeight: 1.2 
+                                }}>
+                                    -{discountPercent}%
+                                </Box>
+                            )}
+                        </Box>
+                    )}
                 </Box>
             </CardContent>
+
+            {/* Hover Add to Cart Overlay */}
+            <Box sx={{
+                position: 'absolute', bottom: -1, right: -1,
+                opacity: isHovered && !isOutOfStock ? 1 : 0,
+                transform: isHovered ? 'translateY(0)' : 'translateY(10px)',
+                transition: 'all 0.2s ease',
+            }}>
+                <IconButton 
+                    onClick={(e) => { e.stopPropagation(); if(onAddToCart) onAddToCart(id); }}
+                    sx={{ 
+                        bgcolor: '#C92127', color: 'white',
+                        borderRadius: '16px 0 8px 0',
+                        width: 36, height: 36,
+                        '&:hover': { bgcolor: '#A91B20' },
+                        boxShadow: '-2px -2px 8px rgba(0,0,0,0.1)'
+                    }}
+                >
+                    <ShoppingCartOutlined sx={{ fontSize: 18 }} />
+                </IconButton>
+            </Box>
         </Card>
     );
 };

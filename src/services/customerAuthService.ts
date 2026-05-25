@@ -16,7 +16,11 @@ const customerAuthService = {
     },
 
     register: async (data: any) => {
-        const response = await axiosInstance.post('/auth/customer/register', data);
+        const sanitizedData = {
+            ...data,
+            email: data.email && data.email.trim() ? data.email.trim() : null
+        };
+        const response = await axiosInstance.post('/auth/customer/register', sanitizedData);
         return response.data;
     },
 

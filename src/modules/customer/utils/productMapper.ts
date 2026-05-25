@@ -13,6 +13,7 @@ export interface DisplayProduct {
     price: number;
     oldPrice: number;
     rating: number;
+    reviewCount: number;
     sold: number;
     stock: number;
     pages: number;
@@ -35,15 +36,16 @@ export interface DisplayProduct {
 export const mapToDisplayProduct = (p: ProductResponse): DisplayProduct => ({
     id: p.id,
     title: p.name,
-    author: '',               // backend chưa có
-    publisher: '',            // backend chưa có
+    author: (p as any).authorId ? 'Tác giả' : '', // Might need author name, but for now map it if possible
+    publisher: (p as any).publisher ?? '',
     year: p.createdAt ? new Date(p.createdAt).getFullYear() : new Date().getFullYear(),
     price: p.retailPrice,
-    oldPrice: 0,              // backend chưa có
-    rating: 0,                // backend chưa có
-    sold: 0,                  // backend chưa có
+    oldPrice: (p as any).coverPrice ?? 0,
+    rating: (p as any).averageRating ?? 0,
+    reviewCount: (p as any).totalReviews ?? 0,
+    sold: (p as any).soldQuantity ?? 0,
     stock: p.availableQuantity ?? 0,
-    pages: 0,                 // backend chưa có
+    pages: (p as any).numberOfPages ?? 0,
     category: p.categoryName ?? '',
     categoryId: p.categoryId,
     badge: '',                // backend chưa có

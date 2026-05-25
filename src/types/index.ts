@@ -32,6 +32,19 @@ export interface AuthResponse {
   user: UserResponse;
 }
 
+export interface HomeBanner {
+  id: string;
+  imageUrl: string;
+  title?: string;
+  subtitle?: string;
+  linkUrl?: string;
+  isActive: boolean;
+  sortOrder: number;
+  bannerType: 'HERO' | 'PROMO' | 'CATEGORY';
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface UserResponse {
   id: string;
   username: string;
@@ -76,6 +89,7 @@ export interface Warehouse {
   address?: string;
   phone?: string;
   managerId?: string;
+  warehouseType?: 'MAIN' | 'BRANCH' | 'DROPSHIP';
   isActive: boolean;
   createdAt: string;
   updatedAt?: string;
@@ -133,6 +147,7 @@ export interface Customer {
   totalSpent: number;
   notes?: string;
   isActive: boolean;
+  avatarUrl?: string;
   createdAt: string;
   updatedAt?: string;
 }
@@ -183,6 +198,8 @@ export interface UpdateProductRequest {
   supplierId?: string | null;
   hasSupplierId?: boolean;
   name?: string;
+  isbnBarcode?: string;
+  sku?: string;
   description?: string;
   retailPrice?: number;
   wholesalePrice?: number;
@@ -318,6 +335,8 @@ export interface InternalTransfer {
   note?: string;
   dispatchedAt?: string;
   receivedAt?: string;
+  referenceOrderId?: string;
+  transferReason?: string;
   items: TransferItem[];
   createdAt: string;
 }
@@ -453,6 +472,8 @@ export interface OrderResponse {
   packedAt?: string;
   codReconciled: boolean;
   note?: string;
+  cashierName?: string;
+  createdByName?: string;
   createdAt: string;
   updatedAt?: string;
   items: OrderItemResponse[];
@@ -469,6 +490,7 @@ export interface OrderItemResponse {
   quantity: number;
   unitPrice: number;
   subtotal: number;
+  isReviewed?: boolean;
 }
 
 export interface OrderStatusHistoryResponse {
@@ -835,7 +857,7 @@ export interface HomeBanner {
   linkUrl?: string;
   buttonText?: string;
   sortOrder: number;
-  bannerType: 'HERO_SLIDER' | 'PROMOTION_BANNER' | 'CATEGORY_BANNER';
+  bannerType: 'HERO' | 'PROMO' | 'CATEGORY';
   isActive: boolean;
 }
 
@@ -846,7 +868,9 @@ export interface ProductReview {
   customerName: string;
   rating: number;
   comment?: string;
+  imageUrls?: string[];
   isVerifiedPurchase: boolean;
+  isApproved?: boolean;
   createdAt: string;
 }
 
@@ -862,11 +886,7 @@ export interface CustomerAddress {
   isDefault: boolean;
 }
 
-export interface WishlistItem {
-  wishlistId: string;
-  product: Product;
-  addedAt: string;
-}
+
 
 export interface RegisterRequest {
   phone: string;
@@ -921,6 +941,11 @@ export interface Promotion {
   // Aliases for backward compat in PromotionDialog
   type?: PromotionType;
   minOrderAmount?: number;
+  promotionSlot?: string;
+  applicableChannel?: string;
+  triggerType?: string;
+  conditionType?: string;
+  conditionValue?: string;
 }
 
-export type PromotionType = 'PERCENTAGE' | 'FIXED_AMOUNT' | 'BUY_X_GET_Y';
+export type PromotionType = 'PERCENTAGE' | 'FIXED_AMOUNT' | 'BUY_X_GET_Y';

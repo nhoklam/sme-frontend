@@ -1,29 +1,27 @@
 import React, { useState } from 'react';
 import { Box, Typography } from '@mui/material';
 import {
-    ManageAccounts, Warehouse, AutoAwesome, Assignment, Lock
+    ManageAccounts, AutoAwesome, Assignment, Lock
 } from '@mui/icons-material';
 import authService from '../../../../services/authService';
 
 // Tab components
 import UsersTab from './tabs/UsersTab';
-import WarehousesTab from './tabs/WarehousesTab';
 import AIDocumentsTab from './tabs/AIDocumentsTab';
 import AuditLogsTab from './tabs/AuditLogsTab';
 import ChangePasswordTab from './tabs/ChangePasswordTab';
 
 const TAB_CONFIG = [
-    { id: 'users', label: 'Quản lý nhân sự', icon: <ManageAccounts sx={{ fontSize: 18 }} />, adminOnly: true },
-    { id: 'warehouses', label: 'Chi nhánh', icon: <Warehouse sx={{ fontSize: 18 }} />, adminOnly: true },
-    { id: 'ai', label: 'Dữ liệu AI', icon: <AutoAwesome sx={{ fontSize: 18 }} />, adminOnly: true },
-    { id: 'audit', label: 'Nhật ký hệ thống', icon: <Assignment sx={{ fontSize: 18 }} />, adminOnly: true },
-    { id: 'password', label: 'Bảo mật', icon: <Lock sx={{ fontSize: 18 }} />, adminOnly: false },
+    { id: 'users', label: 'Tài khoản', icon: <ManageAccounts sx={{ fontSize: 18 }} />, roles: ['ROLE_ADMIN', 'ROLE_MANAGER'] },
+    { id: 'ai', label: 'Dữ liệu AI', icon: <AutoAwesome sx={{ fontSize: 18 }} />, roles: ['ROLE_ADMIN'] },
+    { id: 'audit', label: 'Nhật ký hệ thống', icon: <Assignment sx={{ fontSize: 18 }} />, roles: ['ROLE_ADMIN'] },
+    { id: 'password', label: 'Bảo mật', icon: <Lock sx={{ fontSize: 18 }} />, roles: ['ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_CASHIER'] },
 ];
 
 export default function SystemSettingsPage() {
     const currentUser = authService.getCurrentUser()?.user;
-    const isAdmin = currentUser?.role === 'ROLE_ADMIN';
-    const tabs = TAB_CONFIG.filter(t => !t.adminOnly || isAdmin);
+    const userRole = currentUser?.role || '';
+    const tabs = TAB_CONFIG.filter(t => t.roles.includes(userRole));
     const [tab, setTab] = useState(tabs[0]?.id || 'password');
 
     return (
@@ -74,7 +72,6 @@ export default function SystemSettingsPage() {
 
             {/* Tab Content */}
             {tab === 'users' && <UsersTab />}
-            {tab === 'warehouses' && <WarehousesTab />}
             {tab === 'ai' && <AIDocumentsTab />}
             {tab === 'audit' && <AuditLogsTab />}
             {tab === 'password' && <ChangePasswordTab />}

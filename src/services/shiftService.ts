@@ -5,16 +5,19 @@ import { ApiResponse, PageResponse, ShiftResponse } from '../types';
 export interface PosShift {
     id: string;
     warehouseId: string;
+    warehouseName?: string;
     cashierId: string;
+    cashierName?: string;
     startingCash: number;
     reportedCash?: number;
     theoreticalCash?: number;
     discrepancyAmount?: number;
     discrepancyReason?: string;
-    status: 'OPEN' | 'CLOSED' | 'APPROVED';
+    status: 'OPEN' | 'CLOSED' | 'MANAGER_APPROVED';
     openedAt: string;
     closedAt?: string;
     approvedAt?: string;
+    invoiceCount?: number;
     totalRevenue?: number;
 }
 
@@ -25,8 +28,7 @@ const shiftService = {
         if (params.size !== undefined) query.set('size', String(params.size));
         if (params.warehouseId) query.set('warehouseId', params.warehouseId);
 
-        const res = await axiosInstance.get<ApiResponse<ShiftResponse[]>>(`/pos/shifts/pending?${query}`);
-        // Note: Backend getPendingShifts returns List<ShiftResponse>, not PageResponse
+        const res = await axiosInstance.get<ApiResponse<PageResponse<PosShift>>>(`/pos/shifts?${query}`);
         return res.data.data;
     },
 
@@ -46,7 +48,7 @@ const shiftService = {
     },
 
     closeShift: async (shiftId: string, reportedCash: number, discrepancyReason?: string) => {
-        const res = await axiosInstance.post<ApiResponse<PosShift>>('/pos/shifts/close', { reportedCash, discrepancyReason });
+        const res = await axiosInstance.post<ApiResponse<PosShift>>('/pos/shifts/close', { shiftId, reportedCash, discrepancyReason });
         return res.data.data;
     },
 

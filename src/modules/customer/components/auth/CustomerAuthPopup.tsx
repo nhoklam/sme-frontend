@@ -19,7 +19,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import GoogleIcon from '@mui/icons-material/Google';
-import LocalLibraryIcon from '@mui/icons-material/LocalLibrary';
+import AutoStoriesIcon from '@mui/icons-material/AutoStories';
 import customerAuthService from '../../../../services/customerAuthService';
 
 interface CustomerAuthPopupProps {
@@ -96,6 +96,26 @@ const CustomerAuthPopup: React.FC<CustomerAuthPopupProps> = ({ open, onClose, on
         setError(null);
     };
 
+    const textFieldStyle = {
+        '& .MuiOutlinedInput-root': {
+            color: '#1a1a2e',
+            backgroundColor: '#f9fafc',
+            borderRadius: '8px',
+            transition: 'all 0.3s ease',
+            '& fieldset': { borderColor: 'rgba(0, 0, 0, 0.12)' },
+            '&:hover fieldset': { borderColor: 'rgba(245, 166, 35, 0.5)' },
+            '&.Mui-focused fieldset': { borderColor: '#f5a623', boxShadow: '0 0 8px rgba(245, 166, 35, 0.15)' },
+        },
+        '& .MuiInputLabel-root': {
+            color: 'rgba(26, 26, 46, 0.6)',
+            fontSize: '14px',
+            '&.Mui-focused': { color: '#f5a623' },
+        },
+        '& .MuiFormHelperText-root': {
+            color: 'rgba(26, 26, 46, 0.5)',
+        }
+    };
+
     return (
         <Dialog 
             open={open} 
@@ -104,10 +124,12 @@ const CustomerAuthPopup: React.FC<CustomerAuthPopupProps> = ({ open, onClose, on
             fullWidth
             PaperProps={{
                 sx: {
-                    borderRadius: 4,
+                    borderRadius: '16px',
                     overflow: 'hidden',
-                    boxShadow: '0 24px 48px rgba(0,0,0,0.2)',
-                    bgcolor: '#ffffff'
+                    bgcolor: '#ffffff',
+                    border: '1px solid rgba(0, 0, 0, 0.06)',
+                    boxShadow: '0 24px 48px rgba(0,0,0,0.15)',
+                    color: '#1a1a2e'
                 }
             }}
             TransitionComponent={Fade}
@@ -115,28 +137,50 @@ const CustomerAuthPopup: React.FC<CustomerAuthPopupProps> = ({ open, onClose, on
         >
             {/* Header / Brand Area */}
             <Box sx={{ 
-                bgcolor: '#d32f2f', 
-                color: 'white', 
                 pt: 4, 
                 pb: 2, 
                 px: 3, 
                 position: 'relative',
-                background: 'linear-gradient(135deg, #d32f2f 0%, #9a0007 100%)'
+                background: 'linear-gradient(135deg, rgba(245, 166, 35, 0.1) 0%, #ffffff 100%)',
+                borderBottom: '1px solid rgba(0, 0, 0, 0.06)'
             }}>
                 <IconButton 
                     onClick={onClose} 
                     size="small" 
-                    sx={{ position: 'absolute', top: 8, right: 8, color: 'rgba(255,255,255,0.7)', '&:hover': { color: 'white' } }}
+                    sx={{ 
+                        position: 'absolute', 
+                        top: 12, 
+                        right: 12, 
+                        color: 'rgba(0,0,0,0.4)', 
+                        '&:hover': { color: '#f5a623' } 
+                    }}
                 >
                     <CloseIcon />
                 </IconButton>
                 <Box textAlign="center" mb={2}>
-                    <LocalLibraryIcon sx={{ fontSize: 48, mb: 1, filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.2))' }} />
-                    <Typography variant="h5" fontWeight="800" sx={{ letterSpacing: 0.5 }}>
-                        SME Bookstore
+                    <Box sx={{ 
+                        display: 'inline-flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        width: 56,
+                        height: 56,
+                        borderRadius: '50%',
+                        background: 'rgba(245, 166, 35, 0.12)',
+                        border: '1px solid rgba(245, 166, 35, 0.25)',
+                        mb: 1.5,
+                        boxShadow: '0 2px 8px rgba(245, 166, 35, 0.05)'
+                    }}>
+                        <AutoStoriesIcon sx={{ fontSize: 28, color: '#f5a623' }} />
+                    </Box>
+                    <Typography variant="h5" fontWeight="800" sx={{ 
+                        letterSpacing: '1px', 
+                        color: '#1a1a2e',
+                        textTransform: 'uppercase'
+                    }}>
+                        Bookly Store
                     </Typography>
-                    <Typography variant="body2" sx={{ opacity: 0.8, mt: 0.5 }}>
-                        Khám phá kho tàng tri thức
+                    <Typography variant="body2" sx={{ color: 'rgba(26, 26, 46, 0.6)', mt: 0.5, fontWeight: 400 }}>
+                        Khám phá tinh hoa tri thức & văn hóa
                     </Typography>
                 </Box>
 
@@ -144,19 +188,24 @@ const CustomerAuthPopup: React.FC<CustomerAuthPopupProps> = ({ open, onClose, on
                     value={tabIndex} 
                     onChange={handleTabChange} 
                     variant="fullWidth"
-                    TabIndicatorProps={{
-                        sx: { bgcolor: 'white', height: 3, borderTopLeftRadius: 3, borderTopRightRadius: 3 }
-                    }}
                     sx={{
-                        minHeight: 40,
                         '& .MuiTab-root': { 
-                            color: 'rgba(255,255,255,0.7)', 
+                            color: 'rgba(26, 26, 46, 0.5)', 
                             textTransform: 'none', 
                             fontWeight: 600,
                             fontSize: 15,
-                            transition: 'all 0.3s'
+                            transition: 'all 0.3s',
+                            py: 1.5
                         },
-                        '& .Mui-selected': { color: '#ffffff !important' }
+                        '& .Mui-selected': { 
+                            color: '#f5a623 !important',
+                            fontWeight: 700
+                        },
+                        '& .MuiTabs-indicator': {
+                            backgroundColor: '#f5a623',
+                            height: '2px',
+                            boxShadow: '0 2px 8px rgba(245, 166, 35, 0.4)'
+                        }
                     }}
                 >
                     <Tab label="Đăng nhập" />
@@ -165,17 +214,17 @@ const CustomerAuthPopup: React.FC<CustomerAuthPopupProps> = ({ open, onClose, on
             </Box>
 
             <DialogContent sx={{ p: 4, pb: 5 }}>
-                <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
                     
                     <Collapse in={!isLogin} unmountOnExit timeout={400}>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 2 }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
                             <TextField
                                 required={!isLogin}
                                 fullWidth
                                 label="Họ và tên"
                                 value={fullName}
                                 onChange={(e) => setFullName(e.target.value)}
-                                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                                sx={textFieldStyle}
                             />
                             <TextField
                                 fullWidth
@@ -183,7 +232,7 @@ const CustomerAuthPopup: React.FC<CustomerAuthPopupProps> = ({ open, onClose, on
                                 type="email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                                sx={textFieldStyle}
                             />
                         </Box>
                     </Collapse>
@@ -195,8 +244,9 @@ const CustomerAuthPopup: React.FC<CustomerAuthPopupProps> = ({ open, onClose, on
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         placeholder="VD: 0987654321"
-                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                        sx={textFieldStyle}
                     />
+                    
                     <TextField
                         required
                         fullWidth
@@ -204,23 +254,24 @@ const CustomerAuthPopup: React.FC<CustomerAuthPopupProps> = ({ open, onClose, on
                         type={showPassword ? 'text' : 'password'}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
                         InputProps={{
                             endAdornment: (
                                 <InputAdornment position="end">
                                     <IconButton
                                         onClick={() => setShowPassword(!showPassword)}
                                         edge="end"
+                                        sx={{ color: 'rgba(26, 26, 46, 0.4)', '&:hover': { color: '#f5a623' } }}
                                     >
                                         {showPassword ? <VisibilityOff /> : <Visibility />}
                                     </IconButton>
                                 </InputAdornment>
                             ),
                         }}
+                        sx={textFieldStyle}
                     />
 
                     <Collapse in={!!error}>
-                        <Typography color="error" variant="body2" sx={{ mt: 1, textAlign: 'center', fontWeight: 500, bgcolor: '#ffebee', p: 1, borderRadius: 1 }}>
+                        <Typography color="#d32f2f" variant="body2" sx={{ textAlign: 'center', fontWeight: 500 }}>
                             {error}
                         </Typography>
                     </Collapse>
@@ -235,39 +286,55 @@ const CustomerAuthPopup: React.FC<CustomerAuthPopupProps> = ({ open, onClose, on
                             py: 1.5, 
                             fontWeight: 700, 
                             fontSize: 16,
-                            borderRadius: 2,
+                            borderRadius: '8px',
                             textTransform: 'none',
-                            bgcolor: '#d32f2f',
-                            boxShadow: '0 8px 16px rgba(211,47,47,0.2)',
-                            transition: 'all 0.3s',
+                            background: 'linear-gradient(135deg, #f5a623 0%, #d48b10 100%)',
+                            color: '#0c0c16',
+                            boxShadow: '0 4px 15px rgba(245, 166, 35, 0.2)',
+                            transition: 'all 0.3s ease',
                             '&:hover': {
-                                bgcolor: '#b71c1c',
-                                boxShadow: '0 12px 20px rgba(211,47,47,0.3)',
-                                transform: 'translateY(-2px)'
+                                background: 'linear-gradient(135deg, #ffb83d 0%, #e0951a 100%)',
+                                boxShadow: '0 6px 20px rgba(245, 166, 35, 0.3)',
+                                transform: 'translateY(-1px)'
+                            },
+                            '&:active': {
+                                transform: 'translateY(1px)'
+                            },
+                            '&.Mui-disabled': {
+                                background: 'rgba(0, 0, 0, 0.12)',
+                                color: 'rgba(0, 0, 0, 0.26)'
                             }
                         }}
                     >
-                        {loading ? <CircularProgress size={24} color="inherit" /> : (isLogin ? 'Đăng nhập' : 'Tạo tài khoản')}
+                        {loading ? <CircularProgress size={24} sx={{ color: '#0c0c16' }} /> : (isLogin ? 'Đăng nhập' : 'Tạo tài khoản')}
                     </Button>
 
-                    <Divider sx={{ my: 2, color: 'text.secondary', fontSize: 13, '&::before, &::after': { borderColor: '#eeeeee' } }}>
+                    <Divider sx={{ 
+                        my: 1, 
+                        color: 'rgba(26, 26, 46, 0.4)', 
+                        fontSize: 12, 
+                        fontWeight: 500,
+                        '&::before, &::after': { borderColor: 'rgba(0,0,0,0.06)' } 
+                    }}>
                         HOẶC
                     </Divider>
 
                     <Button
                         fullWidth
                         variant="outlined"
-                        startIcon={<GoogleIcon />}
+                        startIcon={<GoogleIcon sx={{ color: '#4285F4' }} />}
                         sx={{ 
                             py: 1.2, 
-                            borderRadius: 2, 
+                            borderRadius: '8px', 
                             textTransform: 'none', 
                             fontWeight: 600,
-                            color: '#424242',
-                            borderColor: '#e0e0e0',
+                            color: '#1a1a2e',
+                            borderColor: 'rgba(0, 0, 0, 0.15)',
+                            transition: 'all 0.3s',
                             '&:hover': {
-                                bgcolor: '#f5f5f5',
-                                borderColor: '#bdbdbd'
+                                bgcolor: 'rgba(0, 0, 0, 0.03)',
+                                borderColor: 'rgba(245, 166, 35, 0.5)',
+                                color: '#f5a623'
                             }
                         }}
                         onClick={() => alert('Tính năng đăng nhập Google đang được phát triển')}

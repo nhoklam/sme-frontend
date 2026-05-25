@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     Box, Typography, Paper, Button,
     Chip, Pagination, CircularProgress,
@@ -57,6 +58,7 @@ const NotificationListPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [warehouseMap, setWarehouseMap] = useState<Map<string, string>>(new Map());
     const [snack, setSnack] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+    const navigate = useNavigate();
 
     // Fetch danh sách kho một lần — dùng để resolve warehouseId → tên kho
     useEffect(() => {
@@ -159,7 +161,16 @@ const NotificationListPage: React.FC = () => {
                                     gap: 2,
                                     alignItems: 'flex-start',
                                     transition: 'all 0.2s',
+                                    cursor: 'pointer',
                                     '&:hover': { bgcolor: '#f8fafc' }
+                                }}
+                                onClick={() => {
+                                    if (!notif.isRead) handleMarkAsRead(notif.id);
+                                    if (notif.type === 'LOW_STOCK') navigate('/admin/inventory/import');
+                                    else if (notif.type === 'TRANSFER_ARRIVED') navigate('/admin/inventory/transfer');
+                                    else if (notif.type === 'NEW_ORDER' && notif.payload?.orderId) {
+                                        navigate(`/admin/orders/${notif.payload.orderId}`);
+                                    }
                                 }}
                             >
                                 <Box sx={{
@@ -211,7 +222,7 @@ const NotificationListPage: React.FC = () => {
                                                 size="small"
                                                 variant="text"
                                                 startIcon={<Check />}
-                                                onClick={() => handleMarkAsRead(notif.id)}
+                                                onClick={(e) => { e.stopPropagation(); handleMarkAsRead(notif.id); }}
                                                 sx={{ textTransform: 'none', color: '#10b981', p: 0, minWidth: 'auto', '&:hover': { bgcolor: 'transparent', textDecoration: 'underline' } }}
                                             >
                                                 Đánh dấu đã đọc
@@ -221,7 +232,7 @@ const NotificationListPage: React.FC = () => {
                                             size="small"
                                             variant="text"
                                             startIcon={<Delete />}
-                                            onClick={() => handleDelete(notif.id)}
+                                            onClick={(e) => { e.stopPropagation(); handleDelete(notif.id); }}
                                             sx={{ textTransform: 'none', color: '#ef4444', p: 0, minWidth: 'auto', ml: notif.isRead ? 0 : 2, '&:hover': { bgcolor: 'transparent', textDecoration: 'underline' } }}
                                         >
                                             Xóa

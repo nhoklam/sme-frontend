@@ -110,7 +110,7 @@ const ShiftDetailPage = () => {
     );
 
     const isDiff = (shift.discrepancyAmount || 0) !== 0;
-    const statusColor = shift.status === 'OPEN' ? '#2e7d32' : shift.status === 'APPROVED' ? '#1976d2' : '#ed6c02';
+    const statusColor = shift.status === 'OPEN' ? '#2e7d32' : shift.status === 'MANAGER_APPROVED' ? '#1976d2' : '#ed6c02';
 
     return (
         <Box sx={{ p: 3, bgcolor: '#f8f9fb', minHeight: '100vh' }}>
@@ -125,7 +125,7 @@ const ShiftDetailPage = () => {
                             Chi tiết Phiên làm việc
                         </Typography>
                         <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            ID: {shift.id} • <StorefrontOutlined sx={{ fontSize: 12 }} /> Kho: {shift.warehouseId}
+                            <StorefrontOutlined sx={{ fontSize: 12 }} /> Kho: {shift.warehouseName || shift.warehouseId} <Person sx={{ fontSize: 12, ml: 1 }} /> Thu ngân: {shift.cashierName || shift.cashierId}
                         </Typography>
                     </Box>
                 </Box>
@@ -150,11 +150,11 @@ const ShiftDetailPage = () => {
             {/* Status Alert */}
             {isDiff && (
                 <Alert 
-                    severity="warning" 
+                    severity={(shift.discrepancyAmount || 0) < 0 ? "error" : "warning"}
                     icon={<ErrorOutline />}
                     sx={{ mb: 3, borderRadius: 3, border: '1px solid #ffe2a1', fontWeight: 600 }}
                 >
-                    Ca làm việc có chênh lệch tiền mặt: {fmt(shift.discrepancyAmount)}. Lý do: {shift.discrepancyReason || 'Không có ghi chú'}
+                    Ca làm việc bị {(shift.discrepancyAmount || 0) < 0 ? 'thiếu' : 'thừa'} {fmt(Math.abs(shift.discrepancyAmount || 0))} so với hệ thống tính. Lý do: {shift.discrepancyReason || 'Không có ghi chú'}
                 </Alert>
             )}
 
@@ -190,7 +190,7 @@ const ShiftDetailPage = () => {
                 <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                     <DetailStat 
                         label="Trạng thái" 
-                        value={shift.status === 'OPEN' ? 'ĐANG MỞ' : shift.status === 'APPROVED' ? 'ĐÃ DUYỆT' : 'CHỜ DUYỆT'} 
+                        value={shift.status === 'OPEN' ? 'ĐANG MỞ' : shift.status === 'MANAGER_APPROVED' ? 'ĐÃ DUYỆT' : 'CHỜ DUYỆT'} 
                         sub={shift.closedAt ? `Đóng lúc: ${new Date(shift.closedAt).toLocaleTimeString()}` : 'Ca đang hoạt động'}
                         color={statusColor} 
                         icon={<History />} 
@@ -206,7 +206,7 @@ const ShiftDetailPage = () => {
                                 <Person />
                             </Avatar>
                             <Box>
-                                <Typography variant="body2" fontWeight={800}>{shift.cashierId}</Typography>
+                                <Typography variant="body2" fontWeight={800}>{shift.cashierName || shift.cashierId}</Typography>
                                 <Typography variant="caption" color="text.secondary">Thu ngân phiên làm việc</Typography>
                             </Box>
                         </Box>
@@ -214,7 +214,7 @@ const ShiftDetailPage = () => {
                         <FieldRow label="Bắt đầu" value={new Date(shift.openedAt).toLocaleString('vi-VN')} />
                         <FieldRow label="Kết thúc" value={shift.closedAt ? new Date(shift.closedAt).toLocaleString('vi-VN') : '—'} />
                         <FieldRow label="Duyệt lúc" value={shift.approvedAt ? new Date(shift.approvedAt).toLocaleString('vi-VN') : '—'} />
-                        <FieldRow label="Chi nhánh" value={shift.warehouseId} />
+                        <FieldRow label="Chi nhánh" value={shift.warehouseName || shift.warehouseId} />
                     </Paper>
 
                     <Paper elevation={0} sx={{ p: 3, borderRadius: 4, border: '1px solid #f0f0f0' }}>
@@ -222,9 +222,9 @@ const ShiftDetailPage = () => {
                         <FieldRow label="Vốn đầu ca" value={fmt(shift.startingCash)} />
                         <FieldRow label="Tiền mặt hệ thống tính" value={fmt(shift.theoreticalCash)} bold />
                         <FieldRow label="Tiền mặt thực tế (kê khai)" value={fmt(shift.reportedCash)} color="#1976d2" bold />
-                        <Box sx={{ mt: 2, p: 2, bgcolor: isDiff ? '#fff1f0' : '#f6ffed', borderRadius: 2 }}>
-                            <Typography variant="caption" fontWeight={700} color={isDiff ? '#cf1322' : '#389e0d'}>
-                                KẾT QUẢ: {isDiff ? `LỆCH ${fmt(Math.abs(shift.discrepancyAmount || 0))}` : 'KHỚP 100%'}
+                        <Box sx={{ mt: 2, p: 2, bgcolor: isDiff ? ((shift.discrepancyAmount || 0) < 0 ? '#fff1f0' : '#fffbe6') : '#f6ffed', borderRadius: 2 }}>
+                            <Typography variant="caption" fontWeight={700} color={isDiff ? ((shift.discrepancyAmount || 0) < 0 ? '#cf1322' : '#d48806') : '#389e0d'}>
+                                KẾT QUẢ: {isDiff ? ((shift.discrepancyAmount || 0) < 0 ? `THIẾU ${fmt(Math.abs(shift.discrepancyAmount || 0))}` : `THỪA ${fmt(Math.abs(shift.discrepancyAmount || 0))}`) : 'KHỚP 100%'}
                             </Typography>
                         </Box>
                     </Paper>

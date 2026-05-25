@@ -6,11 +6,13 @@ import {
     Typography, Link,
 } from '@mui/material';
 import { Visibility, VisibilityOff, Lock, LoginOutlined, Person } from '@mui/icons-material';
+import { useQueryClient } from '@tanstack/react-query';
 import authService from '../../services/authService';
 
 const IC = '#1976d2';
 
 const LoginForm = ({ onSuccess, onError }) => {
+    const queryClient = useQueryClient();
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -31,6 +33,7 @@ const LoginForm = ({ onSuccess, onError }) => {
             const res = await authService.login(formData.username.trim(), formData.password);
             const authData = res.data;
             authService.saveUser(authData, formData.rememberMe);
+            queryClient.clear();
             if (onSuccess) onSuccess(authData.user);
         } catch (err) {
             const msg = err.response?.data?.message || 'Tên đăng nhập hoặc mật khẩu không đúng';

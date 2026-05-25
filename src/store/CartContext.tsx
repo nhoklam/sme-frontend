@@ -11,8 +11,8 @@ interface CartContextType {
   totalItems: number;
   totalPrice: number;
   totalSaved: number;
-  appliedPromotion: any;
-  setAppliedPromotion: (p: any) => void;
+  appliedPromotions: any[];
+  setAppliedPromotions: (p: any[]) => void;
   cartOpen: boolean;
   openCart: () => void;
   closeCart: () => void;

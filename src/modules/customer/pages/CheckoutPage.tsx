@@ -4,35 +4,32 @@ import { useNavigate } from 'react-router-dom';
 import {
     Box, Container, Grid, Typography, Paper, Button, TextField,
     Divider, FormControl, InputLabel, Select, MenuItem, Alert,
-    CircularProgress, Radio, RadioGroup, Collapse,
+    CircularProgress, Radio, RadioGroup, Collapse, Dialog, DialogTitle,
+    DialogContent, DialogActions, List, ListItem, ListItemText, ListItemButton, Chip, IconButton
 } from '@mui/material';
 import { SelectChangeEvent } from '@mui/material/Select';
 import {
     ArrowBack, ShoppingCart, LocalShipping, Security,
-    ExpandMore, ExpandLess, CheckCircleOutline, Lock
+    ExpandMore, ExpandLess, CheckCircleOutline, Lock, Close as CloseIcon, LocationOn
 } from '@mui/icons-material';
+import { useQuery } from '@tanstack/react-query';
 import { useCartContext } from '../../../store/CartContext';
 import { useCreateOrder } from '../hooks/useOrders';
 import { useCurrentUser } from '../hooks/useAccount';
 import { fmt } from '../../../utils/constants';
+import orderService from '../../../services/orderService';
+import { customerApi } from '../../../services/customerApi';
+import { CustomerAddress } from '../../../types';
 
 const FREE_SHIP = 150000;
-
-const PROVINCES = [
-    { code: 'HCM', label: 'TP. Hồ Chí Minh' },
-    { code: 'HN', label: 'Hà Nội' },
-    { code: 'DN', label: 'Đà Nẵng' },
-    { code: 'HP', label: 'Hải Phòng' },
-    { code: 'CT', label: 'Cần Thơ' },
-    { code: 'BD', label: 'Bình Dương' },
-    { code: 'OTHER', label: 'Tỉnh / Thành phố khác' },
-];
 
 interface CheckoutFormData {
     shippingName: string;
     shippingPhone: string;
-    shippingAddress: string;
-    provinceCode: string;
+    specificAddress: string;
+    provinceCity: string;
+    district: string;
+    ward: string;
     paymentMethod: string;
     note: string;
 }
@@ -63,30 +60,75 @@ const PAYMENT_OPTIONS = [
         icon: '🏦',
     },
     {
-        value: 'MOMO',
-        label: 'Ví MoMo',
-        desc: 'Thanh toán qua ứng dụng MoMo',
+        value: 'VNPAY',
+        label: 'Ví VNPay / Thẻ ATM',
+        desc: 'Thanh toán qua ví VNPay hoặc thẻ ATM/Visa',
+        icon: '💳',
+    },
+    {
+        value: 'PAYOS',
+        label: 'Chuyển khoản QR (PayOS)',
+        desc: 'Thanh toán bằng mã QR chuyển khoản nhanh',
         icon: '📱',
     },
 ];
 
 const CheckoutPage: React.FC = () => {
     const navigate = useNavigate();
-    const { items: rawItems, totalPrice, totalItems, clearCart, appliedPromotion } = useCartContext();
+    const { items: rawItems, totalPrice, totalItems, clearCart, appliedPromotions } = useCartContext();
     const items = rawItems as unknown as CartItemType[];
-    const { user } = useCurrentUser();
+    const { user, isLoggedIn } = useCurrentUser();
     const createOrder = useCreateOrder();
     const [orderSummaryOpen, setOrderSummaryOpen] = useState(false);
+
+    // Location API state
+    const [provinces, setProvinces] = useState<any[]>([]);
+    const [districts, setDistricts] = useState<any[]>([]);
+    const [wards, setWards] = useState<any[]>([]);
+
+    // Address Selection State
+    const [addressModalOpen, setAddressModalOpen] = useState(false);
+
+    const { data: addressData } = useQuery({
+        queryKey: ['customerAddresses'],
+        queryFn: () => customerApi.getAddresses(),
+        enabled: isLoggedIn,
+    });
+    const savedAddresses = addressData?.data || [];
+
+    const handleSelectAddress = (addr: CustomerAddress) => {
+        setForm(f => ({
+            ...f,
+            shippingName: addr.receiverName,
+            shippingPhone: addr.receiverPhone,
+            provinceCity: addr.provinceCity,
+            district: addr.district,
+            ward: addr.ward || '',
+            specificAddress: addr.specificAddress,
+        }));
+        setErrors({});
+        setAddressModalOpen(false);
+    };
 
     const [form, setForm] = useState<CheckoutFormData>({
         shippingName: '',
         shippingPhone: '',
-        shippingAddress: '',
-        provinceCode: 'HCM',
+        specificAddress: '',
+        provinceCity: '',
+        district: '',
+        ward: '',
         paymentMethod: 'COD',
         note: '',
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
+
+    useEffect(() => {
+        // Fetch provinces
+        fetch('https://provinces.open-api.vn/api/?depth=3')
+            .then(res => res.json())
+            .then(data => setProvinces(data))
+            .catch(err => console.error('Error fetching provinces:', err));
+    }, []);
 
     useEffect(() => {
         if (user) {
@@ -98,22 +140,60 @@ const CheckoutPage: React.FC = () => {
         }
     }, [user]);
 
+    useEffect(() => {
+        if (form.provinceCity) {
+            const p = provinces.find(x => x.name === form.provinceCity);
+            setDistricts(p ? p.districts : []);
+        } else {
+            setDistricts([]);
+        }
+    }, [form.provinceCity, provinces]);
+
+    useEffect(() => {
+        if (form.district) {
+            const d = districts.find(x => x.name === form.district);
+            setWards(d ? d.wards : []);
+        } else {
+            setWards([]);
+        }
+    }, [form.district, districts]);
+
+    const rawShipFee = totalPrice >= FREE_SHIP ? 0 : 30000;
+
     const calcDiscount = () => {
-        if (!appliedPromotion) return 0;
-        if (appliedPromotion.type === 'FIXED_AMOUNT') {
-            return Math.min(appliedPromotion.discountValue, totalPrice);
-        }
-        if (appliedPromotion.type === 'PERCENTAGE') {
-            let d = (totalPrice * appliedPromotion.discountValue) / 100;
-            if (appliedPromotion.maxDiscountAmount) d = Math.min(d, appliedPromotion.maxDiscountAmount);
-            return Math.round(d);
-        }
-        return 0;
+        let orderDiscount = 0;
+        let shipDiscount = 0;
+        
+        appliedPromotions.forEach(promo => {
+            let d = 0;
+            if (promo.discountAmount !== undefined) {
+                d = promo.discountAmount;
+            } else {
+                if (promo.type === 'FIXED_AMOUNT') {
+                    d = promo.discountValue;
+                } else if (promo.type === 'PERCENTAGE') {
+                    d = (totalPrice * promo.discountValue) / 100;
+                    if (promo.maxDiscountAmount) d = Math.min(d, promo.maxDiscountAmount);
+                }
+                d = Math.round(d);
+            }
+            
+            const isShipping = promo.promotionSlot === 'SHIPPING' || promo.code?.toUpperCase().includes('SHIP') || promo.code?.toUpperCase().includes('FREE');
+            
+            if (isShipping) {
+                shipDiscount += Math.min(d, rawShipFee);
+            } else {
+                orderDiscount += Math.min(d, totalPrice);
+            }
+        });
+        
+        return { orderDiscount, shipDiscount };
     };
 
-    const discountAmount = calcDiscount();
-    const shipFee = totalPrice >= FREE_SHIP ? 0 : 30000;
-    const finalPrice = totalPrice - discountAmount + shipFee;
+    const { orderDiscount, shipDiscount } = calcDiscount();
+    const discountAmount = orderDiscount + shipDiscount;
+    const finalShipFee = rawShipFee - shipDiscount;
+    const finalPrice = totalPrice - orderDiscount + finalShipFee;
 
     const handleTextChange = (field: keyof CheckoutFormData) =>
         (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -123,7 +203,18 @@ const CheckoutPage: React.FC = () => {
 
     const handleSelectChange = (field: keyof CheckoutFormData) =>
         (e: SelectChangeEvent) => {
-            setForm(f => ({ ...f, [field]: e.target.value }));
+            setForm(f => {
+                const newForm = { ...f, [field]: e.target.value };
+                if (field === 'provinceCity') {
+                    newForm.district = '';
+                    newForm.ward = '';
+                }
+                if (field === 'district') {
+                    newForm.ward = '';
+                }
+                return newForm;
+            });
+            if (errors[field]) setErrors(err => ({ ...err, [field]: '' }));
         };
 
     const handleRadioChange = (_e: React.ChangeEvent<HTMLInputElement>, value: string) => {
@@ -132,11 +223,16 @@ const CheckoutPage: React.FC = () => {
 
     const validate = (): boolean => {
         const errs: Record<string, string> = {};
+        if (!isLoggedIn) {
+            errs.general = 'Vui lòng đăng nhập để tiến hành thanh toán trực tuyến.';
+        }
         if (!form.shippingName.trim()) errs.shippingName = 'Vui lòng nhập họ và tên';
         if (!form.shippingPhone.trim()) errs.shippingPhone = 'Vui lòng nhập số điện thoại';
         else if (!/^(0|\+84)[0-9]{8,10}$/.test(form.shippingPhone.replace(/\s/g, '')))
             errs.shippingPhone = 'Số điện thoại không hợp lệ';
-        if (!form.shippingAddress.trim()) errs.shippingAddress = 'Vui lòng nhập địa chỉ giao hàng';
+        if (!form.provinceCity) errs.provinceCity = 'Vui lòng chọn Tỉnh/Thành phố';
+        if (!form.district) errs.district = 'Vui lòng chọn Quận/Huyện';
+        if (!form.specificAddress.trim()) errs.specificAddress = 'Vui lòng nhập địa chỉ cụ thể';
         setErrors(errs);
         return Object.keys(errs).length === 0;
     };
@@ -144,26 +240,48 @@ const CheckoutPage: React.FC = () => {
     const handleSubmit = async (): Promise<void> => {
         if (!validate()) return;
         try {
+            const fullAddress = `${form.specificAddress.trim()}, ${form.ward ? form.ward + ', ' : ''}${form.district}, ${form.provinceCity}`;
+            
+            const selectedProvince = provinces.find(p => p.name === form.provinceCity);
+            const provCode = selectedProvince ? selectedProvince.code.toString() : form.provinceCity.substring(0, 20);
+
+            // Backend expects a provinceCode, we use the numerical code to avoid DB constraint violation (max 20 chars)
             const orderData = {
-                customerId: user?.id ?? '',
                 shippingName: form.shippingName.trim(),
                 shippingPhone: form.shippingPhone.trim(),
-                shippingAddress: form.shippingAddress.trim(),
-                provinceCode: form.provinceCode,
+                shippingAddress: fullAddress,
+                provinceCode: provCode, 
                 paymentMethod: form.paymentMethod,
                 note: form.note.trim(),
                 items: items.map((item: CartItemType) => ({
                     productId: item.id,
                     quantity: item.qty,
                 })),
-                couponCode: appliedPromotion?.code,
+                couponCodes: appliedPromotions.map((p: any) => p.code),
                 discountAmount: discountAmount,
             };
-            const result = await createOrder.mutateAsync(orderData);
+
+            const result = await createOrder.mutateAsync(orderData as any);
             clearCart();
+            
+            const returnUrl = `${window.location.origin}/payment/return`;
+
+            if (form.paymentMethod === 'VNPAY') {
+                const { checkoutUrl } = await orderService.createVnPayUrl(result.id, returnUrl);
+                window.location.href = checkoutUrl;
+                return;
+            }
+
+            if (form.paymentMethod === 'PAYOS') {
+                const { checkoutUrl } = await orderService.createPayosUrl(result.id, returnUrl, returnUrl);
+                window.location.href = checkoutUrl;
+                return;
+            }
+
             navigate('/order-success', { state: { order: result } });
-        } catch {
-            // Error handled by mutation's isError state
+        } catch (error: any) {
+            const errorMsg = error?.response?.data?.message || error?.message || 'Lỗi hệ thống trong quá trình xử lý đơn hàng.';
+            setErrors(errs => ({ ...errs, general: `Đặt hàng thất bại: ${errorMsg}` }));
         }
     };
 
@@ -220,12 +338,12 @@ const CheckoutPage: React.FC = () => {
             </Box>
 
             <Container maxWidth="lg" sx={{ mt: 4 }}>
-                {createOrder.isError && (
+                {(createOrder.isError || errors.general) && (
                     <Alert
                         severity="error"
                         sx={{ mb: 3, borderRadius: '8px' }}
                     >
-                        Đặt hàng thất bại. Vui lòng kiểm tra lại thông tin giao nhận và thử lại.
+                        {errors.general || (createOrder.error as any)?.response?.data?.message || 'Đặt hàng thất bại. Vui lòng kiểm tra lại thông tin giao nhận và thử lại.'}
                     </Alert>
                 )}
 
@@ -237,11 +355,24 @@ const CheckoutPage: React.FC = () => {
                             elevation={0}
                             sx={{ borderRadius: '12px', p: 3, mb: 3, border: '1px solid #eef0f2', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}
                         >
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 3 }}>
-                                <LocalShipping sx={{ color: '#1a1a2e', fontSize: 22 }} />
-                                <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#1a1a2e' }}>
-                                    Thông tin giao nhận hàng
-                                </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+                                    <LocalShipping sx={{ color: '#1a1a2e', fontSize: 22 }} />
+                                    <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#1a1a2e' }}>
+                                        Thông tin giao nhận hàng
+                                    </Typography>
+                                </Box>
+                                {isLoggedIn && savedAddresses.length > 0 && (
+                                    <Button 
+                                        variant="outlined" 
+                                        size="small" 
+                                        onClick={() => setAddressModalOpen(true)}
+                                        startIcon={<LocationOn />}
+                                        sx={{ borderRadius: 2, textTransform: 'none', borderColor: '#eef0f2', color: '#1a1a2e', fontWeight: 600 }}
+                                    >
+                                        Chọn địa chỉ đã lưu
+                                    </Button>
+                                )}
                             </Box>
 
                             <Grid container spacing={2}>
@@ -278,16 +409,74 @@ const CheckoutPage: React.FC = () => {
                                         }}
                                     />
                                 </Grid>
+
+                                <Grid size={{ xs: 12, sm: 6 }}>
+                                    <FormControl fullWidth size="medium" error={!!errors.provinceCity}>
+                                        <InputLabel sx={{ '&.Mui-focused': { color: '#1a1a2e' } }}>Tỉnh/Thành phố *</InputLabel>
+                                        <Select
+                                            value={form.provinceCity || ''}
+                                            onChange={handleSelectChange('provinceCity')}
+                                            label="Tỉnh/Thành phố *"
+                                            sx={{
+                                                borderRadius: '8px',
+                                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#f5a623' },
+                                            }}
+                                        >
+                                            {provinces.map(p => (
+                                                <MenuItem key={p.code} value={p.name}>{p.name}</MenuItem>
+                                            ))}
+                                        </Select>
+                                        {errors.provinceCity && <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.5 }}>{errors.provinceCity}</Typography>}
+                                    </FormControl>
+                                </Grid>
+                                <Grid size={{ xs: 12, sm: 6 }}>
+                                    <FormControl fullWidth size="medium" disabled={!form.provinceCity} error={!!errors.district}>
+                                        <InputLabel sx={{ '&.Mui-focused': { color: '#1a1a2e' } }}>Quận/Huyện *</InputLabel>
+                                        <Select
+                                            value={form.district || ''}
+                                            onChange={handleSelectChange('district')}
+                                            label="Quận/Huyện *"
+                                            sx={{
+                                                borderRadius: '8px',
+                                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#f5a623' },
+                                            }}
+                                        >
+                                            {districts.map(d => (
+                                                <MenuItem key={d.code} value={d.name}>{d.name}</MenuItem>
+                                            ))}
+                                        </Select>
+                                        {errors.district && <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.5 }}>{errors.district}</Typography>}
+                                    </FormControl>
+                                </Grid>
+                                <Grid size={{ xs: 12, sm: 6 }}>
+                                    <FormControl fullWidth size="medium" disabled={!form.district}>
+                                        <InputLabel sx={{ '&.Mui-focused': { color: '#1a1a2e' } }}>Phường/Xã</InputLabel>
+                                        <Select
+                                            value={form.ward || ''}
+                                            onChange={handleSelectChange('ward')}
+                                            label="Phường/Xã"
+                                            sx={{
+                                                borderRadius: '8px',
+                                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#f5a623' },
+                                            }}
+                                        >
+                                            {wards.map(w => (
+                                                <MenuItem key={w.code} value={w.name}>{w.name}</MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+
                                 <Grid size={{ xs: 12 }}>
                                     <TextField
                                         fullWidth
-                                        label="Địa chỉ nhận hàng chi tiết *"
+                                        label="Địa chỉ chi tiết (số nhà, tên đường...) *"
                                         size="medium"
-                                        value={form.shippingAddress}
-                                        onChange={handleTextChange('shippingAddress')}
-                                        error={!!errors.shippingAddress}
-                                        helperText={errors.shippingAddress}
-                                        placeholder="Số nhà, tên đường, phường/xã..."
+                                        value={form.specificAddress}
+                                        onChange={handleTextChange('specificAddress')}
+                                        error={!!errors.specificAddress}
+                                        helperText={errors.specificAddress}
+                                        placeholder="Số nhà, tên đường, tòa nhà..."
                                         sx={{
                                             '& .MuiOutlinedInput-root': { borderRadius: '8px' },
                                             '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#f5a623' },
@@ -295,33 +484,14 @@ const CheckoutPage: React.FC = () => {
                                         }}
                                     />
                                 </Grid>
-                                <Grid size={{ xs: 12, sm: 6 }}>
-                                    <FormControl fullWidth size="medium">
-                                        <InputLabel sx={{ '&.Mui-focused': { color: '#1a1a2e' } }}>Tỉnh / Thành phố</InputLabel>
-                                        <Select
-                                            value={form.provinceCode}
-                                            onChange={handleSelectChange('provinceCode')}
-                                            label="Tỉnh / Thành phố"
-                                            sx={{
-                                                borderRadius: '8px',
-                                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#f5a623' },
-                                            }}
-                                        >
-                                            {PROVINCES.map(p => (
-                                                <MenuItem key={p.code} value={p.code}>
-                                                    {p.label}
-                                                </MenuItem>
-                                            ))}
-                                        </Select>
-                                    </FormControl>
-                                </Grid>
+                                
                                 <Grid size={{ xs: 12 }}>
                                     <TextField
                                         fullWidth
                                         label="Ghi chú đơn hàng"
                                         size="medium"
                                         multiline
-                                        rows={3}
+                                        rows={2}
                                         value={form.note}
                                         onChange={handleTextChange('note')}
                                         placeholder="Ghi chú thêm cho người giao hàng (nếu có)..."
@@ -442,21 +612,21 @@ const CheckoutPage: React.FC = () => {
                                     p: 1.8,
                                     borderRadius: '8px',
                                     mb: 2.5,
-                                    bgcolor: shipFee === 0 ? 'rgba(46, 125, 50, 0.06)' : 'rgba(245, 166, 35, 0.08)',
+                                    bgcolor: finalShipFee === 0 ? 'rgba(46, 125, 50, 0.06)' : 'rgba(245, 166, 35, 0.08)',
                                     display: 'flex',
                                     gap: 1.2,
                                     alignItems: 'center',
                                 }}>
                                     <LocalShipping sx={{
                                         fontSize: 18,
-                                        color: shipFee === 0 ? '#2e7d32' : '#db941e',
+                                        color: finalShipFee === 0 ? '#2e7d32' : '#db941e',
                                     }} />
                                     <Typography
                                         variant="caption"
-                                        color={shipFee === 0 ? '#2e7d32' : '#db941e'}
+                                        color={finalShipFee === 0 ? '#2e7d32' : '#db941e'}
                                         sx={{ fontWeight: 700 }}
                                     >
-                                        {shipFee === 0
+                                        {finalShipFee === 0
                                             ? 'Ưu đãi: Miễn phí giao hàng toàn quốc!'
                                             : `Mua thêm ${fmt(FREE_SHIP - totalPrice)} để được freeship`}
                                     </Typography>
@@ -467,20 +637,37 @@ const CheckoutPage: React.FC = () => {
                                     <Typography variant="body2" sx={{ fontWeight: 700, color: '#1a1a2e' }}>{fmt(totalPrice)}</Typography>
                                 </Box>
                                 
-                                {discountAmount > 0 && (
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
-                                        <Typography variant="body2" color="text.secondary">Mã giảm giá ({appliedPromotion?.code})</Typography>
-                                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#ff4d4f' }}>-{fmt(discountAmount)}</Typography>
-                                    </Box>
-                                )}
+                                {appliedPromotions.map((promo: any, idx: number) => {
+                                    const isShipping = promo.promotionSlot === 'SHIPPING' || promo.code?.toUpperCase().includes('SHIP') || promo.code?.toUpperCase().includes('FREE');
+                                    let d = 0;
+                                    if (promo.discountAmount !== undefined) d = promo.discountAmount;
+                                    else if (promo.type === 'FIXED_AMOUNT') d = promo.discountValue;
+                                    else if (promo.type === 'PERCENTAGE') d = (totalPrice * promo.discountValue) / 100;
+                                    const finalD = isShipping ? Math.min(d, rawShipFee) : Math.min(d, totalPrice);
+                                    
+                                    if (finalD === 0) return null;
+                                    return (
+                                        <Box key={idx} sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
+                                            <Typography variant="body2" color="text.secondary">Mã giảm giá ({promo.code})</Typography>
+                                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#ff4d4f' }}>-{fmt(finalD)}</Typography>
+                                        </Box>
+                                    );
+                                })}
                                 
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
                                     <Typography variant="body2" color="text.secondary">Phí vận chuyển</Typography>
                                     <Typography
                                         variant="body2"
-                                        sx={{ fontWeight: 700, color: shipFee === 0 ? '#2e7d32' : '#1a1a2e' }}
+                                        sx={{ fontWeight: 700, color: finalShipFee === 0 ? '#2e7d32' : '#1a1a2e' }}
                                     >
-                                        {shipFee === 0 ? 'Miễn phí' : fmt(shipFee)}
+                                        {finalShipFee === 0 ? 'Miễn phí' : (
+                                            rawShipFee !== finalShipFee ? (
+                                                <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                  <Box component="span" sx={{ textDecoration: 'line-through', color: '#8c9ba5', fontSize: '0.75rem', fontWeight: 500 }}>{fmt(rawShipFee)}</Box>
+                                                  {fmt(finalShipFee)}
+                                                </Box>
+                                            ) : fmt(rawShipFee)
+                                        )}
                                     </Typography>
                                 </Box>
 
@@ -542,6 +729,36 @@ const CheckoutPage: React.FC = () => {
                     </Grid>
                 </Grid>
             </Container>
+            {/* Address Selection Modal */}
+            <Dialog open={addressModalOpen} onClose={() => setAddressModalOpen(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: '16px' } }}>
+                <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1, borderBottom: '1px solid #f0f0f0' }}>
+                    <Typography variant="h6" fontWeight={700}>Chọn địa chỉ giao hàng</Typography>
+                    <IconButton onClick={() => setAddressModalOpen(false)} size="small"><CloseIcon /></IconButton>
+                </DialogTitle>
+                <DialogContent sx={{ p: 0 }}>
+                    <List sx={{ p: 0 }}>
+                        {savedAddresses.map((addr) => (
+                            <React.Fragment key={addr.id}>
+                                <ListItem disablePadding>
+                                    <ListItemButton onClick={() => handleSelectAddress(addr)} sx={{ py: 2, px: 3, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                                        <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+                                            <Typography fontWeight={700} color="#1a1a2e">{addr.receiverName}</Typography>
+                                            <Typography color="text.secondary">| {addr.receiverPhone}</Typography>
+                                            {addr.isDefault && <Chip label="Mặc định" size="small" color="primary" sx={{ height: 20, fontSize: 11 }} />}
+                                        </Box>
+                                        <Typography variant="body2" color="text.secondary">{addr.specificAddress}</Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            {addr.ward ? `${addr.ward}, ` : ''}{addr.district}, {addr.provinceCity}
+                                        </Typography>
+                                    </ListItemButton>
+                                </ListItem>
+                                <Divider />
+                            </React.Fragment>
+                        ))}
+                    </List>
+                </DialogContent>
+            </Dialog>
+
         </Box>
     );
 };

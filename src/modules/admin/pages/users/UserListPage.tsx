@@ -15,16 +15,17 @@ import {
 import userService from '../../../../services/userService';
 import { UserResponse, UserRole } from '../../../../types';
 import UserCreateModal from './UserCreateModal';
+import { useAuth } from '../../../../store/hooks/useAuth';
 
 const ROLE_MAP: Record<UserRole, { label: string; color: string; bg: string }> = {
     ROLE_ADMIN: { label: 'Admin', color: '#7b1fa2', bg: '#f3e5f5' },
     ROLE_MANAGER: { label: 'Quản lý', color: '#1976d2', bg: '#e3f2fd' },
     ROLE_CASHIER: { label: 'Thu ngân', color: '#2e7d32', bg: '#e8f5e9' },
+    ROLE_CUSTOMER: { label: 'Khách hàng', color: '#0284c7', bg: '#e0f2fe' },
 };
 
 const ROLE_OPTIONS = [
     { value: 'all', label: 'Tất cả vai trò' },
-    { value: 'ROLE_ADMIN', label: 'Admin' },
     { value: 'ROLE_MANAGER', label: 'Quản lý' },
     { value: 'ROLE_CASHIER', label: 'Thu ngân' },
 ];
@@ -32,10 +33,10 @@ const ROLE_OPTIONS = [
 interface RowMenuProps {
     user: UserResponse;
     onToggleActive: (user: UserResponse) => void;
+    onEdit: (user: UserResponse) => void;
 }
 
-const RowMenu: React.FC<RowMenuProps> = ({ user, onToggleActive }) => {
-    const navigate = useNavigate();
+const RowMenu: React.FC<RowMenuProps> = ({ user, onToggleActive, onEdit }) => {
     const [anchor, setAnchor] = useState<null | HTMLElement>(null);
     return (
         <>
@@ -45,7 +46,7 @@ const RowMenu: React.FC<RowMenuProps> = ({ user, onToggleActive }) => {
             <Menu anchorEl={anchor} open={Boolean(anchor)} onClose={() => setAnchor(null)}
                 PaperProps={{ sx: { minWidth: 160, borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.1)' } }}>
                 <MenuItem
-                    onClick={() => { navigate(`/admin/users/${user.id}/edit`); setAnchor(null); }}
+                    onClick={() => { onEdit(user); setAnchor(null); }}
                     sx={{ fontSize: 13, gap: 1 }}>
                     <Edit sx={{ fontSize: 16, color: '#f59e0b' }} /> Chỉnh sửa
                 </MenuItem>
@@ -64,6 +65,7 @@ const RowMenu: React.FC<RowMenuProps> = ({ user, onToggleActive }) => {
 
 const UserListPage: React.FC = () => {
     const navigate = useNavigate();
+    const { user: currentUser, isManager } = useAuth();
     const [users, setUsers] = useState<UserResponse[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -71,6 +73,12 @@ const UserListPage: React.FC = () => {
     const [roleFilter, setRoleFilter] = useState('all');
     const [snack, setSnack] = useState('');
     const [openCreate, setOpenCreate] = useState(false);
+    const [editingUser, setEditingUser] = useState<UserResponse | null>(null);
+
+    const handleEditClick = (user: UserResponse) => {
+        setEditingUser(user);
+        setOpenCreate(true);
+    };
 
     const loadUsers = useCallback(async () => {
         setLoading(true);
@@ -78,20 +86,24 @@ const UserListPage: React.FC = () => {
         try {
             const data = await userService.getAll({
                 keyword: search.trim() || undefined,
-                role: roleFilter !== 'all' ? roleFilter : undefined,
+                role: isManager ? 'ROLE_CASHIER' : (roleFilter !== 'all' ? roleFilter : undefined),
+                warehouseId: isManager ? (currentUser?.warehouseId || undefined) : undefined,
             });
-            setUsers(data);
+            const filteredData = isManager
+                ? data.filter(u => u.role === 'ROLE_CASHIER')
+                : data.filter(u => u.role !== 'ROLE_ADMIN' && u.role !== 'ROLE_CUSTOMER');
+            setUsers(filteredData);
         } catch (e: any) {
             setError(e.response?.data?.message || 'Không thể tải danh sách người dùng');
         } finally {
             setLoading(false);
         }
-    }, [search, roleFilter]);
+    }, [search, roleFilter, isManager, currentUser?.warehouseId]);
 
     useEffect(() => {
         const t = setTimeout(loadUsers, 400);
         return () => clearTimeout(t);
-    }, [search, roleFilter]);
+    }, [search, roleFilter, loadUsers]);
 
     const handleToggleActive = async (user: UserResponse) => {
         try {
@@ -118,12 +130,18 @@ const UserListPage: React.FC = () => {
         return matchSearch && matchRole;
     });
 
-    const stats = [
-        { label: 'Tổng tài khoản', value: users.length, color: '#1a1a2e' },
-        { label: 'Đang hoạt động', value: users.filter(u => u.isActive).length, color: '#2e7d32' },
-        { label: 'Quản trị viên', value: users.filter(u => u.role === 'ROLE_ADMIN').length, color: '#7b1fa2' },
-        { label: 'Thu ngân', value: users.filter(u => u.role === 'ROLE_CASHIER').length, color: '#1976d2' },
-    ];
+    const stats = isManager
+        ? [
+            { label: 'Tổng nhân sự', value: users.length, color: '#1a1a2e' },
+            { label: 'Đang hoạt động', value: users.filter(u => u.isActive).length, color: '#2e7d32' },
+            { label: 'Thu ngân', value: users.filter(u => u.role === 'ROLE_CASHIER').length, color: '#1976d2' },
+        ]
+        : [
+            { label: 'Tổng nhân sự', value: users.length, color: '#1a1a2e' },
+            { label: 'Đang hoạt động', value: users.filter(u => u.isActive).length, color: '#2e7d32' },
+            { label: 'Quản lý', value: users.filter(u => u.role === 'ROLE_MANAGER').length, color: '#7b1fa2' },
+            { label: 'Thu ngân', value: users.filter(u => u.role === 'ROLE_CASHIER').length, color: '#1976d2' },
+        ];
 
     return (
         <Box sx={{ p: 3, bgcolor: '#f8f9fb', minHeight: '100vh' }}>
@@ -147,7 +165,7 @@ const UserListPage: React.FC = () => {
                         </IconButton>
                     </Tooltip>
                     <Button variant="contained" startIcon={<Add />}
-                        onClick={() => setOpenCreate(true)}
+                        onClick={() => { setEditingUser(null); setOpenCreate(true); }}
                         sx={{ bgcolor: '#2563eb', textTransform: 'none', fontWeight: 700, '&:hover': { bgcolor: '#1d4ed8' } }}>
                         Tạo tài khoản mới
                     </Button>
@@ -155,7 +173,7 @@ const UserListPage: React.FC = () => {
             </Box>
 
             {/* Stats */}
-            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 2, mb: 3 }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(${stats.length}, 1fr)`, gap: 2, mb: 3 }}>
                 {stats.map(s => (
                     <Paper key={s.label} elevation={0} sx={{ p: 2.5, borderRadius: 2, border: '1px solid #f0f0f0', textAlign: 'center' }}>
                         {loading
@@ -180,13 +198,15 @@ const UserListPage: React.FC = () => {
                         </InputAdornment>
                     }}
                 />
-                <FormControl size="small" sx={{ minWidth: 160 }}>
-                    <Select value={roleFilter} onChange={e => setRoleFilter(e.target.value)} sx={{ fontSize: 13 }}>
-                        {ROLE_OPTIONS.map(o => (
-                            <MenuItem key={o.value} value={o.value} sx={{ fontSize: 13 }}>{o.label}</MenuItem>
-                        ))}
-                    </Select>
-                </FormControl>
+                {!isManager && (
+                    <FormControl size="small" sx={{ minWidth: 160 }}>
+                        <Select value={roleFilter} onChange={e => setRoleFilter(e.target.value)} sx={{ fontSize: 13 }}>
+                            {ROLE_OPTIONS.map(o => (
+                                <MenuItem key={o.value} value={o.value} sx={{ fontSize: 13 }}>{o.label}</MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                )}
             </Box>
 
             {/* Table */}
@@ -267,7 +287,7 @@ const UserListPage: React.FC = () => {
                                             />
                                         </TableCell>
                                         <TableCell sx={{ py: 1.5 }} align="center">
-                                            <RowMenu user={user} onToggleActive={handleToggleActive} />
+                                            <RowMenu user={user} onToggleActive={handleToggleActive} onEdit={handleEditClick} />
                                         </TableCell>
                                     </TableRow>
                                 );
@@ -292,10 +312,11 @@ const UserListPage: React.FC = () => {
                 </Box>
             </Paper>
 
-            <UserCreateModal 
-                open={openCreate} 
-                onClose={() => setOpenCreate(false)} 
-                onSaved={loadUsers} 
+            <UserCreateModal
+                open={openCreate}
+                onClose={() => { setOpenCreate(false); setEditingUser(null); }}
+                onSaved={loadUsers}
+                userToEdit={editingUser}
             />
 
             <Snackbar

@@ -1,7 +1,7 @@
 // src/modules/customer/components/home/CategorySidebar.tsx
 import React, { useState } from 'react';
-import { Box, Typography, List, ListItemButton, ListItemIcon, ListItemText, Paper, Skeleton, Divider } from '@mui/material';
-import { ChevronRight, MenuBook } from '@mui/icons-material';
+import { Box, List, ListItemButton, ListItemIcon, ListItemText, Paper, Skeleton, Typography, Divider } from '@mui/material';
+import { ChevronRight } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useCategories, DisplayCategory } from '../../hooks/useCategories';
 
@@ -15,51 +15,18 @@ const CategorySidebar = () => {
     };
 
     return (
-        <Box 
+        <Box
             onMouseLeave={() => setHoveredCategory(null)}
-            sx={{ 
-                width: '100%', 
-                bgcolor: '#ffffff', 
-                borderRadius: '12px',
-                border: '1px solid #eef0f2',
-                boxShadow: '0 4px 20px rgba(26,26,46,0.03)',
-                overflow: 'visible',
-                position: 'relative',
+            sx={{
+                width: '100%',
+                bgcolor: '#ffffff',
                 height: '100%',
                 display: 'flex',
-                flexDirection: 'column'
+                flexDirection: 'column',
+                position: 'relative',
+                overflow: 'visible'
             }}
         >
-            {/* Sidebar Header - Bookly Navy & Gold Accent */}
-            <Box sx={{ 
-                bgcolor: '#1a1a2e', 
-                color: '#ffffff', 
-                px: 2.5, 
-                py: 2.2, 
-                borderTopLeftRadius: '11px',
-                borderTopRightRadius: '11px',
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 1.5,
-                borderBottom: '3px solid #f5a623'
-            }}>
-                <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                    <Typography variant="subtitle1" sx={{ 
-                        fontFamily: '"Playfair Display", serif', 
-                        fontWeight: 900, 
-                        letterSpacing: '0.5px',
-                        textTransform: 'uppercase',
-                        fontSize: '0.9rem',
-                        color: '#f5a623'
-                    }}>
-                        Danh mục sách
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.68rem' }}>
-                        Hành trình tri thức mới
-                    </Typography>
-                </Box>
-            </Box>
-
             {/* Parent Categories List */}
             <Box sx={{ flex: 1, py: 1, overflowY: 'auto' }}>
                 {isLoading ? (
@@ -73,9 +40,11 @@ const CategorySidebar = () => {
                     </Box>
                 ) : (
                     <List dense sx={{ p: 0 }}>
-                        {categories.map((cat) => {
+                        {categories.map((cat, index) => {
                             const hasChildren = cat.children && cat.children.length > 0;
                             const isHovered = hoveredCategory?.id === cat.id;
+                            const isFirst = index === 0;
+                            const isLast = index === categories.length - 1;
 
                             return (
                                 <ListItemButton
@@ -88,31 +57,35 @@ const CategorySidebar = () => {
                                         transition: 'all 0.2s ease',
                                         bgcolor: isHovered ? 'rgba(245, 166, 35, 0.06)' : 'transparent',
                                         color: isHovered ? '#f5a623' : '#1a1a2e',
+                                        borderTopLeftRadius: isFirst ? '12px' : 0,
+                                        borderTopRightRadius: isFirst ? '12px' : 0,
+                                        borderBottomLeftRadius: isLast ? '12px' : 0,
+                                        borderBottomRightRadius: isLast ? '12px' : 0,
                                         '&:hover': {
                                             bgcolor: 'rgba(245, 166, 35, 0.08)',
                                             color: '#f5a623',
                                         }
                                     }}
                                 >
-                                    <ListItemIcon sx={{ 
-                                        minWidth: 32, 
+                                    <ListItemIcon sx={{
+                                        minWidth: 32,
                                         fontSize: '1.25rem',
                                         color: isHovered ? '#f5a623' : '#8c9ba5',
                                         transition: 'color 0.2s ease'
                                     }}>
                                         {cat.icon || '📖'}
                                     </ListItemIcon>
-                                    <ListItemText 
-                                        primary={cat.name} 
-                                        primaryTypographyProps={{ 
-                                            fontSize: '0.88rem', 
-                                            fontWeight: isHovered ? 700 : 500,
+                                    <ListItemText
+                                        primary={cat.name}
+                                        primaryTypographyProps={{
+                                            fontSize: '0.88rem',
+                                            fontWeight: 500,
                                             fontFamily: '"Inter", sans-serif'
-                                        }} 
+                                        }}
                                     />
                                     {hasChildren && (
-                                        <ChevronRight sx={{ 
-                                            fontSize: 16, 
+                                        <ChevronRight sx={{
+                                            fontSize: 16,
                                             color: isHovered ? '#f5a623' : '#c0cacc',
                                             transform: isHovered ? 'translateX(2px)' : 'none',
                                             transition: 'all 0.2s ease'
@@ -127,14 +100,14 @@ const CategorySidebar = () => {
 
             {/* Flyout Dropdown Subcategories Popup */}
             {hoveredCategory && hoveredCategory.children && hoveredCategory.children.length > 0 && (
-                <Paper 
+                <Paper
                     elevation={0}
                     onMouseEnter={() => setHoveredCategory(hoveredCategory)}
                     sx={{
                         position: 'absolute',
                         top: 0,
                         left: '100%',
-                        width: '260px',
+                        width: '400px',
                         minHeight: '100%',
                         bgcolor: '#ffffff',
                         border: '1px solid #eef0f2',
@@ -146,43 +119,64 @@ const CategorySidebar = () => {
                         p: 2.5,
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: 2,
+                        gap: 1.5,
                         animation: 'fadeIn 0.15s ease-out'
                     }}
                 >
+                    {/* Header Title displaying Parent Category Name from API */}
+                    <Box sx={{ px: 1.5, mb: 0.5 }}>
+                        <Typography
+                            variant="subtitle2"
+                            sx={{
+                                fontWeight: 800,
+                                color: '#f5a623',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                                fontSize: '0.85rem',
+                                mb: 1
+                            }}
+                        >
+                            {hoveredCategory.name}
+                        </Typography>
+                        <Divider sx={{ borderColor: '#eef0f2' }} />
+                    </Box>
+
                     {/* Subcategories Section */}
-                    <Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                            <MenuBook sx={{ fontSize: 16, color: '#f5a623' }} />
-                            <Typography variant="body2" sx={{ fontWeight: 800, color: '#1a1a2e', textTransform: 'uppercase', letterSpacing: '0.5px', fontSize: '0.75rem' }}>
-                                {hoveredCategory.name}
-                            </Typography>
-                        </Box>
-                        <Divider sx={{ mb: 1.5, borderColor: '#eef0f2' }} />
-                        <List dense sx={{ p: 0 }}>
+                    <Box sx={{ width: '100%' }}>
+                        <List
+                            dense
+                            sx={{
+                                p: 0,
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(2, 1fr)',
+                                gap: 0.5
+                            }}
+                        >
                             {hoveredCategory.children.map((sub) => (
                                 <ListItemButton
                                     key={sub.id}
                                     onClick={() => handleCategoryClick(sub.name)}
                                     sx={{
-                                        py: 1,
+                                        py: 0.8,
                                         px: 1.5,
                                         borderRadius: '6px',
                                         transition: 'all 0.15s ease',
+                                        color: '#5c6a79',
+                                        bgcolor: 'transparent',
                                         '&:hover': {
-                                            bgcolor: 'rgba(26, 26, 46, 0.03)',
+                                            bgcolor: 'transparent',
                                             color: '#f5a623',
-                                            paddingLeft: '16px'
+                                            paddingLeft: '20px'
                                         }
                                     }}
                                 >
-                                    <ListItemText 
-                                        primary={sub.name} 
-                                        primaryTypographyProps={{ 
-                                            fontSize: '0.85rem', 
+                                    <ListItemText
+                                        primary={sub.name}
+                                        primaryTypographyProps={{
+                                            fontSize: '0.85rem',
                                             fontWeight: 500,
-                                            color: '#5c6a79'
-                                        }} 
+                                            color: 'inherit'
+                                        }}
                                     />
                                 </ListItemButton>
                             ))}

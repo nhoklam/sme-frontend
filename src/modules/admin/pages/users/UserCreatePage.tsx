@@ -10,9 +10,9 @@ import { ArrowBack, Save, Visibility, VisibilityOff, Person, Lock, Email, Phone 
 import userService from '../../../../services/userService';
 import warehouseService from '../../../../services/warehouseService';
 import { CreateUserRequest, Warehouse, UserRole } from '../../../../types';
+import { useAuth } from '../../../../store/hooks/useAuth';
 
 const ROLE_OPTIONS: { value: UserRole; label: string; sub: string; color: string }[] = [
-    { value: 'ROLE_ADMIN', label: 'Admin', sub: 'Toàn quyền hệ thống', color: '#7b1fa2' },
     { value: 'ROLE_MANAGER', label: 'Quản lý', sub: 'Quản lý chi nhánh', color: '#1976d2' },
     { value: 'ROLE_CASHIER', label: 'Thu ngân', sub: 'Bán hàng POS', color: '#2e7d32' },
 ];
@@ -60,7 +60,13 @@ const INITIAL: FormState = {
 
 const UserCreatePage: React.FC = () => {
     const navigate = useNavigate();
-    const [form, setForm] = useState<FormState>(INITIAL);
+    const { user: currentUser, isAdmin, isManager } = useAuth();
+
+    const [form, setForm] = useState<FormState>({
+        ...INITIAL,
+        role: isAdmin ? 'ROLE_MANAGER' : 'ROLE_CASHIER',
+        warehouseId: isAdmin ? '' : (currentUser?.warehouseId || ''),
+    });
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
     const [showPwd, setShowPwd] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
@@ -87,7 +93,7 @@ const UserCreatePage: React.FC = () => {
         if (!form.password || form.password.length < 8) errs.password = 'Mật khẩu tối thiểu 8 ký tự';
         if (form.password !== form.confirmPassword) errs.confirmPassword = 'Mật khẩu xác nhận không khớp';
         if (!form.role) errs.role = 'Vui lòng chọn vai trò';
-        if (form.role !== 'ROLE_ADMIN' && !form.warehouseId) errs.warehouseId = 'Vui lòng chọn chi nhánh';
+        if (!form.warehouseId) errs.warehouseId = 'Vui lòng chọn chi nhánh';
         return errs;
     };
 
@@ -104,7 +110,7 @@ const UserCreatePage: React.FC = () => {
                 email: form.email.trim() || undefined,
                 phone: form.phone.trim() || undefined,
                 role: form.role,
-                warehouseId: form.role !== 'ROLE_ADMIN' ? form.warehouseId : undefined,
+                warehouseId: form.warehouseId,
                 posSettings: form.role === 'ROLE_CASHIER' ? JSON.stringify(form.posSettings) : undefined,
             };
             await userService.create(payload);
@@ -118,7 +124,7 @@ const UserCreatePage: React.FC = () => {
     };
 
     const selectedRole = ROLE_OPTIONS.find(r => r.value === form.role);
-    const needWarehouse = form.role !== 'ROLE_ADMIN';
+    const needWarehouse = true;
 
     return (
         <Box sx={{ p: 3, bgcolor: '#f8f9fb', minHeight: '100vh' }}>
@@ -262,9 +268,9 @@ const UserCreatePage: React.FC = () => {
                                     <Typography variant="caption" fontWeight={700} color="#555" display="block" mb={0.75}>
                                         Vai trò <span style={{ color: '#d32f2f' }}>*</span>
                                     </Typography>
-                                    <FormControl fullWidth size="small" error={!!errors.role}>
+                                    <FormControl fullWidth size="small" error={!!errors.role} disabled={isManager}>
                                         <Select value={form.role}
-                                            onChange={(e) => setForm(f => ({ ...f, role: e.target.value as UserRole, warehouseId: '' }))}>
+                                            onChange={(e) => setForm(f => ({ ...f, role: e.target.value as UserRole, warehouseId: isManager ? (currentUser?.warehouseId || '') : '' }))}>
                                             {ROLE_OPTIONS.map(r => (
                                                 <MenuItem key={r.value} value={r.value} sx={{ fontSize: 13 }}>
                                                     <Box>
@@ -281,7 +287,7 @@ const UserCreatePage: React.FC = () => {
                                     <Typography variant="caption" fontWeight={700} color="#555" display="block" mb={0.75}>
                                         Chi nhánh {needWarehouse && <span style={{ color: '#d32f2f' }}>*</span>}
                                     </Typography>
-                                    <FormControl fullWidth size="small" error={!!errors.warehouseId} disabled={!needWarehouse}>
+                                    <FormControl fullWidth size="small" error={!!errors.warehouseId} disabled={!needWarehouse || isManager}>
                                         <Select value={form.warehouseId}
                                             onChange={(e) => setForm(f => ({ ...f, warehouseId: e.target.value }))}
                                             displayEmpty>
@@ -384,8 +390,7 @@ const UserCreatePage: React.FC = () => {
                                 Quyền hạn: {selectedRole.label}
                             </Typography>
                             <Typography variant="caption" color="text.secondary" display="block">
-                                {form.role === 'ROLE_ADMIN' && <>• Toàn quyền tất cả chức năng<br />• Tạo/xóa tài khoản nhân viên<br />• Xem nhật ký hệ thống<br />• Quản lý tất cả chi nhánh</>}
-                                {form.role === 'ROLE_MANAGER' && <>• Quản lý chi nhánh được gán<br />• Duyệt phiếu nhập kho, chuyển kho<br />• Xem báo cáo chi nhánh<br />• Không tạo tài khoản mới</>}
+                                {form.role === 'ROLE_MANAGER' && <>• Quản lý chi nhánh được gán<br />• Duyệt phiếu nhập kho, chuyển kho<br />• Xem báo cáo chi nhánh<br />• Quản lý nhân viên chi nhánh</>}
                                 {form.role === 'ROLE_CASHIER' && <>• Bán hàng tại POS<br />• Xem sản phẩm & tồn kho<br />• Mở/đóng ca làm việc<br />• Không truy cập báo cáo</>}
                             </Typography>
                         </Paper>

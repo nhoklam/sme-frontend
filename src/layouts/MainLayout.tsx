@@ -6,6 +6,7 @@ import { CartProvider } from '../store/CartContext';
 import Header from '../components/layout/Header';
 import Footer from '../components/layout/Footer';
 import CartDrawer from '../modules/customer/components/cart/CartDrawer';
+import CustomerAiChat from '../modules/customer/components/chat/CustomerAiChat';
 
 const MainLayout = () => (
     <CartProvider>
@@ -17,6 +18,7 @@ const MainLayout = () => (
             <Footer />
         </Box>
         <CartDrawer />
+        <CustomerAiChat />
     </CartProvider>
 );
 

@@ -17,6 +17,7 @@ import supplierService from '../../../../services/supplierService';
 import toast from 'react-hot-toast';
 import { Category, Supplier, UpdateProductRequest, CreateProductRequest } from '../../../../types';
 import JsBarcode from 'jsbarcode';
+import authService from '../../../../services/authService';
 
 const fmt = (n?: number) =>
     n == null ? '—' : new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n);
@@ -24,10 +25,10 @@ const fmt = (n?: number) =>
 const UNIT_OPTIONS = ['Cuốn', 'Bộ', 'Tập', 'Hộp', 'Gói'];
 
 const FieldLabel = ({ label, required, hint }: { label: string; required?: boolean; hint?: string }) => (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.75 }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.75, minHeight: 22 }}>
         <Typography variant="body2" fontWeight={700} color="#334155" fontSize={12.5}>
             {label}
-            {required && <Typography component="span" color="#ef4444"> *</Typography>}
+            {required && <span style={{ color: '#ef4444' }}> *</span>}
         </Typography>
         {hint && (
             <Tooltip title={hint} arrow placement="top">
@@ -95,9 +96,9 @@ const MultiImageUploader = ({ imageUrls, onChange }: { imageUrls: string[]; onCh
         <Box>
             <FieldLabel label="Ảnh sản phẩm" hint="Ảnh đầu tiên sẽ là ảnh đại diện chính." />
             {uploadError && <Alert severity="error" sx={{ mb: 1.5, py: 0, fontSize: 12 }}>{uploadError}</Alert>}
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                 {imageUrls.map((url, idx) => (
-                    <Box key={url + idx} sx={{ position: 'relative', width: 90, height: 120 }}>
+                    <Box key={url + idx} sx={{ position: 'relative', width: 76, height: 100 }}>
                         <Box component="img" src={url} alt="img"
                             sx={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 2, border: idx === 0 ? '2.5px solid #2563eb' : '1.5px solid #e2e8f0', bgcolor: '#f8fafc' }} />
                         <Box sx={{ position: 'absolute', top: 4, right: 4, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
@@ -117,7 +118,7 @@ const MultiImageUploader = ({ imageUrls, onChange }: { imageUrls: string[]; onCh
                 ))}
                 <Box onClick={() => !uploading && inputRef.current?.click()}
                     sx={{
-                        width: 90, height: 120, border: '2px dashed #cbd5e1', borderRadius: 2,
+                        width: 76, height: 100, border: '2px dashed #cbd5e1', borderRadius: 2,
                         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                         cursor: uploading ? 'wait' : 'pointer', bgcolor: '#f8fafc', transition: '0.2s',
                         '&:hover': { borderColor: '#2563eb', bgcolor: '#fff' }, position: 'relative'
@@ -146,6 +147,10 @@ const INITIAL_FORM = {
 };
 
 const ProductFormDialog: React.FC<Props> = ({ open, onClose, onSuccess, productId }) => {
+    const user = authService.getCurrentUser()?.user;
+    const isManager = user?.role === 'ROLE_MANAGER';
+    const disablePrice = !!productId && isManager;
+
     const [form, setForm] = useState(INITIAL_FORM);
     const [categories, setCategories] = useState<Category[]>([]);
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -230,7 +235,8 @@ const ProductFormDialog: React.FC<Props> = ({ open, onClose, onSuccess, productI
             if (productId) {
                 const payload: UpdateProductRequest = {
                     name: form.name.trim(), categoryId: form.categoryId, supplierId: form.supplierId || null, hasSupplierId: true,
-                    isbnBarcode: form.isbnBarcode.trim(), sku: form.sku?.trim() || undefined, description: form.description?.trim() || undefined,
+                    isbnBarcode: form.isbnBarcode.trim(), sku: form.sku?.trim() || undefined,
+                    description: form.description?.trim() || undefined,
                     retailPrice, wholesalePrice, imageUrls: form.imageUrls, unit: form.unit, weight, isActive: form.isActive,
                 };
                 await productService.update(productId, payload);
@@ -285,7 +291,42 @@ const ProductFormDialog: React.FC<Props> = ({ open, onClose, onSuccess, productI
                                                 <FormControl fullWidth size="small" error={!!errors.categoryId} sx={inputStyles}>
                                                     <Select value={form.categoryId} onChange={set('categoryId')} displayEmpty>
                                                         <MenuItem value="" disabled>— Chọn danh mục —</MenuItem>
-                                                        {categories.map(c => <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>{c.name}</MenuItem>)}
+                                                        {(() => {
+                                                            const roots = categories.filter(c => !c.parentId);
+                                                            const getChildren = (parentId: string) => categories.filter(c => c.parentId === parentId);
+                                                            const items: React.ReactNode[] = [];
+                                                            roots.forEach(root => {
+                                                                const children = getChildren(root.id);
+                                                                if (children.length > 0) {
+                                                                    // Parent as group header (not selectable)
+                                                                    items.push(
+                                                                        <MenuItem key={`header-${root.id}`} disabled sx={{ 
+                                                                            fontSize: 12, fontWeight: 800, color: '#1e293b', 
+                                                                            textTransform: 'uppercase', letterSpacing: '0.5px',
+                                                                            bgcolor: '#f1f5f9', mt: 0.5,
+                                                                            '&.Mui-disabled': { opacity: 1 }
+                                                                        }}>
+                                                                            {root.name}
+                                                                        </MenuItem>
+                                                                    );
+                                                                    children.forEach(child => {
+                                                                        items.push(
+                                                                            <MenuItem key={child.id} value={child.id} sx={{ fontSize: 13, pl: 4 }}>
+                                                                                ↳ {child.name}
+                                                                            </MenuItem>
+                                                                        );
+                                                                    });
+                                                                } else {
+                                                                    // Standalone category (no children)
+                                                                    items.push(
+                                                                        <MenuItem key={root.id} value={root.id} sx={{ fontSize: 13 }}>
+                                                                            {root.name}
+                                                                        </MenuItem>
+                                                                    );
+                                                                }
+                                                            });
+                                                            return items;
+                                                        })()}
                                                     </Select>
                                                 </FormControl>
                                             </Grid>
@@ -323,12 +364,12 @@ const ProductFormDialog: React.FC<Props> = ({ open, onClose, onSuccess, productI
                                         <Grid container spacing={2}>
                                             <Grid size={{ xs: 12, sm: 4 }}>
                                                 <FieldLabel label="Giá bán lẻ" required />
-                                                <TextField fullWidth size="small" type="number" value={form.retailPrice} onChange={set('retailPrice')} error={!!errors.retailPrice} helperText={errors.retailPrice} sx={inputStyles}
+                                                <TextField fullWidth size="small" type="number" value={form.retailPrice} onChange={set('retailPrice')} error={!!errors.retailPrice} helperText={errors.retailPrice} sx={inputStyles} disabled={disablePrice}
                                                     InputProps={{ endAdornment: <InputAdornment position="end"><Typography variant="caption" fontWeight={700} color="#94a3b8">₫</Typography></InputAdornment> }} />
                                             </Grid>
                                             <Grid size={{ xs: 12, sm: 4 }}>
                                                 <FieldLabel label="Giá bán sỉ" />
-                                                <TextField fullWidth size="small" type="number" value={form.wholesalePrice} onChange={set('wholesalePrice')} sx={inputStyles}
+                                                <TextField fullWidth size="small" type="number" value={form.wholesalePrice} onChange={set('wholesalePrice')} sx={inputStyles} disabled={disablePrice}
                                                     InputProps={{ endAdornment: <InputAdornment position="end"><Typography variant="caption" fontWeight={700} color="#94a3b8">₫</Typography></InputAdornment> }} />
                                             </Grid>
                                             <Grid size={{ xs: 12, sm: 4 }}>
@@ -388,7 +429,7 @@ const ProductFormDialog: React.FC<Props> = ({ open, onClose, onSuccess, productI
                                                 <Typography variant="body2" fontWeight={800} color={form.isActive ? '#16a34a' : '#e11d48'}>{form.isActive ? 'ĐANG KINH DOANH' : 'NGỪNG KINH DOANH'}</Typography>
                                                 <Typography variant="caption" color="text.secondary">Trạng thái hiển thị POS</Typography>
                                             </Box>
-                                            <Switch checked={form.isActive} onChange={e => setForm(f => ({ ...f, isActive: e.target.checked }))} color="success" />
+                                            <Switch checked={form.isActive} onChange={e => setForm(f => ({ ...f, isActive: e.target.checked }))} color="success" disabled={isManager} />
                                         </Box>
                                     )}
                                 </Box>

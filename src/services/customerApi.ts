@@ -1,5 +1,5 @@
 import axiosInstance from './axiosInstance';
-import { Customer, CustomerAddress, WishlistItem, Order, PageData, ApiResponse } from '../types';
+import { Customer, CustomerAddress, Order, PageData, ApiResponse } from '../types';
 
 export const customerApi = {
   getProfile: async () => {
@@ -22,21 +22,9 @@ export const customerApi = {
     return axiosInstance.delete<any, ApiResponse<void>>(`/customers/me/addresses/${id}`);
   },
   setDefaultAddress: async (id: string) => {
-    return axiosInstance.patch<any, ApiResponse<CustomerAddress>>(`/customers/me/addresses/${id}/set-default`);
+    return axiosInstance.put<any, ApiResponse<CustomerAddress>>(`/customers/me/addresses/${id}/default`);
   },
 
-  getWishlist: async () => {
-    return axiosInstance.get<any, ApiResponse<WishlistItem[]>>('/customers/me/wishlist');
-  },
-  addToWishlist: async (productId: string) => {
-    return axiosInstance.post<any, ApiResponse<void>>(`/customers/me/wishlist/${productId}`);
-  },
-  removeFromWishlist: async (productId: string) => {
-    return axiosInstance.delete<any, ApiResponse<void>>(`/customers/me/wishlist/${productId}`);
-  },
-  checkWishlist: async (productId: string) => {
-    return axiosInstance.get<any, ApiResponse<{ inWishlist: boolean }>>(`/customers/me/wishlist/${productId}/check`);
-  },
 
   getOrders: async (page: number = 0, size: number = 10) => {
     return axiosInstance.get<any, ApiResponse<PageData<Order>>>('/customers/me/orders', {
@@ -48,5 +36,20 @@ export const customerApi = {
   },
   getLoyaltyPoints: async () => {
     return axiosInstance.get<any, ApiResponse<{ totalPoints: number; tier: string }>>('/customers/me/loyalty-points');
+  },
+  
+  // Review & Upload
+  uploadImage: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return axiosInstance.post<any, ApiResponse<{ url: string }>>('/upload/image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  createReview: async (productId: string, data: { orderId: string; rating: number; comment?: string; imageUrls?: string[] }) => {
+    return axiosInstance.post<any, ApiResponse<any>>('/reviews', {
+      productId,
+      ...data
+    });
   }
 };

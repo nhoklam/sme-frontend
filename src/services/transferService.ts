@@ -39,9 +39,22 @@ export const transferService = {
         return res.data.data;
     },
 
+    // Lấy danh sách phiếu chuyển theo mã đơn hàng
+    getByOrderId: async (orderId: string): Promise<InternalTransfer[]> => {
+        const res = await axiosInstance.get<ApiResponse<InternalTransfer[]>>(`/transfers/order/${orderId}`);
+        return res.data.data;
+    },
+
     // Xác nhận nhận hàng (chuyển trạng thái từ DISPATCHED → RECEIVED)
     receive: async (id: string, items?: Array<{ productId: string; receivedQty: number }>): Promise<InternalTransfer> => {
-        const res = await axiosInstance.post<ApiResponse<InternalTransfer>>(`/transfers/${id}/receive`, items ? { items } : undefined);
+        // Backend mong đợi mảng List<ReceiveItemRequest> trực tiếp trong body, không bọc trong object { items }
+        const res = await axiosInstance.post<ApiResponse<InternalTransfer>>(`/transfers/${id}/receive`, items || []);
+        return res.data.data;
+    },
+
+    // Hủy phiếu chuyển kho
+    cancel: async (id: string, reason?: string): Promise<InternalTransfer> => {
+        const res = await axiosInstance.post<ApiResponse<InternalTransfer>>(`/transfers/${id}/cancel`, reason ? { reason } : {});
         return res.data.data;
     },
 };

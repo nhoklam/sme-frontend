@@ -31,6 +31,9 @@ import RefundDialog from '../components/pos/RefundDialog';
 import PromotionDialog from '../components/pos/PromotionDialog';
 import RevenueReportDialog from '../components/pos/RevenueReportDialog';
 import promotionService from '../../../services/promotionService';
+import posService from '../../../services/posService';
+import QrPaymentDialog from '../components/pos/QrPaymentDialog';
+import { usePosPaymentWebSocket } from '../../../store/hooks/usePosPaymentWebSocket';
 
 const fmt = (n?: number) =>
     new Intl.NumberFormat('vi-VN', {
@@ -150,9 +153,25 @@ const EmployeePOSPage: React.FC = () => {
     const [refundInitialCode, setRefundInitialCode] = useState<string | undefined>(undefined);
     const [revenueOpen, setRevenueOpen] = useState(false);
 
-    const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'BANK_TRANSFER' | 'CARD' | 'E_WALLET'>('CASH');
+    const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'BANK_TRANSFER' | 'CARD' | 'VNPAY' | 'PAYOS'>('CASH');
     const [customerGivenAmount, setCustomerGivenAmount] = useState<number | ''>('');
     const [autoPrint, setAutoPrint] = useState(true);
+
+    const [qrDialogOpen, setQrDialogOpen] = useState(false);
+    const [qrPaymentData, setQrPaymentData] = useState<{ checkoutUrl: string; qrCode?: string; orderCode: string; amount: number; gateway: string } | null>(null);
+
+    usePosPaymentWebSocket(qrPaymentData?.orderCode || '', (invoice) => {
+        setSnack({ msg: '✅ Khách hàng đã thanh toán thành công!', sev: 'success' });
+        setQrDialogOpen(false);
+        setQrPaymentData(null);
+        updateOrder(o => ({ ...o, items: [], customer: null, pointsToUse: 0, couponCode: '', couponDiscount: 0, orderDiscount: 0, orderDiscountAmt: 0 }));
+        setCheckoutOpen(false);
+        setCustomerGivenAmount('');
+        if (autoPrint) {
+            setPrintInvoice(invoice);
+            setPrintDialogOpen(true);
+        }
+    });
 
     const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
     const [editingPriceVal, setEditingPriceVal] = useState('');
@@ -315,7 +334,7 @@ const EmployeePOSPage: React.FC = () => {
             if (actualAmount > finalAmount) actualAmount = finalAmount;
             const payments = [{ method: paymentMethod, amount: actualAmount }];
 
-            const res = await axiosInstance.post('/pos/checkout', {
+            const reqPayload = {
                 shiftId: shift.id,
                 customerId: activeOrder.customer?.id ?? null,
                 items: activeOrder.items.map(i => ({ productId: i.productId, quantity: i.quantity, unitPrice: i.unitPrice })),
@@ -324,7 +343,17 @@ const EmployeePOSPage: React.FC = () => {
                 orderDiscountAmt: orderDiscountAmt > 0 ? orderDiscountAmt : undefined,
                 couponDiscountAmt: couponDiscountAmt > 0 ? couponDiscountAmt : undefined,
                 couponCodes: activeOrder.couponCode ? [activeOrder.couponCode] : undefined,
-            });
+            };
+
+            if (paymentMethod === 'VNPAY' || paymentMethod === 'PAYOS') {
+                const data = await posService.initQrCheckout(paymentMethod, reqPayload);
+                setQrPaymentData(data);
+                setQrDialogOpen(true);
+                setCheckoutLoading(false);
+                return;
+            }
+
+            const res = await axiosInstance.post('/pos/checkout', reqPayload);
             const invoiceData = res.data?.data;
             if (invoiceData && invoiceData.items) {
                 invoiceData.items = invoiceData.items.map((inv: any) => {
@@ -893,8 +922,9 @@ const EmployeePOSPage: React.FC = () => {
                             {[
                                 { id: 'CASH', label: 'Tiền mặt' },
                                 { id: 'BANK_TRANSFER', label: 'Chuyển khoản' },
-                                { id: 'CARD', label: 'Thẻ' },
-                                { id: 'E_WALLET', label: 'Ví điện tử' }
+                                { id: 'CARD', label: 'Quẹt thẻ' },
+                                { id: 'VNPAY', label: 'VNPay' },
+                                { id: 'PAYOS', label: 'PayOS' }
                             ].map(method => (
                                 <FormControlLabel
                                     key={method.id}
@@ -957,6 +987,18 @@ const EmployeePOSPage: React.FC = () => {
                     setPrintDialogOpen(true);
                 }}
             />
+
+            {qrPaymentData && (
+                <QrPaymentDialog 
+                    open={qrDialogOpen} 
+                    onClose={() => { setQrDialogOpen(false); setQrPaymentData(null); }} 
+                    checkoutUrl={qrPaymentData.checkoutUrl} 
+                    qrCode={qrPaymentData.qrCode}
+                    orderCode={qrPaymentData.orderCode} 
+                    amount={qrPaymentData.amount} 
+                    gateway={qrPaymentData.gateway} 
+                />
+            )}
 
             {/* Confirm Delete Dialog */}
             <Dialog open={confirmDeleteIdx !== null} onClose={() => setConfirmDeleteIdx(null)} PaperProps={{ sx: { borderRadius: 3, minWidth: 380 } }}>

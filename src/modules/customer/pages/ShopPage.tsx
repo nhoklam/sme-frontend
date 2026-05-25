@@ -4,7 +4,8 @@ import {
     Box, Container, Grid, Typography, Paper, Button,
     TextField, InputAdornment, Select, MenuItem,
     FormControl, Chip, IconButton, Drawer, Badge,
-    Pagination, Skeleton, Fade, Divider, Slider
+    Pagination, Skeleton, Fade, Divider, Slider,
+    Breadcrumbs, Link
 } from '@mui/material';
 import { SelectChangeEvent } from '@mui/material/Select';
 import {
@@ -75,19 +76,6 @@ const FilterSidebar: React.FC<FilterSidebarProps> = ({
 
             {/* Categories */}
             <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5, color: 'var(--color-primary)' }}>Danh mục</Typography>
-            <Box
-                onClick={() => setFilters(f => ({ ...f, category: '', categoryId: '' }))}
-                sx={{
-                    display: 'flex', alignItems: 'center', px: 1.5, py: 1, mb: 0.5, borderRadius: 1, cursor: 'pointer',
-                    bgcolor: filters.category === '' ? 'rgba(245, 166, 35, 0.1)' : 'transparent',
-                    borderLeft: filters.category === '' ? '3px solid var(--color-secondary)' : '3px solid transparent',
-                    '&:hover': { bgcolor: 'rgba(245, 166, 35, 0.05)' },
-                }}
-            >
-                <Typography sx={{ fontSize: '0.9rem', fontWeight: filters.category === '' ? 700 : 500, color: filters.category === '' ? 'var(--color-secondary)' : 'var(--text-primary)' }}>
-                    Tất cả sách
-                </Typography>
-            </Box>
 
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mb: 3, maxHeight: 250, overflowY: 'auto' }}>
                 {categoriesLoading
@@ -202,13 +190,13 @@ const ShopPage: React.FC = () => {
 
     const [quickViewProduct, setQuickViewProduct] = useState<any>(null);
 
-    const { categories, isLoading: categoriesLoading } = useCategories();
+    const { categories, flatCategories, isLoading: categoriesLoading } = useCategories();
 
     useEffect(() => {
         const categoryName = searchParams.get('category') || '';
         const sortParam = searchParams.get('sort') || 'popular';
         const searchKeyword = searchParams.get('search') || '';
-        const matchedCat = categories.find(c => c.name === categoryName);
+        const matchedCat = flatCategories.find(c => c.name === categoryName);
 
         setFilters(f => ({
             ...f,
@@ -259,9 +247,33 @@ const ShopPage: React.FC = () => {
             {/* Breadcrumb bar */}
             <Box sx={{ bgcolor: 'var(--bg-paper)', borderBottom: '1px solid var(--color-border)', py: 2 }}>
                 <Container maxWidth="lg">
-                    <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500, letterSpacing: 0.5 }}>
-                        Trang chủ / Cửa hàng {filters.category ? `/ ${filters.category}` : ''}
-                    </Typography>
+                    <Breadcrumbs sx={{ fontSize: 13, '& .MuiBreadcrumbs-separator': { color: 'text.secondary' } }}>
+                        <Link
+                            underline="hover"
+                            color="inherit"
+                            onClick={() => navigate('/')}
+                            sx={{ cursor: 'pointer', fontWeight: 500 }}
+                        >
+                            Trang chủ
+                        </Link>
+                        <Link
+                            underline="hover"
+                            color={filters.category ? 'inherit' : 'var(--color-secondary)'}
+                            onClick={() => {
+                                setFilters(f => ({ ...f, category: '', categoryId: '' }));
+                                setPage(0);
+                                navigate('/shop');
+                            }}
+                            sx={{ cursor: 'pointer', fontWeight: filters.category ? 500 : 700 }}
+                        >
+                            Cửa hàng
+                        </Link>
+                        {filters.category && (
+                            <Typography fontSize={13} color="var(--color-secondary)" fontWeight={700}>
+                                {filters.category}
+                            </Typography>
+                        )}
+                    </Breadcrumbs>
                     <Typography variant="h4" sx={{ fontFamily: '"Playfair Display", serif', fontWeight: 700, mt: 1, color: 'var(--color-primary)' }}>
                         {filters.category || 'Tất cả sách'}
                     </Typography>
@@ -359,16 +371,16 @@ const ShopPage: React.FC = () => {
                             <Fade in>
                                 <Grid container spacing={3}>
                                     {products.map(p => {
-                                        // Ánh xạ thuộc tính để ProductCard có thể hiển thị (mock badges & discount)
+                                        // Ánh xạ thuộc tính để ProductCard có thể hiển thị
                                         const productProps = {
                                             id: p.id,
                                             title: p.title || 'Đang cập nhật',
                                             author: p.author || 'Đang cập nhật',
                                             coverImage: p.img,
                                             price: p.price,
-                                            rating: p.rating || (4.5 + Math.random() * 0.5), // Mock rating
-                                            reviewCount: Math.floor(Math.random() * 500) + 50, // Mock reviews
-                                            badges: Math.random() > 0.8 ? ['bestseller' as const] : [],
+                                            rating: p.rating || 0, 
+                                            reviewCount: 0, 
+                                            badges: [] as const,
                                             onQuickView: () => setQuickViewProduct(p),
                                             onAddToCart: () => {
                                                 addToCart({ ...p, qty: 1 });

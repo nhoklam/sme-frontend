@@ -18,7 +18,8 @@ import {
 import * as XLSX from 'xlsx';
 import supplierService from '../../../../services/supplierService';
 import financeService from '../../../../services/financeService';
-import type { Supplier, CreateSupplierRequest, SupplierDebt } from '../../../../types/index';
+import { purchaseService } from '../../../../services/purchaseService';
+import type { Supplier, CreateSupplierRequest, SupplierDebt, PurchaseOrder } from '../../../../types/index';
 
 // ─── Types ────────────────────────────────────────────────────
 interface FormData {
@@ -90,6 +91,8 @@ const SupplierDetailDialog: React.FC<{
     const [debts, setDebts] = useState<SupplierDebt[]>([]);
     const [loadingDebts, setLoadingDebts] = useState(false);
     const [totalDebt, setTotalDebt] = useState<number>(0);
+    const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+    const [loadingOrders, setLoadingOrders] = useState(false);
 
     useEffect(() => {
         if (open && supplier && tab === 0) {
@@ -108,9 +111,22 @@ const SupplierDetailDialog: React.FC<{
     }, [open, supplier, tab]);
 
     useEffect(() => {
+        if (open && supplier && tab === 1) {
+            setLoadingOrders(true);
+            purchaseService.getBySupplier(supplier.id, { page: 0, size: 50 })
+                .then((ordersPage) => {
+                    setPurchaseOrders(ordersPage.content ?? []);
+                })
+                .catch(() => { setPurchaseOrders([]); })
+                .finally(() => setLoadingOrders(false));
+        }
+    }, [open, supplier, tab]);
+
+    useEffect(() => {
         if (!open) {
             setTab(0);
             setTotalDebt(0);
+            setPurchaseOrders([]);
         }
     }, [open]);
 
@@ -258,11 +274,70 @@ const SupplierDetailDialog: React.FC<{
                 )}
 
                 {tab === 1 && (
-                    <Box sx={{ textAlign: 'center', py: 8 }}>
-                        <History sx={{ fontSize: 48, color: '#e0e0e0', mb: 1 }} />
-                        <Typography variant="body2" color="text.secondary">
-                            Lịch sử nhập kho từ nhà cung cấp này sẽ hiển thị ở đây
-                        </Typography>
+                    <Box>
+                        {loadingOrders ? (
+                            [1, 2, 3].map(i => <Skeleton key={i} height={45} sx={{ mb: 1, borderRadius: 1 }} />)
+                        ) : purchaseOrders.length > 0 ? (
+                            <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #f0f0f0', borderRadius: 2 }}>
+                                <Table size="small">
+                                    <TableHead>
+                                        <TableRow sx={{ bgcolor: '#fafafa' }}>
+                                            <TableCell sx={{ fontWeight: 700, fontSize: 12 }}>MÃ ĐƠN NHẬP</TableCell>
+                                            <TableCell sx={{ fontWeight: 700, fontSize: 12 }}>NGÀY TẠO</TableCell>
+                                            <TableCell align="right" sx={{ fontWeight: 700, fontSize: 12 }}>TỔNG TIỀN</TableCell>
+                                            <TableCell align="right" sx={{ fontWeight: 700, fontSize: 12 }}>ĐÃ TRẢ</TableCell>
+                                            <TableCell align="center" sx={{ fontWeight: 700, fontSize: 12 }}>TRẠNG THÁI</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {purchaseOrders.map(order => (
+                                            <TableRow key={order.id} hover>
+                                                <TableCell sx={{ fontSize: 12, fontFamily: 'monospace', color: '#1976d2', fontWeight: 600 }}>
+                                                    {order.code}
+                                                </TableCell>
+                                                <TableCell sx={{ fontSize: 12 }}>
+                                                    {new Date(order.createdAt).toLocaleDateString('vi-VN')}
+                                                </TableCell>
+                                                <TableCell align="right" sx={{ fontSize: 12, fontWeight: 700 }}>
+                                                    {fmtCurrency(order.totalAmount)}
+                                                </TableCell>
+                                                <TableCell align="right" sx={{ fontSize: 12, color: '#2e7d32' }}>
+                                                    {fmtCurrency(order.paidAmount)}
+                                                </TableCell>
+                                                <TableCell align="center">
+                                                    <Chip
+                                                        label={
+                                                            order.status === 'COMPLETED' ? 'Đã nhập kho' :
+                                                                order.status === 'PENDING' ? 'Chờ duyệt' :
+                                                                    order.status === 'CANCELLED' ? 'Đã hủy' : 'Nháp'
+                                                        }
+                                                        size="small"
+                                                        sx={{
+                                                            height: 20, fontSize: 11, fontWeight: 700,
+                                                            bgcolor:
+                                                                order.status === 'COMPLETED' ? '#e8f5e9' :
+                                                                    order.status === 'PENDING' ? '#fff3e0' :
+                                                                        order.status === 'CANCELLED' ? '#ffe5e5' : '#f5f5f5',
+                                                            color:
+                                                                order.status === 'COMPLETED' ? '#2e7d32' :
+                                                                    order.status === 'PENDING' ? '#ef6c00' :
+                                                                        order.status === 'CANCELLED' ? '#c62828' : '#666',
+                                                        }}
+                                                    />
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        ) : (
+                            <Box sx={{ textAlign: 'center', py: 8 }}>
+                                <History sx={{ fontSize: 48, color: '#e0e0e0', mb: 1 }} />
+                                <Typography variant="body2" color="text.secondary">
+                                    Không tìm thấy lịch sử nhập kho nào từ nhà cung cấp này
+                                </Typography>
+                            </Box>
+                        )}
                     </Box>
                 )}
             </DialogContent>
@@ -566,6 +641,7 @@ const SupplierFormDialog: React.FC<{
 // ─── Main Component ────────────────────────────────────────────
 const SupplierPage: React.FC = () => {
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+    const [allDebts, setAllDebts] = useState<SupplierDebt[]>([]);
     const [loading, setLoading] = useState(false);
     const [page, setPage] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
@@ -591,10 +667,14 @@ const SupplierPage: React.FC = () => {
     const fetchSuppliers = useCallback(async () => {
         setLoading(true);
         try {
-            const data = await supplierService.getAll({ keyword, page, size: PAGE_SIZE });
+            const [data, debtsList] = await Promise.all([
+                supplierService.getAll({ keyword, page, size: PAGE_SIZE }),
+                financeService.getSupplierDebts()
+            ]);
             setSuppliers(data.content ?? []);
             setTotalPages(data.totalPages ?? 0);
             setTotalElements(data.totalElements ?? 0);
+            setAllDebts(debtsList ?? []);
         } catch {
             showSnack('Không thể tải danh sách nhà cung cấp', 'error');
         } finally {
@@ -681,6 +761,36 @@ const SupplierPage: React.FC = () => {
         }
     };
 
+    const handleExportExcel = () => {
+        try {
+            const worksheetData = suppliers.map(s => ({
+                'Tên nhà cung cấp': s.name,
+                'Mã số thuế': s.taxCode || '',
+                'Người liên hệ': s.contactPerson || '',
+                'Số điện thoại': s.phone || '',
+                'Email': s.email || '',
+                'Địa chỉ': s.address || '',
+                'Tên ngân hàng': s.bankName || '',
+                'Số tài khoản': s.bankAccount || '',
+                'Kỳ hạn nợ (ngày)': s.paymentTerms,
+                'Trạng thái': s.isActive ? 'Hoạt động' : 'Dừng hoạt động',
+                'Ghi chú': s.notes || ''
+            }));
+
+            const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Suppliers');
+            XLSX.writeFile(workbook, `Danh_sach_nha_cung_cap_${new Date().toISOString().slice(0, 10)}.xlsx`);
+            showSnack('Xuất file Excel thành công!', 'success');
+        } catch (err) {
+            console.error(err);
+            showSnack('Lỗi khi xuất file Excel', 'error');
+        }
+    };
+    const totalOutstandingDebt = allDebts.reduce((sum, d) => sum + (d.remainingAmount ?? 0), 0);
+    const outstandingSupplierIds = new Set(allDebts.filter(d => d.remainingAmount > 0).map(d => d.supplierId));
+    const outstandingSuppliersCount = outstandingSupplierIds.size;
+
     return (
         <Box sx={{ p: 3, bgcolor: '#f8f9fb', minHeight: '100vh' }}>
             {/* Header */}
@@ -697,12 +807,12 @@ const SupplierPage: React.FC = () => {
                     </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', gap: 1 }}>
-                    <Button variant="outlined" startIcon={<FileDownloadOutlined sx={{ fontSize: 15 }} />}
+                    <Button variant="outlined" startIcon={<FileDownloadOutlined sx={{ fontSize: 15 }} />} onClick={handleExportExcel}
                         sx={{ textTransform: 'none', borderColor: '#e0e0e0', color: '#555', fontSize: 13, borderRadius: 2 }}>
                         Xuất Excel
                     </Button>
-                    <Button 
-                        variant="outlined" 
+                    <Button
+                        variant="outlined"
                         component="label"
                         startIcon={<UploadFile sx={{ fontSize: 15 }} />}
                         sx={{ textTransform: 'none', borderColor: '#e0e0e0', color: '#1976d2', fontSize: 13, borderRadius: 2 }}
@@ -717,38 +827,71 @@ const SupplierPage: React.FC = () => {
                 </Box>
             </Box>
 
-            {/* Premium Stats Dashboard */}
+            {/* Uniform premium Stats Dashboard */}
             <Grid container spacing={3} sx={{ mb: 3 }}>
-                <Grid size={{ xs: 12, md: 4 }}>
-                    <Card elevation={0} sx={{ borderRadius: 4, border: '1px solid #ffcdd2', bgcolor: '#fff5f5' }}>
-                        <CardContent sx={{ p: 3 }}>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
-                                <Typography variant="caption" fontWeight={800} color="#d32f2f">TỔNG NỢ NCC</Typography>
-                                <Box sx={{ p: 0.8, borderRadius: 1.5, bgcolor: '#d32f2f', color: '#fff', display: 'flex' }}><History sx={{ fontSize: 18 }} /></Box>
+                {[
+                    {
+                        label: 'Tổng nợ NCC',
+                        value: fmtCurrency(totalOutstandingDebt),
+                        desc: `Dựa trên ${outstandingSuppliersCount} NCC còn dư nợ`,
+                        color: '#d32f2f',
+                        borderColor: '#ffcdd2',
+                        bgColor: '#fff5f5'
+                    },
+                    {
+                        label: 'Tổng số NCC',
+                        value: totalElements,
+                        desc: 'Tất cả đối tác trong hệ thống',
+                        color: '#1a1a2e',
+                        borderColor: '#f0f0f0',
+                        bgColor: '#fff'
+                    },
+                    {
+                        label: 'Đang hoạt động',
+                        value: activeCount,
+                        desc: 'Sẵn sàng giao dịch',
+                        color: '#2e7d32',
+                        borderColor: '#c8e6c9',
+                        bgColor: '#f1f8e9'
+                    },
+                    {
+                        label: 'Vô hiệu hóa',
+                        value: totalElements - activeCount,
+                        desc: 'Tạm ngưng hợp tác',
+                        color: '#757575',
+                        borderColor: '#f0f0f0',
+                        bgColor: '#fff'
+                    }
+                ].map((s, i) => (
+                    <Grid size={{ xs: 12, sm: 6, md: 3 }} key={i}>
+                        <Paper elevation={0}
+                            sx={{
+                                p: 2.5,
+                                borderRadius: 3,
+                                border: '1px solid',
+                                borderColor: s.borderColor,
+                                bgcolor: s.bgColor,
+                                height: '100%',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'space-between',
+                                gap: 1
+                            }}
+                        >
+                            <Box>
+                                <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                    {s.label}
+                                </Typography>
+                                <Typography variant="h5" fontWeight={900} color={s.color} sx={{ my: 0.5, fontSize: s.label.includes('nợ') ? '1.5rem' : '1.75rem' }}>
+                                    {s.value}
+                                </Typography>
                             </Box>
-                            <Typography variant="h4" fontWeight={900} color="#d32f2f">
-                                {fmtCurrency(suppliers.reduce((s, n) => s + (n.isActive ? 5000000 : 0), 0))} {/* Mocking total debt for UI demo */}
+                            <Typography variant="caption" color="text.secondary">
+                                {s.desc}
                             </Typography>
-                            <Typography variant="caption" color="text.secondary" mt={1} display="block">Dựa trên 5 nhà cung cấp còn dư nợ</Typography>
-                        </CardContent>
-                    </Card>
-                </Grid>
-                <Grid size={{ xs: 12, md: 8 }}>
-                    <Grid container spacing={2}>
-                        {[
-                            { label: 'Tổng số NCC', value: totalElements, color: '#1a1a2e', bg: '#fff' },
-                            { label: 'Đang hoạt động', value: activeCount, color: '#2e7d32', bg: '#fff' },
-                            { label: 'Vô hiệu hóa', value: totalElements - activeCount, color: '#888', bg: '#fff' },
-                        ].map((s, i) => (
-                            <Grid size={{ xs: 12, sm: 4 }} key={i}>
-                                <Paper elevation={0} sx={{ p: 2.5, borderRadius: 4, border: '1px solid #f0f0f0', bgcolor: s.bg, height: '100%' }}>
-                                    <Typography variant="h5" fontWeight={900} color={s.color}>{s.value}</Typography>
-                                    <Typography variant="caption" color="text.secondary" fontWeight={700}>{s.label.toUpperCase()}</Typography>
-                                </Paper>
-                            </Grid>
-                        ))}
+                        </Paper>
                     </Grid>
-                </Grid>
+                ))}
             </Grid>
 
 

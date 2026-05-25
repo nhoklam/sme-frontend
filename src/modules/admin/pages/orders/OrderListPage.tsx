@@ -1,6 +1,6 @@
 // src/modules/admin/pages/orders/OrderListPage.tsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
     Box, Typography, Button, Paper, Table, TableBody,
     TableCell, TableContainer, TableHead, TableRow,
@@ -29,6 +29,9 @@ import {
 import productService from '../../../../services/productService';
 import InlineCustomerSearch from '../../../employee/components/pos/InlineCustomerSearch';
 import POSProductSearchBar from '../../../employee/components/pos/POSProductSearchBar';
+import PrintInvoiceDialog from '../../../employee/components/pos/PrintInvoiceDialog';
+import PrintShippingLabelDialog from './PrintShippingLabelDialog';
+import { useAuth } from '../../../../store/hooks/useAuth';
 
 // ── Memoized OrderRow ──────────────────────────────────────────
 const OrderRow = React.memo(({
@@ -40,7 +43,7 @@ const OrderRow = React.memo(({
     const status = STATUS_MAP[order.status as OrderStatus] || { label: order.status, color: '#666', bg: '#f3f4f6', step: 0 };
     const payStatus = PAYMENT_STATUS_MAP[order.paymentStatus as PaymentStatus] || { label: order.paymentStatus, color: '#888' };
     const typeInfo = TYPE_MAP[order.type || ''] || { label: order.type, color: '#555', bg: '#f5f5f5' };
-    const provinceName = PROVINCES.find(p => p.code === order.provinceCode)?.name || order.provinceCode || '—';
+    const provinceName = getProvinceName(order.provinceCode);
     const isCancelled = order.status === 'CANCELLED';
 
     return (
@@ -97,7 +100,7 @@ const OrderRow = React.memo(({
             </TableCell>
             <TableCell sx={{ py: 1.5 }}>
                 {order.paymentMethod && (
-                    <Chip label={order.paymentMethod === 'COD' ? 'COD' : order.paymentMethod === 'BANK_TRANSFER' ? 'Chuyển khoản' : order.paymentMethod === 'CASH' ? 'Tiền mặt' : order.paymentMethod === 'MOMO' ? 'MoMo' : order.paymentMethod === 'VNPAY' ? 'VNPay' : order.paymentMethod}
+                    <Chip label={order.paymentMethod === 'COD' ? 'COD' : order.paymentMethod === 'BANK_TRANSFER' ? 'Chuyển khoản' : order.paymentMethod === 'CASH' ? 'Tiền mặt' : order.paymentMethod === 'MOMO' ? 'MoMo' : order.paymentMethod === 'VNPAY' ? 'VNPay' : order.paymentMethod === 'PAYOS' ? 'PayOS' : order.paymentMethod}
                         size="small" sx={{ height: 20, fontSize: 10, fontWeight: 700, bgcolor: '#f0f4ff', color: '#1976d2' }} />
                 )}
             </TableCell>
@@ -121,13 +124,15 @@ const fmt = (n?: number) => {
     return n.toLocaleString('vi-VN') + ' đ';
 };
 
-const STATUS_MAP: Record<OrderStatus, { label: string; color: string; bg: string; step: number }> = {
-    PENDING: { label: 'Chờ xử lý', color: '#e65100', bg: '#fff3e0', step: 0 },
-    PACKING: { label: 'Đóng gói', color: '#1976d2', bg: '#e3f2fd', step: 1 },
-    SHIPPING: { label: 'Đang giao', color: '#6a1b9a', bg: '#f3e5f5', step: 2 },
-    DELIVERED: { label: 'Hoàn thành', color: '#2e7d32', bg: '#e8f5e9', step: 3 },
-    CANCELLED: { label: 'Đã hủy', color: '#d32f2f', bg: '#ffebee', step: -1 },
-    RETURNED: { label: 'Hoàn trả', color: '#d32f2f', bg: '#ffebee', step: -1 },
+const STATUS_MAP: Record<OrderStatus | string, { label: string; color: string; bg: string; step: number }> = {
+    PAYMENT_PENDING: { label: 'Chờ thanh toán', color: '#b45309', bg: '#fef3c7', step: 0 },
+    PENDING: { label: 'Chờ xử lý', color: '#1d4ed8', bg: '#dbeafe', step: 1 },
+    WAITING_FOR_CONSOLIDATION: { label: 'Đang gom hàng', color: '#c2410c', bg: '#ffedd5', step: 1 },
+    PACKING: { label: 'Đóng gói', color: '#6d28d9', bg: '#ede9fe', step: 2 },
+    SHIPPING: { label: 'Đang giao', color: '#15803d', bg: '#dcfce3', step: 3 },
+    DELIVERED: { label: 'Hoàn thành', color: '#166534', bg: '#d1fae5', step: 4 },
+    CANCELLED: { label: 'Đã hủy', color: '#6b7280', bg: '#f3f4f6', step: -1 },
+    RETURNED: { label: 'Hoàn trả', color: '#b91c1c', bg: '#fef2f2', step: -1 },
 };
 
 const PAYMENT_STATUS_MAP: Record<PaymentStatus, { label: string; color: string }> = {
@@ -145,7 +150,9 @@ const TYPE_MAP: Record<string, { label: string; color: string; bg: string }> = {
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
     { value: '', label: 'Tất cả' },
+    { value: 'PAYMENT_PENDING', label: 'Chờ thanh toán' },
     { value: 'PENDING', label: 'Chờ xử lý' },
+    { value: 'WAITING_FOR_CONSOLIDATION', label: 'Đang gom hàng' },
     { value: 'PACKING', label: 'Đóng gói' },
     { value: 'SHIPPING', label: 'Đang giao' },
     { value: 'DELIVERED', label: 'Hoàn thành' },
@@ -153,8 +160,8 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
     { value: 'RETURNED', label: 'Hoàn trả' },
 ];
 
-// Danh sách tỉnh thành Việt Nam (rút gọn)
-const PROVINCES = [
+// Danh sách tỉnh thành Việt Nam (dự phòng)
+export const PROVINCES = [
     { code: 'HCM', name: 'TP. Hồ Chí Minh' },
     { code: 'HN', name: 'Hà Nội' },
     { code: 'DN', name: 'Đà Nẵng' },
@@ -172,6 +179,29 @@ const PROVINCES = [
     { code: 'QNI', name: 'Quảng Ngãi' },
 ];
 
+let globalProvincesCache: Record<string, string> = {};
+const fetchProvinces = async () => {
+    if (Object.keys(globalProvincesCache).length > 0) return;
+    try {
+        const res = await fetch('https://provinces.open-api.vn/api/?depth=1');
+        const data = await res.json();
+        data.forEach((p: any) => {
+            globalProvincesCache[p.code.toString()] = p.name.replace('Thành phố ', 'TP. ').replace('Tỉnh ', '');
+        });
+    } catch (e) {
+        console.error('Failed to fetch provinces', e);
+    }
+};
+// Trigger fetch immediately
+fetchProvinces();
+
+export const getProvinceName = (code: string) => {
+    if (!code) return '—';
+    if (globalProvincesCache[code]) return globalProvincesCache[code];
+    const local = PROVINCES.find(p => p.code === code);
+    return local ? local.name : code;
+};
+
 const PAYMENT_OPTIONS = [
     { value: '', label: 'Tất cả thanh toán' },
     { value: 'UNPAID', label: 'Chưa thu' },
@@ -186,6 +216,7 @@ const PAYMENT_METHOD_OPTIONS = [
     { value: 'CASH', label: 'Tiền mặt' },
     { value: 'MOMO', label: 'MoMo' },
     { value: 'VNPAY', label: 'VNPay' },
+    { value: 'PAYOS', label: 'PayOS' },
 ];
 
 // ── Row action menu ────────────────────────────────────────
@@ -223,13 +254,13 @@ const RowMenu: React.FC<{
     );
 };
 
-// ── ORDER DETAIL DIALOG ──────────────────────────────────
 const OrderDetailDialog: React.FC<{
     order: OrderResponse | null;
     open: boolean;
     onClose: () => void;
     onStatusChange: (order: OrderResponse, newStatus: string) => void;
-}> = ({ order, open, onClose, onStatusChange }) => {
+    onPrint?: () => void;
+}> = ({ order, open, onClose, onStatusChange, onPrint }) => {
     if (!order) return null;
     const status = STATUS_MAP[order.status as OrderStatus] || { label: order.status, color: '#666', bg: '#f3f4f6', step: 0 };
     const payStatus = PAYMENT_STATUS_MAP[order.paymentStatus as PaymentStatus] || { label: order.paymentStatus, color: '#888' };
@@ -368,7 +399,7 @@ const OrderDetailDialog: React.FC<{
                                     { label: 'Loại đơn', value: TYPE_MAP[order.type]?.label || order.type },
                                     { label: 'Mã vận đơn', value: order.trackingCode || '—' },
                                     { label: 'Đơn vị vận chuyển', value: order.shippingProvider || '—' },
-                                    { label: 'Khu vực', value: PROVINCES.find(p => p.code === order.provinceCode)?.name || order.provinceCode || '—' },
+                                    { label: 'Khu vực', value: getProvinceName(order.provinceCode) },
                                 ].map(row => (
                                     <Box key={row.label} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
                                         <Typography variant="caption" color="text.secondary">{row.label}</Typography>
@@ -461,6 +492,14 @@ const OrderDetailDialog: React.FC<{
             </DialogContent>
 
             <DialogActions sx={{ px: 3, pb: 2.5, pt: 1, gap: 1 }}>
+                <Box sx={{ flex: 1 }}>
+                    {onPrint && (
+                        <Button onClick={onPrint} variant="outlined" startIcon={<FileDownloadOutlined />}
+                            sx={{ textTransform: 'none', borderColor: '#e0e0e0', color: '#1a1a2e', borderRadius: 1.5, fontWeight: 700 }}>
+                            {isOffline ? 'In hóa đơn (K80)' : 'In tem dán (A6)'}
+                        </Button>
+                    )}
+                </Box>
                 <Button onClick={onClose} variant="outlined"
                     sx={{ textTransform: 'none', borderColor: '#e0e0e0', color: '#555', borderRadius: 1.5 }}>
                     Đóng
@@ -612,14 +651,13 @@ const CreateOrderDialog: React.FC<{
                             <Grid container spacing={1.5}>
                                 <Grid size={{ xs: 6 }}><TextField fullWidth size="small" label="Người nhận *" value={shippingName} onChange={e => setShippingName(e.target.value)} /></Grid>
                                 <Grid size={{ xs: 6 }}><TextField fullWidth size="small" label="SĐT nhận *" value={shippingPhone} onChange={e => setShippingPhone(e.target.value)} /></Grid>
-                                <Grid size={{ xs: 12 }}><TextField fullWidth size="small" label="Địa chỉ *" value={shippingAddress} onChange={e => setShippingAddress(e.target.value)} /></Grid>
-                                <Grid size={{ xs: 12 }}><FormControl fullWidth size="small"><Select value={provinceCode} onChange={e => setProvinceCode(e.target.value)} displayEmpty sx={{ fontSize: 13 }}><MenuItem value="">Chọn tỉnh/thành *</MenuItem>{PROVINCES.map(p => <MenuItem key={p.code} value={p.code} sx={{ fontSize: 13 }}>{p.name}</MenuItem>)}</Select></FormControl></Grid>
+                                <Grid size={{ xs: 12 }}><FormControl fullWidth size="small"><Select value={provinceCode} onChange={e => setProvinceCode(e.target.value)} displayEmpty sx={{ fontSize: 13 }}><MenuItem value="">Chọn tỉnh/thành *</MenuItem>{Object.entries(globalProvincesCache).length > 0 ? Object.entries(globalProvincesCache).map(([code, name]) => <MenuItem key={code} value={code} sx={{ fontSize: 13 }}>{name}</MenuItem>) : PROVINCES.map(p => <MenuItem key={p.code} value={p.code} sx={{ fontSize: 13 }}>{p.name}</MenuItem>)}</Select></FormControl></Grid>
                             </Grid>
                         </Paper>
                         <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #f0f0f0', mb: 2 }}>
                             <Typography variant="caption" fontWeight={700} color="#555" letterSpacing={0.3} display="block" mb={1.5}>THANH TOÁN & KHO</Typography>
                             <Grid container spacing={1.5}>
-                                <Grid size={{ xs: 6 }}><FormControl fullWidth size="small"><Select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} sx={{ fontSize: 13 }}>{[{ v: 'COD', l: 'COD' }, { v: 'BANK_TRANSFER', l: 'Chuyển khoản' }, { v: 'MOMO', l: 'MoMo' }, { v: 'VNPAY', l: 'VNPay' }].map(m => <MenuItem key={m.v} value={m.v} sx={{ fontSize: 13 }}>{m.l}</MenuItem>)}</Select></FormControl></Grid>
+                                <Grid size={{ xs: 6 }}><FormControl fullWidth size="small"><Select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} sx={{ fontSize: 13 }}>{[{ v: 'COD', l: 'COD' }, { v: 'BANK_TRANSFER', l: 'Chuyển khoản' }, { v: 'MOMO', l: 'MoMo' }, { v: 'VNPAY', l: 'VNPay' }, { v: 'PAYOS', l: 'PayOS' }].map(m => <MenuItem key={m.v} value={m.v} sx={{ fontSize: 13 }}>{m.l}</MenuItem>)}</Select></FormControl></Grid>
                                 <Grid size={{ xs: 6 }}><FormControl fullWidth size="small"><Select value={assignedWarehouseId} onChange={e => setAssignedWarehouseId(e.target.value)} displayEmpty sx={{ fontSize: 13 }}><MenuItem value="">Kho tự động</MenuItem>{warehouses.filter(w => w.isActive).map(w => <MenuItem key={w.id} value={w.id} sx={{ fontSize: 13 }}>{w.name}</MenuItem>)}</Select></FormControl></Grid>
                             </Grid>
                         </Paper>
@@ -652,12 +690,15 @@ const CreateOrderDialog: React.FC<{
 // ══════════════════════════════════════════════════════════════
 const OrderListPage: React.FC = () => {
     const navigate = useNavigate();
+    const { id: urlOrderId } = useParams<{ id: string }>();
+    const { user, isAdmin, isManager, warehouseId: userWarehouseId } = useAuth();
 
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
     const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
     const [paymentMethodFilter, setPaymentMethodFilter] = useState('');
     const [provinceFilter, setProvinceFilter] = useState('');
+    const [warehouseFilter, setWarehouseFilter] = useState('');
     const [showAdvanced, setShowAdvanced] = useState(false);
 
     const [orders, setOrders] = useState<any[]>([]);
@@ -667,9 +708,12 @@ const OrderListPage: React.FC = () => {
     const [page, setPage] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
+    const [stats, setStats] = useState({ totalCount: 0, pendingCount: 0, paidCount: 0, totalRevenue: 0 });
     const [snack, setSnack] = useState<{ message: string; severity: 'success' | 'error' | 'info' } | null>(null);
     const [detailOrder, setDetailOrder] = useState<any>(null);
     const [detailOpen, setDetailOpen] = useState(false);
+    const [printInvoice, setPrintInvoice] = useState<any>(null);
+    const [printOpen, setPrintOpen] = useState(false);
     const [createOpen, setCreateOpen] = useState(false);
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
 
@@ -678,6 +722,53 @@ const OrderListPage: React.FC = () => {
     useEffect(() => {
         warehouseService.getAll().then(setWarehouses).catch(() => { });
     }, []);
+
+    useEffect(() => {
+        setWarehouseFilter(userWarehouseId || '');
+    }, [userWarehouseId]);
+
+    useEffect(() => {
+        if (urlOrderId) {
+            const loadUrlOrder = async () => {
+                try {
+                    const full = await orderService.getById(urlOrderId);
+                    setDetailOrder({ ...full, _source: 'ONLINE' });
+                    setDetailOpen(true);
+                } catch {
+                    try {
+                        const res = await axiosInstance.get(`/pos/invoices/code/${urlOrderId}`);
+                        const inv = res.data?.data;
+                        if (inv) {
+                            const mapped = {
+                                id: inv.id, code: inv.code,
+                                items: inv.items, discountAmount: inv.discountAmount,
+                                assignedWarehouseName: inv.warehouseName,
+                                shippingAddress: 'Bán tại quầy',
+                                paymentMethod: inv.payments?.[0]?.method || 'Tiền mặt',
+                                payments: inv.payments,
+                                _source: 'OFFLINE', cashierName: inv.cashierName,
+                                totalAmount: inv.totalAmount, finalAmount: inv.finalAmount,
+                                status: 'DELIVERED', createdAt: inv.createdAt,
+                                customerName: inv.customerName, customerPhone: inv.customerPhone
+                            };
+                            setDetailOrder(mapped);
+                            setDetailOpen(true);
+                        }
+                    } catch (e) {
+                        // ignore
+                    }
+                }
+            };
+            loadUrlOrder();
+        }
+    }, [urlOrderId]);
+
+    const handleCloseDetail = useCallback(() => {
+        setDetailOpen(false);
+        if (urlOrderId) {
+            navigate('/admin/orders', { replace: true });
+        }
+    }, [urlOrderId, navigate]);
 
     const loadOrders = useCallback(async () => {
         setLoading(true); setError('');
@@ -691,33 +782,56 @@ const OrderListPage: React.FC = () => {
                 page, size: PAGE_SIZE,
             };
 
-            if (source === 'ONLINE' || source === 'ALL') {
-                const res = await orderService.getOrders({
-                    ...params,
+            const [onlineRes, offlineRes, statsRes] = await Promise.all([
+                // 1. Fetch Online Orders
+                (source === 'ONLINE' || source === 'ALL')
+                    ? orderService.getOrders({
+                        ...params,
+                        status: statusFilter || undefined,
+                        paymentStatus: paymentStatusFilter || undefined,
+                        warehouseId: warehouseFilter || undefined,
+                    })
+                    : Promise.resolve(null),
+
+                // 2. Fetch Offline Invoices
+                (source === 'OFFLINE' || source === 'ALL')
+                    ? (() => {
+                        let shouldFetchOffline = true;
+                        let typeParam = '';
+                        if (statusFilter) {
+                            if (statusFilter === 'DELIVERED') typeParam = '&type=SALE';
+                            else if (statusFilter === 'RETURNED') typeParam = '&type=RETURN';
+                            else if (statusFilter === 'CANCELLED') typeParam = '&type=VOIDED';
+                            else shouldFetchOffline = false;
+                        }
+                        if (!shouldFetchOffline) return Promise.resolve(null);
+
+                        const kwParam = search ? `&keyword=${encodeURIComponent(search)}` : '';
+                        const whParam = warehouseFilter ? `&warehouseId=${warehouseFilter}` : '';
+                        return axiosInstance.get(`/pos/invoices?page=${page}&size=${PAGE_SIZE}${kwParam}${typeParam}${whParam}`)
+                            .then(res => res.data?.data);
+                    })()
+                    : Promise.resolve(null),
+
+                // 3. Fetch Stats
+                orderService.getStats({
+                    keyword: search.trim() || undefined,
                     status: statusFilter || undefined,
                     paymentStatus: paymentStatusFilter || undefined,
-                });
-                const mappedOnline = (res?.content ?? []).map(o => ({ ...o, _source: 'ONLINE' }));
+                    warehouseId: warehouseFilter || undefined,
+                    source: source
+                })
+            ]);
+
+            if (onlineRes) {
+                const mappedOnline = (onlineRes.content ?? []).map(o => ({ ...o, _source: 'ONLINE' }));
                 finalOrders = [...finalOrders, ...mappedOnline];
-                tPages = Math.max(tPages, res?.totalPages ?? 0);
-                tElements += res?.totalElements ?? 0;
+                tPages = Math.max(tPages, onlineRes.totalPages ?? 0);
+                tElements += onlineRes.totalElements ?? 0;
             }
 
-            let shouldFetchOffline = source === 'OFFLINE' || source === 'ALL';
-            let typeParam = '';
-
-            if (statusFilter) {
-                if (statusFilter === 'DELIVERED') typeParam = '&type=SALE';
-                else if (statusFilter === 'RETURNED') typeParam = '&type=RETURN';
-                else if (statusFilter === 'CANCELLED') typeParam = '&type=VOIDED';
-                else shouldFetchOffline = false; // Các trạng thái khác (PENDING, v.v.) không có trong hóa đơn OFFLINE
-            }
-
-            if (shouldFetchOffline) {
-                const kwParam = search ? `&keyword=${encodeURIComponent(search)}` : '';
-                const res = await axiosInstance.get(`/pos/invoices?page=${page}&size=${PAGE_SIZE}${kwParam}${typeParam}`);
-                const data = res.data?.data;
-                const mappedOffline = (data?.content ?? []).map((inv: any) => {
+            if (offlineRes) {
+                const mappedOffline = (offlineRes.content ?? []).map((inv: any) => {
                     let mappedStatus = 'DELIVERED';
                     if (inv.type === 'RETURN') mappedStatus = 'RETURNED';
                     if (inv.type === 'VOIDED') mappedStatus = 'CANCELLED';
@@ -741,8 +855,8 @@ const OrderListPage: React.FC = () => {
                     };
                 });
                 finalOrders = [...finalOrders, ...mappedOffline];
-                tPages = Math.max(tPages, data?.totalPages ?? 0);
-                tElements += data?.totalElements ?? 0;
+                tPages = Math.max(tPages, offlineRes.totalPages ?? 0);
+                tElements += offlineRes.totalElements ?? 0;
             }
 
             // Nếu là 'ALL', sắp xếp lại theo thời gian
@@ -756,14 +870,17 @@ const OrderListPage: React.FC = () => {
             setOrders(finalOrders);
             setTotalPages(tPages);
             setTotalElements(tElements);
+            if (statsRes) {
+                setStats(statsRes);
+            }
         } catch (e: any) {
             setError(e.response?.data?.message || 'Không thể tải danh sách đơn hàng');
         } finally {
             setLoading(false);
         }
-    }, [page, search, statusFilter, paymentStatusFilter, paymentMethodFilter, provinceFilter, source]);
+    }, [page, search, statusFilter, paymentStatusFilter, paymentMethodFilter, provinceFilter, warehouseFilter, source]);
 
-    useEffect(() => { setPage(0); }, [search, statusFilter, paymentStatusFilter, paymentMethodFilter, provinceFilter, source]);
+    useEffect(() => { setPage(0); }, [search, statusFilter, paymentStatusFilter, paymentMethodFilter, provinceFilter, warehouseFilter, source]);
     useEffect(() => { loadOrders(); }, [loadOrders]);
 
     const handleAction = React.useCallback(async (action: string, order: OrderResponse) => {
@@ -811,6 +928,30 @@ const OrderListPage: React.FC = () => {
         setDetailOpen(true);
     }, []);
 
+    const handlePrintOrder = (order: any) => {
+        const invoiceData = {
+            id: order.id,
+            code: order.code,
+            type: order.type,
+            totalAmount: order.totalAmount || order.finalAmount,
+            discountAmount: order.discountAmount || 0,
+            finalAmount: order.finalAmount,
+            cashierName: order.cashierName || order.createdByName,
+            customerName: order.customerName || order.shippingName,
+            customerPhone: order.customerPhone || order.shippingPhone,
+            shippingAddress: order.shippingAddress,
+            note: order.note,
+            createdAt: order.createdAt,
+            items: order.items || [],
+            payments: [{ method: order.paymentMethod || 'CASH', amount: order.finalAmount }],
+            _source: order._source,
+            paymentMethod: order.paymentMethod,
+            paymentStatus: order.paymentStatus
+        };
+        setPrintInvoice(invoiceData);
+        setPrintOpen(true);
+    };
+
     const handleStatusChange = async (order: OrderResponse, newStatus: string) => {
         try {
             await orderService.updateStatus(order.id, newStatus);
@@ -827,10 +968,6 @@ const OrderListPage: React.FC = () => {
     };
 
     const activeFilterCount = [search, statusFilter, paymentStatusFilter, paymentMethodFilter, provinceFilter].filter(Boolean).length;
-    const totalRevenue = orders.filter(o => o.status !== 'CANCELLED').reduce((s, o) => s + (o.finalAmount || 0), 0);
-    const pendingCount = orders.filter(o => o.status === 'PENDING').length;
-    const paidCount = orders.filter(o => o.paymentStatus === 'PAID').length;
-
     return (
         <Box sx={{ p: 3, bgcolor: '#f8f9fb', minHeight: '100vh' }}>
             {/* Header */}
@@ -879,10 +1016,10 @@ const OrderListPage: React.FC = () => {
             {/* Stats */}
             <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 1.5, mb: 2.5 }}>
                 {[
-                    { label: 'Tổng đơn', value: totalElements.toLocaleString(), color: '#1a1a2e' },
-                    { label: 'Chờ xử lý', value: pendingCount, color: '#e65100' },
-                    { label: 'Đã thanh toán', value: paidCount, color: '#2e7d32' },
-                    { label: 'Doanh thu hiển thị', value: `${(totalRevenue / 1_000_000).toFixed(1)}M đ`, color: '#1976d2' },
+                    { label: 'Tổng đơn', value: stats.totalCount.toLocaleString(), color: '#1a1a2e' },
+                    { label: 'Chờ xử lý', value: stats.pendingCount.toLocaleString(), color: '#e65100' },
+                    { label: 'Đã thanh toán', value: stats.paidCount.toLocaleString(), color: '#2e7d32' },
+                    { label: 'Doanh thu hiển thị', value: `${(stats.totalRevenue / 1_000_000).toFixed(1)}M đ`, color: '#1976d2' },
                 ].map(s => (
                     <Paper key={s.label} elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #f0f0f0' }}>
                         <Typography variant="caption" color="text.secondary" fontSize={11} fontWeight={600} letterSpacing={0.3} display="block">
@@ -1065,8 +1202,9 @@ const OrderListPage: React.FC = () => {
             <OrderDetailDialog
                 order={detailOrder}
                 open={detailOpen}
-                onClose={() => setDetailOpen(false)}
+                onClose={handleCloseDetail}
                 onStatusChange={handleStatusChange}
+                onPrint={() => handlePrintOrder(detailOrder)}
             />
 
             {/* CREATE ORDER DIALOG */}
@@ -1076,6 +1214,22 @@ const OrderListPage: React.FC = () => {
                 onCreated={() => { loadOrders(); setSnack({ message: 'Tạo đơn hàng thành công!', severity: 'success' }); }}
                 warehouses={warehouses}
             />
+
+            {/* PRINT INVOICE DIALOG */}
+            {printInvoice?._source === 'ONLINE' ? (
+                <PrintShippingLabelDialog
+                    open={printOpen}
+                    onClose={() => setPrintOpen(false)}
+                    order={printInvoice}
+                />
+            ) : (
+                <PrintInvoiceDialog
+                    open={printOpen}
+                    onClose={() => setPrintOpen(false)}
+                    invoice={printInvoice}
+                    cashierDisplayName={printInvoice?.cashierName || user?.fullName}
+                />
+            )}
 
             {/* Snackbar */}
             <Snackbar open={!!snack} autoHideDuration={3000} onClose={() => setSnack(null)}

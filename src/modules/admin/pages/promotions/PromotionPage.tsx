@@ -17,6 +17,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import promotionService from '../../../../services/promotionService';
 import { Promotion, PromotionType } from '../../../../types';
+import authService from '../../../../services/authService';
 
 const fmtCurrency = (n: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n);
 const fmtDate = (s: string) => {
@@ -43,6 +44,8 @@ export default function PromotionPage() {
     const [createOpen, setCreateOpen] = useState(false);
     const [selected, setSelected] = useState<Promotion | null>(null);
     const qc = useQueryClient();
+    const user = authService.getCurrentUser()?.user;
+    const isAdmin = user?.role === 'ROLE_ADMIN';
 
     const { data, isLoading } = useQuery({
         queryKey: ['promotions', page, search],
@@ -84,12 +87,14 @@ export default function PromotionPage() {
                     <Typography variant="h5" fontWeight={900} color="#1a1a2e" mt={0.5}>Chương trình Khuyến mãi</Typography>
                     <Typography variant="body2" color="text.secondary" fontSize={12}>Tạo và quản lý các mã giảm giá, chiết khấu</Typography>
                 </Box>
-                <Button
-                    variant="contained" startIcon={<Add />} onClick={() => setCreateOpen(true)}
-                    sx={{ bgcolor: '#2563eb', textTransform: 'none', fontWeight: 800, borderRadius: 2.5, px: 3, py: 1, '&:hover': { bgcolor: '#1d4ed8' } }}
-                >
-                    Tạo chương trình mới
-                </Button>
+                {isAdmin && (
+                    <Button
+                        variant="contained" startIcon={<Add />} onClick={() => setCreateOpen(true)}
+                        sx={{ bgcolor: '#2563eb', textTransform: 'none', fontWeight: 800, borderRadius: 2.5, px: 3, py: 1, '&:hover': { bgcolor: '#1d4ed8' } }}
+                    >
+                        Tạo chương trình mới
+                    </Button>
+                )}
             </Box>
 
             {/* Stats */}
@@ -147,7 +152,9 @@ export default function PromotionPage() {
                                     <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
                                         <LocalOffer sx={{ fontSize: 48, color: '#e0e0e0', mb: 1 }} />
                                         <Typography variant="body2" color="text.secondary">Chưa có chương trình khuyến mãi nào</Typography>
-                                        <Button variant="text" sx={{ mt: 1 }} onClick={() => { setSelected(null); setCreateOpen(true); }}>Tạo ngay</Button>
+                                        {isAdmin && (
+                                            <Button variant="text" sx={{ mt: 1 }} onClick={() => { setSelected(null); setCreateOpen(true); }}>Tạo ngay</Button>
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             ) : (
@@ -201,11 +208,18 @@ export default function PromotionPage() {
                                                     size="small" checked={p.isActive}
                                                     onChange={() => handleToggle(p.id)}
                                                     color="success"
+                                                    disabled={!isAdmin}
                                                 />
                                             </TableCell>
                                             <TableCell align="right">
-                                                <IconButton size="small" onClick={() => handleEdit(p)} sx={{ color: '#f59e0b', '&:hover': { bgcolor: '#fef3c7' } }}><Edit sx={{ fontSize: 18 }} /></IconButton>
-                                                <IconButton size="small" onClick={() => handleDelete(p.id)} sx={{ color: '#ef4444', '&:hover': { bgcolor: '#fef2f2' } }}><Delete sx={{ fontSize: 18 }} /></IconButton>
+                                                {isAdmin ? (
+                                                    <>
+                                                        <IconButton size="small" onClick={() => handleEdit(p)} sx={{ color: '#f59e0b', '&:hover': { bgcolor: '#fef3c7' } }}><Edit sx={{ fontSize: 18 }} /></IconButton>
+                                                        <IconButton size="small" onClick={() => handleDelete(p.id)} sx={{ color: '#ef4444', '&:hover': { bgcolor: '#fef2f2' } }}><Delete sx={{ fontSize: 18 }} /></IconButton>
+                                                    </>
+                                                ) : (
+                                                    <Typography variant="caption" color="text.secondary">Chỉ xem</Typography>
+                                                )}
                                             </TableCell>
                                         </TableRow>
                                     );

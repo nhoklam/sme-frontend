@@ -11,8 +11,23 @@ import {
 } from '@mui/icons-material';
 import userService from '../../../../../services/userService';
 import warehouseService from '../../../../../services/warehouseService';
+import authService from '../../../../../services/authService';
 import type { UserResponse, Warehouse as WarehouseType } from '../../../../../types';
 import toast from 'react-hot-toast';
+
+// ── Loại bỏ dấu tiếng Việt ─────────────────────────────────
+const removeDiacritics = (str: string): string => {
+    return str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd')
+        .replace(/Đ/g, 'D')
+        .toLowerCase()
+        .replace(/\s+/g, '.')
+        .replace(/[^a-z0-9._]/g, '');
+};
+
+const isValidUsername = (str: string): boolean => /^[a-zA-Z0-9._]+$/.test(str);
 
 const getRoleLabel = (role: string) => {
     switch (role) {
@@ -32,16 +47,24 @@ const getRoleColor = (role: string) => {
 };
 
 export default function UsersTab() {
+    const currentUser = authService.getCurrentUser()?.user;
+    const isManager = currentUser?.role === 'ROLE_MANAGER';
+    const managerWarehouseId = currentUser?.warehouseId || '';
+
     const [users, setUsers] = useState<UserResponse[]>([]);
     const [warehouses, setWarehouses] = useState<WarehouseType[]>([]);
     const [loading, setLoading] = useState(true);
-    const [filters, setFilters] = useState({ keyword: '', role: '', warehouseId: '' });
+    const [filters, setFilters] = useState({
+        keyword: '',
+        role: '',
+        warehouseId: isManager ? managerWarehouseId : ''
+    });
     const [showModal, setShowModal] = useState(false);
     const [editing, setEditing] = useState<UserResponse | null>(null);
     const [saving, setSaving] = useState(false);
     const [form, setForm] = useState({
         username: '', password: '', fullName: '', email: '', phone: '',
-        role: 'ROLE_CASHIER', warehouseId: '',
+        role: 'ROLE_CASHIER', warehouseId: isManager ? managerWarehouseId : '',
     });
 
     const loadData = async () => {
@@ -49,13 +72,21 @@ export default function UsersTab() {
         try {
             const cleanFilters: any = {};
             if (filters.keyword) cleanFilters.keyword = filters.keyword;
-            if (filters.role) cleanFilters.role = filters.role;
-            if (filters.warehouseId) cleanFilters.warehouseId = filters.warehouseId;
+            if (isManager) {
+                cleanFilters.role = 'ROLE_CASHIER';
+                cleanFilters.warehouseId = managerWarehouseId;
+            } else {
+                if (filters.role) cleanFilters.role = filters.role;
+                if (filters.warehouseId) cleanFilters.warehouseId = filters.warehouseId;
+            }
             const [u, w] = await Promise.all([
                 userService.getAll(cleanFilters),
                 warehouseService.getAll(),
             ]);
-            setUsers(u);
+            const filteredUsers = isManager
+                ? u.filter(user => user.role === 'ROLE_CASHIER')
+                : u.filter(user => user.role !== 'ROLE_CUSTOMER');
+            setUsers(filteredUsers);
             setWarehouses(w);
         } catch { toast.error('Lỗi tải dữ liệu'); }
         finally { setLoading(false); }
@@ -79,12 +110,19 @@ export default function UsersTab() {
             });
         } else {
             setEditing(null);
-            setForm({ username: '', password: '', fullName: '', email: '', phone: '', role: 'ROLE_CASHIER', warehouseId: '' });
+            setForm({
+                username: '', password: '', fullName: '', email: '', phone: '',
+                role: 'ROLE_CASHIER', warehouseId: isManager ? managerWarehouseId : '',
+            });
         }
         setShowModal(true);
     };
 
     const handleSave = async () => {
+        if (!editing && !isValidUsername(form.username)) {
+            toast.error('Tên đăng nhập chỉ được chứa chữ cái không dấu, số, dấu chấm và gạch dưới');
+            return;
+        }
         setSaving(true);
         try {
             const payload: any = { ...form };
@@ -125,16 +163,18 @@ export default function UsersTab() {
                     InputProps={{ startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 18, color: '#9ca3af' }} /></InputAdornment> }}
                     sx={{ flex: 1, minWidth: 220 }}
                 />
-                <FormControl size="small" sx={{ minWidth: 150 }}>
-                    <Select value={filters.role} onChange={e => setFilters(p => ({ ...p, role: e.target.value }))} displayEmpty>
-                        <MenuItem value="">Mọi vai trò</MenuItem>
-                        <MenuItem value="ROLE_ADMIN">Quản trị viên</MenuItem>
-                        <MenuItem value="ROLE_MANAGER">Quản lý</MenuItem>
-                        <MenuItem value="ROLE_CASHIER">Thu ngân</MenuItem>
-                    </Select>
-                </FormControl>
+                {!isManager && (
+                    <FormControl size="small" sx={{ minWidth: 150 }}>
+                        <Select value={filters.role} onChange={e => setFilters(p => ({ ...p, role: e.target.value }))} displayEmpty>
+                            <MenuItem value="">Mọi vai trò</MenuItem>
+                            <MenuItem value="ROLE_ADMIN">Quản trị viên</MenuItem>
+                            <MenuItem value="ROLE_MANAGER">Quản lý</MenuItem>
+                            <MenuItem value="ROLE_CASHIER">Thu ngân</MenuItem>
+                        </Select>
+                    </FormControl>
+                )}
                 <FormControl size="small" sx={{ minWidth: 180 }}>
-                    <Select value={filters.warehouseId} onChange={e => setFilters(p => ({ ...p, warehouseId: e.target.value }))} displayEmpty>
+                    <Select value={filters.warehouseId} onChange={e => setFilters(p => ({ ...p, warehouseId: e.target.value }))} displayEmpty disabled={isManager}>
                         <MenuItem value="">Mọi chi nhánh</MenuItem>
                         {warehouses.map(w => <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>)}
                     </Select>
@@ -224,7 +264,12 @@ export default function UsersTab() {
                     <Grid container spacing={2} sx={{ mt: 0.5 }}>
                         <Grid size={{ xs: 12, sm: 6 }}>
                             <Typography variant="caption" fontWeight={700} color="#64748b" mb={0.5} display="block">Tên đăng nhập *</Typography>
-                            <TextField fullWidth size="small" value={form.username} onChange={e => setForm(p => ({ ...p, username: e.target.value }))} disabled={!!editing} placeholder="username" />
+                            <TextField fullWidth size="small" value={form.username}
+                                onChange={e => setForm(p => ({ ...p, username: removeDiacritics(e.target.value) }))}
+                                disabled={!!editing} placeholder="vd: nguyen.vana"
+                                helperText={!editing ? 'Chỉ chữ không dấu, số, dấu chấm, gạch dưới' : ''}
+                                error={!editing && form.username.length > 0 && !isValidUsername(form.username)}
+                            />
                         </Grid>
                         <Grid size={{ xs: 12, sm: 6 }}>
                             <Typography variant="caption" fontWeight={700} color="#64748b" mb={0.5} display="block">Mật khẩu {!editing && '*'}</Typography>
@@ -244,19 +289,19 @@ export default function UsersTab() {
                         </Grid>
                         <Grid size={{ xs: 12, sm: 6 }}>
                             <Typography variant="caption" fontWeight={700} color="#1d4ed8" mb={0.5} display="block">Phân quyền *</Typography>
-                            <FormControl fullWidth size="small">
-                                <Select value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value, warehouseId: e.target.value === 'ROLE_ADMIN' ? '' : p.warehouseId }))}>
-                                    <MenuItem value="ROLE_ADMIN">Quản trị viên (Admin)</MenuItem>
-                                    <MenuItem value="ROLE_MANAGER">Quản lý chi nhánh</MenuItem>
+                            <FormControl fullWidth size="small" disabled={isManager}>
+                                <Select value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value }))}>
+                                    {!isManager && <MenuItem value="ROLE_ADMIN">Quản trị viên (Admin)</MenuItem>}
+                                    {!isManager && <MenuItem value="ROLE_MANAGER">Quản lý chi nhánh</MenuItem>}
                                     <MenuItem value="ROLE_CASHIER">Nhân viên Thu ngân</MenuItem>
                                 </Select>
                             </FormControl>
                         </Grid>
                         <Grid size={{ xs: 12, sm: 6 }}>
-                            <Typography variant="caption" fontWeight={700} color="#1d4ed8" mb={0.5} display="block">Nơi làm việc</Typography>
-                            <FormControl fullWidth size="small" disabled={form.role === 'ROLE_ADMIN'}>
+                            <Typography variant="caption" fontWeight={700} color="#1d4ed8" mb={0.5} display="block">Nơi làm việc *</Typography>
+                            <FormControl fullWidth size="small" disabled={isManager}>
                                 <Select value={form.warehouseId} onChange={e => setForm(p => ({ ...p, warehouseId: e.target.value }))} displayEmpty>
-                                    <MenuItem value="">{form.role === 'ROLE_ADMIN' ? 'Toàn hệ thống' : '-- Chọn chi nhánh --'}</MenuItem>
+                                    {!isManager && <MenuItem value="">-- Chọn chi nhánh --</MenuItem>}
                                     {warehouses.map(w => <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>)}
                                 </Select>
                             </FormControl>

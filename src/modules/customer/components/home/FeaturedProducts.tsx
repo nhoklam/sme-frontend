@@ -1,170 +1,133 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Typography, Grid, Tabs, Tab } from '@mui/material';
+import { Box, Typography, Grid, Tabs, Tab, Skeleton } from '@mui/material';
 import ProductCard from '../../../../components/common/ProductCard';
 import { useCartContext } from '../../../../store/CartContext';
-
-// MOCK DATA for Featured Products
-const MOCK_PRODUCTS = [
-    {
-        id: '1',
-        title: 'Đắc Nhân Tâm (Khổ Lớn)',
-        author: 'Dale Carnegie',
-        coverImage: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?q=80&w=600&auto=format&fit=crop',
-        price: 86000,
-        originalPrice: 108000,
-        rating: 4.8,
-        reviewCount: 342,
-        badges: ['bestseller', 'sale'] as const,
-        discountPercent: 20,
-        category: 'Kỹ năng sống'
-    },
-    {
-        id: '2',
-        title: 'Nhà Giả Kim',
-        author: 'Paulo Coelho',
-        coverImage: 'https://images.unsplash.com/photo-1589829085413-56de8ae18c73?q=80&w=600&auto=format&fit=crop',
-        price: 79000,
-        rating: 4.9,
-        reviewCount: 1250,
-        badges: ['bestseller'] as const,
-        category: 'Văn học'
-    },
-    {
-        id: '3',
-        title: 'Tâm Lý Học Tội Phạm',
-        author: 'Stanton E. Samenow',
-        coverImage: 'https://images.unsplash.com/photo-1587876931567-564ce588bfbd?q=80&w=600&auto=format&fit=crop',
-        price: 135000,
-        originalPrice: 150000,
-        rating: 4.5,
-        reviewCount: 89,
-        badges: ['new'] as const,
-        category: 'Tâm lý học'
-    },
-    {
-        id: '4',
-        title: 'Dạy Con Làm Giàu (Tập 1)',
-        author: 'Robert T. Kiyosaki',
-        coverImage: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?q=80&w=600&auto=format&fit=crop',
-        price: 95000,
-        rating: 4.7,
-        reviewCount: 456,
-        badges: [] as const,
-        category: 'Kinh tế'
-    },
-    {
-        id: '5',
-        title: 'Nghệ Thuật Tinh Tế Của Việc Đếch Quan Tâm',
-        author: 'Mark Manson',
-        coverImage: 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?q=80&w=600&auto=format&fit=crop',
-        price: 85000,
-        originalPrice: 100000,
-        rating: 4.6,
-        reviewCount: 210,
-        badges: ['sale'] as const,
-        discountPercent: 15,
-        category: 'Kỹ năng sống'
-    },
-    {
-        id: '6',
-        title: 'Súng, Vi Trùng Và Thép',
-        author: 'Jared Diamond',
-        coverImage: 'https://images.unsplash.com/photo-1532012197267-da84d127e765?q=80&w=600&auto=format&fit=crop',
-        price: 180000,
-        rating: 4.9,
-        reviewCount: 520,
-        badges: [] as const,
-        category: 'Lịch sử & Địa lý'
-    },
-    {
-        id: '7',
-        title: 'Sapiens: Lược Sử Loài Người',
-        author: 'Yuval Noah Harari',
-        coverImage: 'https://images.unsplash.com/photo-1495640388908-05fa85288e61?q=80&w=600&auto=format&fit=crop',
-        price: 195000,
-        rating: 4.8,
-        reviewCount: 630,
-        badges: ['bestseller'] as const,
-        category: 'Lịch sử & Địa lý'
-    },
-    {
-        id: '8',
-        title: 'Hai Số Phận',
-        author: 'Jeffrey Archer',
-        coverImage: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?q=80&w=600&auto=format&fit=crop',
-        price: 120000,
-        rating: 4.7,
-        reviewCount: 150,
-        badges: ['out_of_stock'] as const,
-        category: 'Văn học'
-    }
-];
-
-const TABS = ['Tất cả', 'Văn học', 'Kinh tế', 'Kỹ năng sống'];
+import { useProducts } from '../../hooks/useProducts';
+import { useCategories } from '../../hooks/useCategories';
 
 const FeaturedProducts = () => {
     const navigate = useNavigate();
     const { addToCart, openCart } = useCartContext();
     const [activeTab, setActiveTab] = useState(0);
 
+    const { categories, isLoading: categoriesLoading } = useCategories();
+    // Tab 0 is 'Tất cả'
+    const tabs = [{ id: '', name: 'Tất cả' }, ...(categories || [])].slice(0, 5); // take max 5 tabs
+
+    const activeCategoryId = tabs[activeTab]?.id;
+
+    const { products, isLoading: productsLoading } = useProducts({
+        categoryId: activeCategoryId || undefined,
+        size: 8, // fetch up to 8 products for the section
+    });
+
     const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
         setActiveTab(newValue);
     };
 
-    const filteredProducts = activeTab === 0 
-        ? MOCK_PRODUCTS 
-        : MOCK_PRODUCTS.filter(p => p.category === TABS[activeTab]);
-
     return (
-        <Box sx={{ mb: 6 }}>
-            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, mb: 4, borderBottom: '1px solid var(--color-border)' }}>
-                <Typography variant="h3" sx={{ fontSize: { xs: '1.5rem', md: '2rem' }, mb: { xs: 2, md: 0 } }}>
-                    Sản Phẩm Bán Chạy
-                </Typography>
-                <Tabs 
-                    value={activeTab} 
-                    onChange={handleTabChange}
-                    variant="scrollable"
-                    scrollButtons="auto"
-                    sx={{ 
-                        '& .MuiTab-root': { textTransform: 'none', fontWeight: 600, fontSize: '1rem', minWidth: 100 },
-                        '& .Mui-selected': { color: 'var(--color-secondary) !important' },
-                        '& .MuiTabs-indicator': { backgroundColor: 'var(--color-secondary)' }
-                    }}
-                >
-                    {TABS.map((tab, idx) => (
-                        <Tab key={idx} label={tab} />
-                    ))}
-                </Tabs>
+        <Box sx={{ mb: 5 }}>
+            {/* Header Tabs Block */}
+            <Box sx={{ 
+                display: 'flex', 
+                flexDirection: { xs: 'column', md: 'row' }, 
+                alignItems: { xs: 'stretch', md: 'center' },
+                bgcolor: '#fff',
+                borderBottom: '2px solid #C92127', // Đáy màu đỏ làm bệ đỡ
+                mb: 3
+            }}>
+                {categoriesLoading ? (
+                    <Skeleton width={300} height={48} />
+                ) : (
+                    <Tabs 
+                        value={activeTab} 
+                        onChange={handleTabChange}
+                        variant="scrollable"
+                        scrollButtons="auto"
+                        TabIndicatorProps={{ style: { display: 'none' } }} // Ẩn indicator mặc định
+                        sx={{ 
+                            minHeight: 48,
+                            '& .MuiTab-root': { 
+                                textTransform: 'uppercase', 
+                                fontWeight: 700, 
+                                fontSize: '0.9rem', 
+                                minWidth: 120,
+                                minHeight: 48,
+                                color: '#333',
+                                borderRight: '1px solid #eee',
+                                transition: 'all 0.3s ease',
+                                '&:hover': {
+                                    color: '#C92127',
+                                    bgcolor: '#fdfdfd'
+                                }
+                            },
+                            '& .Mui-selected': { 
+                                color: '#fff !important', 
+                                bgcolor: '#C92127',
+                                borderRight: 'none',
+                                '&:hover': {
+                                    bgcolor: '#A91B20',
+                                    color: '#fff !important',
+                                }
+                            }
+                        }}
+                    >
+                        {tabs.map((tab, idx) => (
+                            <Tab key={tab.id || 'all'} label={tab.name} />
+                        ))}
+                    </Tabs>
+                )}
             </Box>
 
-            <Grid container spacing={3}>
-                {filteredProducts.map((product) => (
-                    <Grid size={{ xs: 6, sm: 4, md: 3 }} key={product.id} sx={{ display: 'flex' }}>
-                        <ProductCard 
-                            {...product}
-                            onAddToCart={() => {
-                                addToCart({
-                                    id: product.id,
-                                    title: product.title,
-                                    author: product.author,
-                                    price: product.price,
-                                    oldPrice: product.originalPrice || 0,
-                                    img: product.coverImage,
-                                    images: [product.coverImage],
-                                    stock: 50,
-                                    category: product.category,
-                                    categoryId: 'featured'
-                                });
-                                openCart();
-                            }}
-                            onQuickView={(id) => navigate(`/product/${id}`)}
-                            onToggleWishlist={(id, status) => console.log('Toggle wishlist:', id, status)}
-                        />
-                    </Grid>
-                ))}
-            </Grid>
+            {/* Product Grid */}
+            <Box sx={{ bgcolor: '#fff', p: { xs: 1, sm: 2 }, borderRadius: '8px' }}>
+                <Grid container spacing={2}>
+                    {productsLoading ? (
+                        Array.from({ length: 8 }).map((_, idx) => (
+                            <Grid size={{ xs: 6, sm: 4, md: 3 }} key={idx} sx={{ display: 'flex' }}>
+                                <Box sx={{ width: '100%' }}>
+                                    <Skeleton variant="rectangular" height={250} sx={{ borderRadius: 2 }} />
+                                    <Skeleton width="80%" sx={{ mt: 1 }} />
+                                    <Skeleton width="40%" />
+                                </Box>
+                            </Grid>
+                        ))
+                    ) : products.length === 0 ? (
+                        <Box sx={{ width: '100%', py: 8, textAlign: 'center' }}>
+                            <Typography color="text.secondary">Không có sản phẩm nào trong danh mục này.</Typography>
+                        </Box>
+                    ) : (
+                        products.map((product) => (
+                            <Grid size={{ xs: 6, sm: 4, md: 3 }} key={product.id} sx={{ display: 'flex' }}>
+                                <ProductCard 
+                                    id={product.id}
+                                    title={product.title}
+                                    author={product.author}
+                                    coverImage={product.img}
+                                    price={product.price}
+                                    originalPrice={product.price * 1.2}
+                                    discountPercent={20}
+                                    badges={Math.random() > 0.8 ? ['bestseller'] : []}
+                                    onAddToCart={() => {
+                                        addToCart({
+                                            ...product,
+                                            oldPrice: product.price * 1.2,
+                                            images: [product.img],
+                                            stock: 50,
+                                            category: tabs[activeTab]?.name,
+                                            categoryId: 'featured',
+                                            qty: 1
+                                        });
+                                        openCart();
+                                    }}
+                                    onQuickView={(id) => navigate(`/product/${id}`)}
+                                />
+                            </Grid>
+                        ))
+                    )}
+                </Grid>
+            </Box>
         </Box>
     );
 };

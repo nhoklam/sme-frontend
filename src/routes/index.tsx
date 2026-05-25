@@ -23,6 +23,7 @@ const InventoryPage = lazy(() => import('../modules/admin/pages/inventory/Invent
 const ImportPage = lazy(() => import('../modules/admin/pages/inventory/ImportPage'));
 const TransfersPage = lazy(() => import('../modules/admin/pages/inventory/TransfersPage'));
 const InventoryHistoryPage = lazy(() => import('../modules/admin/pages/inventory/InventoryHistoryPage'));
+const StockAlertPage = lazy(() => import('../modules/admin/pages/inventory/StockAlertPage'));
 const CustomerListPage = lazy(() => import('../modules/admin/pages/customers/CustomerListPage'));
 const SupplierPage = lazy(() => import('../modules/admin/pages/suppliers/SupplierPage'));
 const RevenueReportPage = lazy(() => import('../modules/admin/pages/reports/RevenueReportPage'));
@@ -36,6 +37,8 @@ const PaymentSettingsPage = lazy(() => import('../modules/admin/pages/settings/P
 
 const UserListPage = lazy(() => import('../modules/admin/pages/users/UserListPage'));
 const UserCreatePage = lazy(() => import('../modules/admin/pages/users/UserCreatePage'));
+const ProfilePage = lazy(() => import('../modules/admin/pages/users/ProfilePage'));
+const RolePermissionPage = lazy(() => import('../modules/admin/pages/users/RolePermissionPage'));
 const FinancePage = lazy(() => import('../modules/admin/pages/finance/FinancePage'));
 const WarehousePage = lazy(() => import('../modules/admin/pages/warehouses/WarehousePage'));
 const CodReconciliationPage = lazy(() => import('../modules/admin/pages/orders/CodReconciliationPage'));
@@ -45,6 +48,13 @@ const PromotionPage = lazy(() => import('../modules/admin/pages/promotions/Promo
 const CustomerAnalysisReportPage = lazy(() => import('../modules/admin/pages/reports/CustomerAnalysisReportPage'));
 const ShiftListPage = lazy(() => import('../modules/admin/pages/shifts/ShiftListPage'));
 const ShiftDetailPage = lazy(() => import('../modules/admin/pages/shifts/ShiftDetailPage'));
+const ShiftAssignmentPage = lazy(() => import('../modules/admin/pages/shifts/ShiftAssignmentPage'));
+const BannerListPage = lazy(() => import('../modules/admin/pages/banners/BannerListPage'));
+const AuthorListPage = lazy(() => import('../modules/admin/pages/authors/AuthorListPage'));
+const ArticleListPage = lazy(() => import('../modules/admin/pages/articles/ArticleListPage'));
+const ReviewModerationPage = lazy(() => import('../modules/admin/pages/reviews/ReviewModerationPage'));
+const AiKnowledgePage = lazy(() => import('../modules/admin/pages/ai/AiKnowledgePage'));
+
 
 // Customer Pages
 const HomePage = lazy(() => import('../modules/customer/pages/HomePage'));
@@ -55,9 +65,13 @@ const CheckoutPage = lazy(() => import('../modules/customer/pages/CheckoutPage')
 const AccountPage = lazy(() => import('../modules/customer/pages/AccountPage'));
 const OrderSuccessPage = lazy(() => import('../modules/customer/pages/OrderSuccessPage'));
 const OrderTrackingPage = lazy(() => import('../modules/customer/pages/OrderTrackingPage'));
+const PaymentReturnPage = lazy(() => import('../modules/customer/pages/PaymentReturnPage'));
 const ForgotPasswordPage = lazy(() => import('../modules/customer/pages/ForgotPasswordPage'));
-const WishlistPage = lazy(() => import('../modules/customer/pages/WishlistPage'));
+
 const CustomerLoginPage = lazy(() => import('../modules/customer/pages/CustomerLoginPage'));
+
+const ArticleDetailPageCustomer = lazy(() => import('../modules/customer/pages/ArticleDetailPage'));
+const ReviewPage = lazy(() => import('../modules/customer/pages/ReviewPage'));
 
 // Employee Pages
 const EmployeePOSPage = lazy(() => import('../modules/employee/pages/EmployeePOSPage'));
@@ -109,8 +123,15 @@ const AdminGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     return <>{children}</>;
 };
 
+const NoPermission: React.FC = () => (
+    <Box sx={{ p: 4, textAlign: 'center', mt: 10 }}>
+        <Typography variant="h5" color="error" fontWeight={700}>Không có quyền truy cập</Typography>
+        <Typography color="text.secondary" mt={1}>Bạn không có quyền truy cập vào chức năng này. Vui lòng liên hệ Quản trị viên.</Typography>
+    </Box>
+);
+
 const AdminOnlyGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    if (getRole() !== 'ROLE_ADMIN') return <Navigate to="/admin/dashboard" replace />;
+    if (getRole() !== 'ROLE_ADMIN') return <NoPermission />;
     return <>{children}</>;
 };
 
@@ -128,15 +149,6 @@ const POSGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     return <>{children}</>;
 };
 
-// ─────────────────────────────────────────────────────────────
-// COMING SOON PLACEHOLDER
-// ─────────────────────────────────────────────────────────────
-const ComingSoon: React.FC<{ title: string }> = ({ title }) => (
-    <Box sx={{ p: 3 }}>
-        <Typography variant="h5" fontWeight={700}>{title}</Typography>
-        <Typography color="text.secondary" mt={1}>Tính năng đang phát triển</Typography>
-    </Box>
-);
 
 // ─────────────────────────────────────────────────────────────
 // INDEX REDIRECT
@@ -161,13 +173,17 @@ const AppRoutes: React.FC = () => (
             <Route path="login" element={withSuspense(CustomerLoginPage)} />
             <Route path="forgot-password" element={withSuspense(ForgotPasswordPage)} />
             <Route path="shop" element={withSuspense(ShopPage)} />
+            <Route path="review-sach" element={withSuspense(ReviewPage)} />
+            <Route path="tin-tuc" element={withSuspense(ReviewPage)} />
             <Route path="product/:id" element={withSuspense(ProductDetailPageCustomer)} />
+            <Route path="article/:slug" element={withSuspense(ArticleDetailPageCustomer)} />
             <Route path="cart" element={withSuspense(CartPage)} />
             <Route path="checkout" element={withSuspense(CheckoutPage)} />
             <Route path="account" element={withSuspense(AccountPage)} />
             <Route path="order-success" element={withSuspense(OrderSuccessPage)} />
             <Route path="order-tracking" element={withSuspense(OrderTrackingPage)} />
-            <Route path="wishlist" element={withSuspense(WishlistPage)} />
+            <Route path="payment/return" element={withSuspense(PaymentReturnPage)} />
+
         </Route>
 
         <Route
@@ -214,8 +230,8 @@ const AppRoutes: React.FC = () => (
             <Route path="inventory/import" element={<AdminGuard>{withSuspense(ImportPage)}</AdminGuard>} />
             <Route path="inventory/transfer" element={<AdminGuard>{withSuspense(TransfersPage)}</AdminGuard>} />
             <Route path="inventory/history" element={<AdminGuard>{withSuspense(InventoryHistoryPage)}</AdminGuard>} />
+            <Route path="inventory/alerts" element={<AdminGuard>{withSuspense(StockAlertPage)}</AdminGuard>} />
 
-            <Route path="inventory/alerts" element={<AdminGuard>{withSuspense(InventoryPage)}</AdminGuard>} />
 
             <Route path="customers" element={<AdminGuard>{withSuspense(CustomerListPage)}</AdminGuard>} />
             <Route path="customers/:id" element={<AdminGuard>{withSuspense(CustomerDetailPage)}</AdminGuard>} />
@@ -236,17 +252,26 @@ const AppRoutes: React.FC = () => (
             <Route path="reports/employees" element={<AdminGuard>{withSuspense(EmployeeReportPage)}</AdminGuard>} />
             <Route path="reports/customers" element={<AdminGuard>{withSuspense(CustomerAnalysisReportPage)}</AdminGuard>} />
 
-            <Route path="users" element={<AdminOnlyGuard>{withSuspense(UserListPage)}</AdminOnlyGuard>} />
-            <Route path="users/create" element={<AdminOnlyGuard>{withSuspense(UserCreatePage)}</AdminOnlyGuard>} />
-            <Route path="users/roles" element={<AdminOnlyGuard><ComingSoon title="Phân quyền" /></AdminOnlyGuard>} />
+            <Route path="profile" element={withSuspense(ProfilePage)} />
+            <Route path="users" element={<AdminGuard>{withSuspense(UserListPage)}</AdminGuard>} />
+            <Route path="users/create" element={<AdminGuard>{withSuspense(UserCreatePage)}</AdminGuard>} />
+            <Route path="users/roles" element={<AdminOnlyGuard>{withSuspense(RolePermissionPage)}</AdminOnlyGuard>} />
             <Route path="warehouses" element={<AdminOnlyGuard>{withSuspense(WarehousePage)}</AdminOnlyGuard>} />
 
-            <Route path="settings" element={<AdminOnlyGuard>{withSuspense(SystemSettingsPage)}</AdminOnlyGuard>} />
-            <Route path="settings/notifications" element={<AdminOnlyGuard>{withSuspense(NotificationSettingsPage)}</AdminOnlyGuard>} />
-            <Route path="settings/payments" element={<AdminOnlyGuard>{withSuspense(PaymentSettingsPage)}</AdminOnlyGuard>} />
+            <Route path="settings" element={<AdminGuard>{withSuspense(SystemSettingsPage)}</AdminGuard>} />
+            <Route path="settings/notifications" element={<AdminGuard>{withSuspense(NotificationSettingsPage)}</AdminGuard>} />
+            <Route path="settings/payments" element={<AdminGuard>{withSuspense(PaymentSettingsPage)}</AdminGuard>} />
             <Route path="shifts" element={<AdminGuard>{withSuspense(ShiftListPage)}</AdminGuard>} />
             <Route path="shifts/:id" element={<AdminGuard>{withSuspense(ShiftDetailPage)}</AdminGuard>} />
+            <Route path="shift-assignments" element={<AdminGuard>{withSuspense(ShiftAssignmentPage)}</AdminGuard>} />
             <Route path="notifications" element={<AdminGuard>{withSuspense(NotificationListPage)}</AdminGuard>} />
+
+            {/* GAP Features - Mới bổ sung */}
+            <Route path="banners" element={<AdminGuard>{withSuspense(BannerListPage)}</AdminGuard>} />
+            <Route path="authors" element={<AdminGuard>{withSuspense(AuthorListPage)}</AdminGuard>} />
+            <Route path="articles" element={<AdminGuard>{withSuspense(ArticleListPage)}</AdminGuard>} />
+            <Route path="reviews" element={<AdminGuard>{withSuspense(ReviewModerationPage)}</AdminGuard>} />
+            <Route path="settings/ai-knowledge" element={<AdminOnlyGuard>{withSuspense(AiKnowledgePage)}</AdminOnlyGuard>} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

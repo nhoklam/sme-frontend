@@ -22,7 +22,8 @@ interface StoredUser {
 const PUBLIC_PREFIXES = [
   '/products',
   '/categories',
-  '/orders', // order tracking by code is public
+  '/auth',         // login/register endpoints are public
+  '/customers/me', // Nếu chưa đăng nhập → 401 nhưng không redirect
 ];
 
 const isPublicRoute = (url: string = ''): boolean =>
@@ -43,17 +44,46 @@ const processQueue = (error: Error | null, token: string | null = null) => {
   failedQueue = [];
 };
 
-// Request interceptor: attach token if available
+// Request interceptor: attach token if available (supports both Admin and Customer auth)
 axiosInstance.interceptors.request.use(
   (config: InternalAxiosRequestConfig): InternalAxiosRequestConfig => {
-    const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr) as StoredUser;
-        if (user.accessToken) {
-          config.headers.Authorization = `Bearer ${user.accessToken}`;
+    // Xác định context hiện tại là Admin hay Customer
+    const isAdminContext = window.location.pathname.startsWith('/admin');
+
+    let token: string | null = null;
+
+    if (isAdminContext) {
+      // Admin: ưu tiên đọc từ key 'user'
+      const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr) as StoredUser;
+          token = user.accessToken || null;
+        } catch { /* ignore */ }
+      }
+    } else {
+      // Customer: ưu tiên đọc từ key 'customer_auth'
+      const customerStr = localStorage.getItem('customer_auth');
+      if (customerStr) {
+        try {
+          const customer = JSON.parse(customerStr) as StoredUser;
+          token = customer.accessToken || null;
+        } catch { /* ignore */ }
+      }
+      // Fallback: nếu customer chưa có, thử admin token (cho API public)
+      if (!token) {
+        const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
+        if (userStr) {
+          try {
+            const user = JSON.parse(userStr) as StoredUser;
+            token = user.accessToken || null;
+          } catch { /* ignore */ }
         }
-      } catch { /* ignore parse errors */ }
+      }
+    }
+
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
@@ -89,43 +119,59 @@ axiosInstance.interceptors.response.use(
       originalRequest._retry = true;
       isRefreshing = true;
 
-      const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
-      if (!userStr) {
+      const currentPath = window.location.pathname;
+      const isAdminContext = currentPath.startsWith('/admin');
+
+      // Tìm token refresh phù hợp theo context
+      let storedAuth: StoredUser | null = null;
+      let storageKey: string = 'user';
+      let storageType: 'local' | 'session' = 'local';
+
+      if (isAdminContext) {
+        const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
+        if (userStr) {
+          try { storedAuth = JSON.parse(userStr); } catch { /* ignore */ }
+          storageType = localStorage.getItem('user') ? 'local' : 'session';
+          storageKey = 'user';
+        }
+      } else {
+        // Customer context
+        const customerStr = localStorage.getItem('customer_auth');
+        if (customerStr) {
+          try { storedAuth = JSON.parse(customerStr); } catch { /* ignore */ }
+          storageKey = 'customer_auth';
+          storageType = 'local';
+        }
+      }
+
+      if (!storedAuth || !storedAuth.refreshToken) {
         isRefreshing = false;
-        // Chỉ redirect nếu không phải trang khách hàng (ví dụ: trang admin)
-        const currentPath = window.location.pathname;
-        const isCustomerPage = !currentPath.startsWith('/admin') && currentPath !== '/admin/login';
-        if (!isCustomerPage && !authService.getCurrentUser()) {
-          // Token expired and no user info for Admin
+        // Không redirect tự động cho customer — chỉ reject error
+        // Customer có thể chưa đăng nhập, vẫn cho xem trang
+        if (isAdminContext && !authService.getCurrentUser()) {
           window.location.href = '/admin/login';
-        } else if (isCustomerPage && !customerAuthService.getCurrentCustomerAuth()) {
-          // Token expired for Customer
-          window.location.href = '/login';
         }
         return Promise.reject(error);
       }
 
       try {
-        const user = JSON.parse(userStr) as StoredUser;
-        if (!user.refreshToken) throw new Error('No refresh token');
-
         const response = await axios.post(
           `${process.env.REACT_APP_API_URL || 'http://localhost:8080/api'}/auth/refresh`,
-          { refreshToken: user.refreshToken }
+          { refreshToken: storedAuth.refreshToken }
         );
 
         const { accessToken, refreshToken: newRefreshToken } = response.data.data;
-        const updatedUser = {
-          ...user,
+        const updatedAuth = {
+          ...storedAuth,
           accessToken,
-          refreshToken: newRefreshToken || user.refreshToken,
+          refreshToken: newRefreshToken || storedAuth.refreshToken,
         };
 
-        // Persist updated tokens
-        if (localStorage.getItem('user')) {
-          localStorage.setItem('user', JSON.stringify(updatedUser));
+        // Lưu lại tokens vào đúng storage key
+        if (storageType === 'local') {
+          localStorage.setItem(storageKey, JSON.stringify(updatedAuth));
         } else {
-          sessionStorage.setItem('user', JSON.stringify(updatedUser));
+          sessionStorage.setItem(storageKey, JSON.stringify(updatedAuth));
         }
 
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
@@ -133,17 +179,15 @@ axiosInstance.interceptors.response.use(
         return axiosInstance(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError as Error, null);
-        localStorage.removeItem('user');
-        sessionStorage.removeItem('user');
-        // Only redirect if we're on a non-customer page
-        const currentPath = window.location.pathname;
-        const isCustomerPage = !currentPath.startsWith('/admin');
-        if (isCustomerPage) {
-          customerAuthService.logout();
-          window.location.href = '/login';
-        } else {
+        if (isAdminContext) {
+          localStorage.removeItem('user');
+          sessionStorage.removeItem('user');
           authService.logout();
           window.location.href = '/admin/login';
+        } else {
+          localStorage.removeItem('customer_auth');
+          customerAuthService.logout();
+          // Không redirect khách hàng — chỉ xóa auth data
         }
         return Promise.reject(refreshError);
       } finally {

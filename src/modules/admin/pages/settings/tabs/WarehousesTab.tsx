@@ -5,7 +5,7 @@ import {
     MenuItem, FormControl, Dialog, DialogTitle,
     DialogContent, DialogActions, Grid, CircularProgress, Tooltip
 } from '@mui/material';
-import { Add, Edit, Close, PersonOff, PersonAdd, Phone, Person } from '@mui/icons-material';
+import { Add, Edit, Close, Block, CheckCircle, Phone, Person } from '@mui/icons-material';
 import warehouseService from '../../../../../services/warehouseService';
 import userService from '../../../../../services/userService';
 import type { Warehouse, UserResponse } from '../../../../../types';
@@ -18,13 +18,17 @@ export default function WarehousesTab() {
     const [showModal, setShowModal] = useState(false);
     const [editing, setEditing] = useState<Warehouse | null>(null);
     const [saving, setSaving] = useState(false);
-    const [form, setForm] = useState({ name: '', address: '', phone: '', managerId: '' });
+    const [form, setForm] = useState({ name: '', code: '', warehouseType: 'BRANCH' as 'MAIN' | 'BRANCH' | 'DROPSHIP', address: '', phone: '', managerId: '' });
 
     const loadData = async () => {
         setLoading(true);
         try {
             const [w, m] = await Promise.all([
-                warehouseService.getAllPaged({ size: 100 }).then(r => r.content ?? []),
+                warehouseService.getAllPaged({ size: 100 }).then(r => {
+                    if (Array.isArray(r)) return r;
+                    if ((r as any)?.content) return (r as any).content;
+                    return [];
+                }),
                 userService.getAll({ role: 'ROLE_MANAGER' }),
             ]);
             setWarehouses(w);
@@ -44,10 +48,24 @@ export default function WarehousesTab() {
     const handleOpenModal = (w?: Warehouse) => {
         if (w) {
             setEditing(w);
-            setForm({ name: w.name, address: w.address ?? '', phone: w.phone ?? '', managerId: (w as any).managerId ?? '' });
+            setForm({
+                name: w.name,
+                code: w.code ?? '',
+                warehouseType: w.warehouseType ?? 'BRANCH',
+                address: w.address ?? '',
+                phone: w.phone ?? '',
+                managerId: (w as any).managerId ?? ''
+            });
         } else {
             setEditing(null);
-            setForm({ name: '', address: '', phone: '', managerId: '' });
+            setForm({
+                name: '',
+                code: '',
+                warehouseType: 'BRANCH',
+                address: '',
+                phone: '',
+                managerId: ''
+            });
         }
         setShowModal(true);
     };
@@ -56,6 +74,7 @@ export default function WarehousesTab() {
         setSaving(true);
         try {
             const payload: any = { ...form };
+            if (!payload.code) delete payload.code; // Nếu trống để backend tự sinh
             if (!payload.managerId) payload.managerId = undefined;
             if (editing) {
                 await warehouseService.update(editing.id!, payload);
@@ -96,7 +115,9 @@ export default function WarehousesTab() {
                     <Table size="small">
                         <TableHead>
                             <TableRow sx={{ bgcolor: '#f8fafc' }}>
-                                <TableCell sx={{ fontWeight: 700, color: '#64748b', fontSize: 11 }}>TÊN CHI NHÁNH</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: '#64748b', fontSize: 11 }}>MÃ KHO/CN</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: '#64748b', fontSize: 11 }}>TÊN CHI NHÁNH / KHO</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: '#64748b', fontSize: 11 }} align="center">PHÂN LOẠI</TableCell>
                                 <TableCell sx={{ fontWeight: 700, color: '#64748b', fontSize: 11 }}>ĐỊA CHỈ & LIÊN HỆ</TableCell>
                                 <TableCell sx={{ fontWeight: 700, color: '#64748b', fontSize: 11 }} align="center">QUẢN LÝ</TableCell>
                                 <TableCell sx={{ fontWeight: 700, color: '#64748b', fontSize: 11 }} align="center">TRẠNG THÁI</TableCell>
@@ -105,44 +126,68 @@ export default function WarehousesTab() {
                         </TableHead>
                         <TableBody>
                             {loading ? (
-                                <TableRow><TableCell colSpan={5} align="center" sx={{ py: 8 }}><CircularProgress size={32} /></TableCell></TableRow>
+                                <TableRow><TableCell colSpan={7} align="center" sx={{ py: 8 }}><CircularProgress size={32} /></TableCell></TableRow>
                             ) : warehouses.length === 0 ? (
-                                <TableRow><TableCell colSpan={5} align="center" sx={{ py: 8, color: '#94a3b8' }}>Chưa có chi nhánh nào</TableCell></TableRow>
-                            ) : warehouses.map(w => (
-                                <TableRow key={w.id} hover sx={{ opacity: w.isActive ? 1 : 0.6 }}>
-                                    <TableCell>
-                                        <Typography fontSize={14} fontWeight={700} color="#1e293b">{w.name}</Typography>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Typography fontSize={12} fontWeight={500} color="#475569" sx={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                            {w.address || <span style={{ color: '#cbd5e1', fontStyle: 'italic' }}>Chưa cập nhật</span>}
-                                        </Typography>
-                                        {w.phone && <Typography fontSize={11} color="#94a3b8" fontFamily="monospace" mt={0.25}>{w.phone}</Typography>}
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        {(w as any).managerId ? (
-                                            <Chip icon={<Person sx={{ fontSize: 14 }} />} label={managerMap.get((w as any).managerId) ?? 'N/A'} size="small"
-                                                sx={{ bgcolor: '#dbeafe', color: '#1d4ed8', fontWeight: 700, fontSize: 10, height: 24 }} />
-                                        ) : (
-                                            <Typography fontSize={11} color="#94a3b8" fontStyle="italic">Chưa chỉ định</Typography>
-                                        )}
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        <Chip label={w.isActive ? 'Hoạt động' : 'Đóng cửa'} size="small"
-                                            sx={{ bgcolor: w.isActive ? '#dcfce7' : '#fee2e2', color: w.isActive ? '#16a34a' : '#dc2626', fontWeight: 700, fontSize: 10, height: 22 }} />
-                                    </TableCell>
-                                    <TableCell align="right">
-                                        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.5 }}>
-                                            <Tooltip title="Sửa"><IconButton size="small" onClick={() => handleOpenModal(w)} sx={{ color: '#f59e0b', '&:hover': { bgcolor: '#fef3c7' } }}><Edit sx={{ fontSize: 16 }} /></IconButton></Tooltip>
-                                            <Tooltip title={w.isActive ? 'Đóng cửa' : 'Mở lại'}>
-                                                <IconButton size="small" onClick={() => handleToggle(w)} sx={{ color: w.isActive ? '#ef4444' : '#22c55e', '&:hover': { bgcolor: w.isActive ? '#fef2f2' : '#f0fdf4' } }}>
-                                                    {w.isActive ? <PersonOff sx={{ fontSize: 16 }} /> : <PersonAdd sx={{ fontSize: 16 }} />}
-                                                </IconButton>
-                                            </Tooltip>
-                                        </Box>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
+                                <TableRow><TableCell colSpan={7} align="center" sx={{ py: 8, color: '#94a3b8' }}>Chưa có chi nhánh nào</TableCell></TableRow>
+                            ) : warehouses.map(w => {
+                                const isMain = w.warehouseType === 'MAIN';
+                                const isDropship = w.warehouseType === 'DROPSHIP';
+                                return (
+                                    <TableRow key={w.id} hover sx={{ opacity: w.isActive ? 1 : 0.6 }}>
+                                        <TableCell>
+                                            <Typography fontSize={12} fontWeight={700} fontFamily="monospace" sx={{ bgcolor: '#f1f5f9', px: 1, py: 0.25, borderRadius: 1, display: 'inline-block', color: '#475569' }}>
+                                                {w.code || '—'}
+                                            </Typography>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Typography fontSize={14} fontWeight={700} color="#1e293b">{w.name}</Typography>
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            <Chip
+                                                label={isMain ? 'Kho tổng (Kho chung)' : isDropship ? 'Kho ký gửi' : 'Chi nhánh'}
+                                                size="small"
+                                                sx={{
+                                                    fontWeight: 800,
+                                                    fontSize: 10,
+                                                    height: 22,
+                                                    bgcolor: isMain ? '#f5f3ff' : isDropship ? '#fff7ed' : '#eff6ff',
+                                                    color: isMain ? '#7c3aed' : isDropship ? '#ea580c' : '#2563eb',
+                                                    border: '1px solid',
+                                                    borderColor: isMain ? '#ddd6fe' : isDropship ? '#ffedd5' : '#dbeafe'
+                                                }}
+                                            />
+                                        </TableCell>
+                                        <TableCell>
+                                            <Typography fontSize={12} fontWeight={500} color="#475569" sx={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {w.address || <span style={{ color: '#cbd5e1', fontStyle: 'italic' }}>Chưa cập nhật</span>}
+                                            </Typography>
+                                            {w.phone && <Typography fontSize={11} color="#94a3b8" fontFamily="monospace" mt={0.25}>{w.phone}</Typography>}
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            {(w as any).managerId ? (
+                                                <Chip icon={<Person sx={{ fontSize: 14 }} />} label={managerMap.get((w as any).managerId) ?? 'N/A'} size="small"
+                                                    sx={{ bgcolor: '#e0f2fe', color: '#0369a1', fontWeight: 700, fontSize: 10, height: 24 }} />
+                                            ) : (
+                                                <Typography fontSize={11} color="#94a3b8" fontStyle="italic">Chưa chỉ định</Typography>
+                                            )}
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            <Chip label={w.isActive ? 'Hoạt động' : 'Đóng cửa'} size="small"
+                                                sx={{ bgcolor: w.isActive ? '#dcfce7' : '#fee2e2', color: w.isActive ? '#16a34a' : '#dc2626', fontWeight: 700, fontSize: 10, height: 22 }} />
+                                        </TableCell>
+                                        <TableCell align="right">
+                                            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.5 }}>
+                                                <Tooltip title="Chỉnh sửa"><IconButton size="small" onClick={() => handleOpenModal(w)} sx={{ color: '#f59e0b', '&:hover': { bgcolor: '#fef3c7' } }}><Edit sx={{ fontSize: 16 }} /></IconButton></Tooltip>
+                                                <Tooltip title={w.isActive ? 'Vô hiệu hóa' : 'Kích hoạt lại'}>
+                                                    <IconButton size="small" onClick={() => handleToggle(w)} sx={{ color: w.isActive ? '#ef4444' : '#22c55e', '&:hover': { bgcolor: w.isActive ? '#fef2f2' : '#f0fdf4' } }}>
+                                                        {w.isActive ? <Block sx={{ fontSize: 16 }} /> : <CheckCircle sx={{ fontSize: 16 }} />}
+                                                    </IconButton>
+                                                </Tooltip>
+                                            </Box>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
                         </TableBody>
                     </Table>
                 </TableContainer>
@@ -156,9 +201,23 @@ export default function WarehousesTab() {
                 </DialogTitle>
                 <DialogContent dividers>
                     <Grid container spacing={2} sx={{ mt: 0.5 }}>
-                        <Grid size={{ xs: 12 }}>
-                            <Typography variant="caption" fontWeight={700} color="#64748b" mb={0.5} display="block">Tên chi nhánh *</Typography>
-                            <TextField fullWidth size="small" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="VD: Cửa hàng Trung tâm Q1" />
+                        <Grid size={{ xs: 12, sm: 6 }}>
+                            <Typography variant="caption" fontWeight={700} color="#64748b" mb={0.5} display="block">Tên chi nhánh / Kho *</Typography>
+                            <TextField fullWidth size="small" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="VD: Cửa hàng Q1 hoặc Kho tổng" />
+                        </Grid>
+                        <Grid size={{ xs: 12, sm: 6 }}>
+                            <Typography variant="caption" fontWeight={700} color="#64748b" mb={0.5} display="block">Mã chi nhánh / Kho (Code)</Typography>
+                            <TextField fullWidth size="small" value={form.code} onChange={e => setForm(p => ({ ...p, code: e.target.value }))} placeholder="VD: CN001, KHOTONG (để trống tự sinh)" />
+                        </Grid>
+                        <Grid size={{ xs: 12, sm: 6 }}>
+                            <Typography variant="caption" fontWeight={700} color="#1d4ed8" mb={0.5} display="block">Phân loại *</Typography>
+                            <FormControl fullWidth size="small">
+                                <Select value={form.warehouseType} onChange={e => setForm(p => ({ ...p, warehouseType: e.target.value as any }))}>
+                                    <MenuItem value="BRANCH">Chi nhánh bán hàng</MenuItem>
+                                    <MenuItem value="MAIN">Kho tổng (Kho chung)</MenuItem>
+                                    <MenuItem value="DROPSHIP">Kho ký gửi</MenuItem>
+                                </Select>
+                            </FormControl>
                         </Grid>
                         <Grid size={{ xs: 12, sm: 6 }}>
                             <Typography variant="caption" fontWeight={700} color="#64748b" mb={0.5} display="block">Số điện thoại</Typography>
@@ -173,9 +232,9 @@ export default function WarehousesTab() {
                                 </Select>
                             </FormControl>
                         </Grid>
-                        <Grid size={{ xs: 12 }}>
+                        <Grid size={{ xs: 12, sm: 6 }}>
                             <Typography variant="caption" fontWeight={700} color="#64748b" mb={0.5} display="block">Địa chỉ</Typography>
-                            <TextField fullWidth size="small" multiline rows={2} value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} />
+                            <TextField fullWidth size="small" value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} placeholder="Số nhà, tên đường, quận/huyện..." />
                         </Grid>
                     </Grid>
                 </DialogContent>

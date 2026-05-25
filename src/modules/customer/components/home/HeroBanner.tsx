@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Box, Typography, Button, IconButton } from '@mui/material';
 import { ArrowBackIosNew, ArrowForwardIos } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { bannerApi } from '../../../../services/bannerApi';
 
 const SLIDES = [
     {
@@ -34,16 +36,32 @@ const HeroBanner = () => {
     const navigate = useNavigate();
     const [currentSlide, setCurrentSlide] = useState(0);
 
+    const { data: bannersRes } = useQuery({
+        queryKey: ['heroBanners'],
+        queryFn: () => bannerApi.getActiveBanners('HERO')
+    });
+
+    const dynamicSlides = bannersRes?.data?.map((b: any) => ({
+        id: b.id,
+        image: b.imageUrl,
+        title: b.title,
+        subtitle: b.subtitle,
+        cta: 'Khám Phá',
+        link: b.linkUrl || '/shop'
+    })) || [];
+
+    const activeSlides = dynamicSlides.length > 0 ? dynamicSlides : SLIDES;
+
     // Auto slide
     useEffect(() => {
         const timer = setInterval(() => {
-            setCurrentSlide((prev) => (prev + 1) % SLIDES.length);
+            setCurrentSlide((prev) => (prev + 1) % activeSlides.length);
         }, 5000);
         return () => clearInterval(timer);
-    }, []);
+    }, [activeSlides.length]);
 
-    const nextSlide = () => setCurrentSlide((prev) => (prev + 1) % SLIDES.length);
-    const prevSlide = () => setCurrentSlide((prev) => (prev - 1 + SLIDES.length) % SLIDES.length);
+    const nextSlide = () => setCurrentSlide((prev) => (prev + 1) % activeSlides.length);
+    const prevSlide = () => setCurrentSlide((prev) => (prev - 1 + activeSlides.length) % activeSlides.length);
 
     return (
         <Box sx={{ 
@@ -51,7 +69,7 @@ const HeroBanner = () => {
             borderRadius: { xs: 0, md: '16px' }, overflow: 'hidden'
         }}>
             {/* Slides */}
-            {SLIDES.map((slide, idx) => (
+            {activeSlides.map((slide, idx) => (
                 <Box
                     key={slide.id}
                     sx={{
@@ -103,7 +121,7 @@ const HeroBanner = () => {
 
             {/* Dots */}
             <Box sx={{ position: 'absolute', bottom: 24, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 1 }}>
-                {SLIDES.map((_, idx) => (
+                {activeSlides.map((_, idx) => (
                     <Box 
                         key={idx}
                         onClick={() => setCurrentSlide(idx)}

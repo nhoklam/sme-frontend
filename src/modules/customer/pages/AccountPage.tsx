@@ -1,21 +1,27 @@
 import React, { useState } from 'react';
-import { Box, Typography, Paper, Tabs, Tab, Grid, Avatar, Button, Skeleton, Chip } from '@mui/material';
-import { Person, ShoppingBag, LocationOn, Favorite, Logout } from '@mui/icons-material';
+import { Box, Typography, Paper, Tabs, Tab, Grid, Avatar, Button, Skeleton, Chip, Badge, IconButton, CircularProgress } from '@mui/material';
+import { Person, ShoppingBag, LocationOn, Logout, PhotoCamera } from '@mui/icons-material';
 import AccountInfo from '../components/account/AccountInfo';
 import OrderHistory from '../components/account/OrderHistory';
 import AddressBook from '../components/account/AddressBook';
-import Wishlist from '../components/account/Wishlist';
 import { useCurrentUser } from '../hooks/useAccount';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import customerAuthService from '../../../services/customerAuthService';
+import { customerApi } from '../../../services/customerApi';
 
 const AccountPage = () => {
-    const [tabValue, setTabValue] = useState(0);
+    const [searchParams, setSearchParams] = useSearchParams();
     const { user, isLoading } = useCurrentUser();
     const navigate = useNavigate();
 
+    const tabMap: Record<string, number> = { 'info': 0, 'orders': 1, 'address': 2 };
+    const reverseTabMap: Record<number, string> = { 0: 'info', 1: 'orders', 2: 'address' };
+    
+    const currentTabParam = searchParams.get('tab') || 'info';
+    const tabValue = tabMap[currentTabParam] ?? 0;
+
     const handleTabChange = (_event: any, newValue: number) => {
-        setTabValue(newValue);
+        setSearchParams({ tab: reverseTabMap[newValue] });
     };
 
     const handleLogout = () => {
@@ -24,14 +30,32 @@ const AccountPage = () => {
         window.location.reload();
     };
 
-    const displayUser = user ?? { fullName: 'Khách', email: '', phone: '' };
+    const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+    const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0) return;
+        const file = e.target.files[0];
+        try {
+            setUploadingAvatar(true);
+            const res = await customerApi.uploadImage(file);
+            const newAvatarUrl = res.data.url;
+            await customerApi.updateProfile({ avatarUrl: newAvatarUrl });
+            window.location.reload();
+        } catch (error) {
+            console.error('Lỗi upload avatar:', error);
+            alert('Có lỗi xảy ra khi cập nhật ảnh đại diện');
+        } finally {
+            setUploadingAvatar(false);
+        }
+    };
+
+    const displayUser = user ?? { fullName: 'Khách', email: '', phoneNumber: '' };
 
     const renderTabContent = () => {
         switch (tabValue) {
             case 0: return <AccountInfo user={displayUser} />;
             case 1: return <OrderHistory />;
             case 2: return <AddressBook />;
-            case 3: return <Wishlist />;
             default: return null;
         }
     };
@@ -50,63 +74,68 @@ const AccountPage = () => {
 
     return (
         <Box sx={{ py: 4 }}>
-            <Typography variant="h4" sx={{ fontWeight: 700, mb: 4 }}>
-                Tài khoản của tôi
-            </Typography>
 
-            <Grid container spacing={4}>
-                {/* Sidebar */}
-                <Grid size={{ xs: 12, md: 3 }}>
-                    <Paper sx={{ p: 3, borderRadius: 3, textAlign: 'center' }}>
-                        <Avatar sx={{ width: 80, height: 80, mx: 'auto', mb: 2, bgcolor: '#d32f2f', fontSize: 32 }}>
-                            {displayUser.fullName?.charAt(0)?.toUpperCase() ?? 'K'}
-                        </Avatar>
-                        <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
+
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                {/* Top Center Profile Card */}
+                <Box sx={{ width: '100%', maxWidth: 400 }}>
+                    <Paper sx={{ p: 4, borderRadius: 4, textAlign: 'center', border: '1px solid #eef0f2', boxShadow: '0 8px 30px rgba(0,0,0,0.04)' }}>
+                        <Badge
+                            overlap="circular"
+                            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                            badgeContent={
+                                <IconButton
+                                    component="label"
+                                    sx={{ bgcolor: '#fff', boxShadow: 1, '&:hover': { bgcolor: '#f5f5f5' }, width: 32, height: 32 }}
+                                    disabled={uploadingAvatar}
+                                >
+                                    {uploadingAvatar ? <CircularProgress size={16} /> : <PhotoCamera sx={{ fontSize: 18, color: '#1a1a2e' }} />}
+                                    <input type="file" hidden accept="image/*" onChange={handleAvatarUpload} />
+                                </IconButton>
+                            }
+                        >
+                            <Avatar src={(displayUser as any).avatarUrl} sx={{ width: 100, height: 100, mx: 'auto', mb: 2, bgcolor: '#1a1a2e', fontSize: 40, fontWeight: 700 }}>
+                                {!(displayUser as any).avatarUrl && (displayUser.fullName?.charAt(0)?.toUpperCase() ?? 'K')}
+                            </Avatar>
+                        </Badge>
+                        <Typography variant="h5" sx={{ fontWeight: 700, mb: 1, color: '#1a1a2e' }}>
                             {displayUser.fullName}
                         </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                            {displayUser.email}
-                        </Typography>
-                        {displayUser.phone && (
-                            <Chip label={displayUser.phone} size="small" sx={{ mb: 2, bgcolor: '#f5f5f5' }} />
-                        )}
                         <Button
-                            fullWidth variant="outlined" color="error"
+                            variant="outlined" color="error"
                             startIcon={<Logout />}
                             onClick={handleLogout}
-                            sx={{ textTransform: 'none', fontWeight: 600, mt: 1, borderRadius: 2 }}
+                            sx={{ textTransform: 'none', fontWeight: 600, mt: 2, borderRadius: 2, borderColor: '#eef0f2', color: '#e8401c', '&:hover': { borderColor: '#e8401c', bgcolor: 'rgba(232, 64, 28, 0.04)' }, px: 4 }}
                         >
                             Đăng xuất
                         </Button>
                     </Paper>
-                </Grid>
+                </Box>
 
-                {/* Content */}
-                <Grid size={{ xs: 12, md: 9 }}>
-                    <Paper sx={{ borderRadius: 3, overflow: 'hidden' }}>
+                {/* Content Area Below */}
+                <Box sx={{ width: '100%', maxWidth: 800 }}>
+                    <Paper sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid #eef0f2', boxShadow: '0 8px 30px rgba(0,0,0,0.04)' }}>
                         <Tabs
                             value={tabValue}
                             onChange={handleTabChange}
-                            variant="scrollable"
-                            scrollButtons="auto"
+                            variant="fullWidth"
                             sx={{
-                                borderBottom: '1px solid #e2e8f0',
-                                '& .MuiTab-root': { textTransform: 'none', fontWeight: 500, minHeight: 56 },
-                                '& .Mui-selected': { color: '#d32f2f' },
-                                '& .MuiTabs-indicator': { backgroundColor: '#d32f2f' },
+                                borderBottom: '1px solid #eef0f2',
+                                '& .MuiTab-root': { textTransform: 'none', fontWeight: 700, minHeight: 64, fontSize: '15px' },
+                                '& .Mui-selected': { color: '#f5a623' },
+                                '& .MuiTabs-indicator': { backgroundColor: '#f5a623', height: 4 },
                             }}
                         >
-                            <Tab icon={<Person />} iconPosition="start" label="Thông tin" />
-                            <Tab icon={<ShoppingBag />} iconPosition="start" label="Đơn hàng" />
-                            <Tab icon={<LocationOn />} iconPosition="start" label="Địa chỉ" />
-                            <Tab icon={<Favorite />} iconPosition="start" label="Yêu thích" />
+                            <Tab icon={<Person />} iconPosition="start" label="Thông tin cá nhân" />
+                            <Tab icon={<ShoppingBag />} iconPosition="start" label="Lịch sử đơn hàng" />
+                            <Tab icon={<LocationOn />} iconPosition="start" label="Sổ địa chỉ" />
                         </Tabs>
-                        <Box sx={{ p: 3 }}>
+                        <Box sx={{ p: 4, bgcolor: '#ffffff' }}>
                             {renderTabContent()}
                         </Box>
                     </Paper>
-                </Grid>
-            </Grid>
+                </Box>
+            </Box>
         </Box>
     );
 };

@@ -1,5 +1,5 @@
 // src/modules/customer/pages/CartPage.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Box, Container, Grid, Typography, Button, Paper,
@@ -23,47 +23,183 @@ const CartPage = () => {
     const {
         items, removeItem, updateQty, clearCart,
         totalItems, totalPrice, totalSaved,
-        appliedPromotion, setAppliedPromotion
+        appliedPromotions, setAppliedPromotions
     } = useCartContext();
     const [coupon, setCoupon] = useState('');
     const [couponErr, setCouponErr] = useState('');
     const [isValidating, setIsValidating] = useState(false);
+    const [activePromotions, setActivePromotions] = useState<any[]>([]);
+
+    useEffect(() => {
+        promotionService.getActive().then(res => setActivePromotions(res)).catch(console.error);
+    }, []);
+
+    const rawShipFee = totalPrice >= FREE_SHIP ? 0 : 30000;
 
     const calcDiscount = () => {
-        if (!appliedPromotion) return 0;
-        if (appliedPromotion.type === 'FIXED_AMOUNT') {
-            return Math.min(appliedPromotion.discountValue, totalPrice);
-        }
-        if (appliedPromotion.type === 'PERCENTAGE') {
-            let d = (totalPrice * appliedPromotion.discountValue) / 100;
-            if (appliedPromotion.maxDiscountAmount) d = Math.min(d, appliedPromotion.maxDiscountAmount);
-            return Math.round(d);
-        }
-        return 0;
+        let orderDiscount = 0;
+        let shipDiscount = 0;
+        
+        appliedPromotions.forEach(promo => {
+            let d = 0;
+            if (promo.discountAmount !== undefined) {
+                d = promo.discountAmount;
+            } else {
+                if (promo.type === 'FIXED_AMOUNT') {
+                    d = promo.discountValue;
+                } else if (promo.type === 'PERCENTAGE') {
+                    d = (totalPrice * promo.discountValue) / 100;
+                    if (promo.maxDiscountAmount) d = Math.min(d, promo.maxDiscountAmount);
+                }
+                d = Math.round(d);
+            }
+            
+            const isShipping = promo.promotionSlot === 'SHIPPING' || promo.code?.toUpperCase().includes('SHIP') || promo.code?.toUpperCase().includes('FREE');
+            
+            if (isShipping) {
+                shipDiscount += Math.min(d, rawShipFee);
+            } else {
+                orderDiscount += Math.min(d, totalPrice);
+            }
+        });
+        
+        return { orderDiscount, shipDiscount };
     };
 
-    const discount = calcDiscount();
-    const shipFee = totalPrice >= FREE_SHIP ? 0 : 30000;
-    const finalPrice = totalPrice - discount + shipFee;
+    const { orderDiscount, shipDiscount } = calcDiscount();
+    const discount = orderDiscount + shipDiscount;
+    const finalShipFee = rawShipFee - shipDiscount;
+    const finalPrice = totalPrice - orderDiscount + finalShipFee;
 
     // Load suggested products from API
     const { products: allProducts } = useProducts({ size: 8, page: 0 });
     const cartItemIds = new Set(items.map((i: any) => i.id));
     const suggested = allProducts.filter(p => !cartItemIds.has(p.id)).slice(0, 4);
 
-    const applyCoupon = async () => {
-        if (!coupon.trim()) return;
+    const applyCoupon = async (codeToApply?: string) => {
+        const targetCode = typeof codeToApply === 'string' ? codeToApply : coupon;
+        if (!targetCode.trim()) return;
         setIsValidating(true);
         setCouponErr('');
         try {
-            const promo = await promotionService.validate(coupon.trim(), totalPrice);
-            setAppliedPromotion(promo);
+            const promoResult = await promotionService.validate(targetCode.trim(), totalPrice);
+            const fullPromo = activePromotions.find(p => p.code?.toUpperCase() === targetCode.trim().toUpperCase());
+            
+            let newPromo: any;
+            if (fullPromo) {
+                newPromo = { ...fullPromo, discountAmount: promoResult.discountAmount };
+            } else {
+                newPromo = {
+                    code: promoResult.code,
+                    type: 'FIXED_AMOUNT',
+                    discountValue: promoResult.discountAmount,
+                    discountAmount: promoResult.discountAmount,
+                    promotionSlot: targetCode.trim().toUpperCase().includes('SHIP') || targetCode.trim().toUpperCase().includes('FREE') ? 'SHIPPING' : 'ORDER'
+                };
+            }
+            
+            const isShipping = newPromo.promotionSlot === 'SHIPPING' || newPromo.code?.toUpperCase().includes('SHIP') || newPromo.code?.toUpperCase().includes('FREE');
+            
+            // Lọc bỏ mã cũ cùng loại (shipping hoặc order)
+            const filteredPromos = appliedPromotions.filter(p => {
+                const pIsShipping = p.promotionSlot === 'SHIPPING' || p.code?.toUpperCase().includes('SHIP') || p.code?.toUpperCase().includes('FREE');
+                return pIsShipping !== isShipping;
+            });
+            
+            setAppliedPromotions([...filteredPromos, newPromo]);
+
+            if (typeof codeToApply === 'string') setCoupon(codeToApply);
+            else setCoupon('');
         } catch (err: any) {
-            setAppliedPromotion(null);
             setCouponErr(err.response?.data?.message || 'Mã giảm giá không hợp lệ hoặc đã hết hạn');
         } finally {
             setIsValidating(false);
         }
+    };
+
+    const validOnlinePromos = activePromotions.filter(p => !p.applicableChannel || p.applicableChannel === 'ONLINE' || p.applicableChannel === 'ALL');
+    const shippingPromos = validOnlinePromos.filter(p => p.promotionSlot === 'SHIPPING' || p.code?.toUpperCase().includes('SHIP') || p.code?.toUpperCase().includes('FREE'));
+    const orderPromos = validOnlinePromos.filter(p => p.promotionSlot !== 'SHIPPING' && !p.code?.toUpperCase().includes('SHIP') && !p.code?.toUpperCase().includes('FREE'));
+
+    const renderPromoList = (promos: any[], title: string, icon: string) => {
+        if (promos.length === 0) return null;
+        return (
+            <Box sx={{ mt: 3, pt: 3, borderTop: '1px dashed #e2e8f0' }}>
+                <Typography variant="body2" sx={{ fontWeight: 800, color: '#334155', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    {icon} {title}
+                </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, maxHeight: 220, overflowY: 'auto', pr: 0.5, '&::-webkit-scrollbar': { width: '4px' }, '&::-webkit-scrollbar-thumb': { bgcolor: '#cbd5e1', borderRadius: '4px' } }}>
+                    {promos.map(promo => {
+                        const minOrder = promo.minOrderAmount || 0;
+                        const isEligible = totalPrice >= minOrder;
+                        const isApplied = appliedPromotions.some((ap: any) => ap.code === promo.code);
+                        return (
+                            <Box key={promo.id} sx={{
+                                display: 'flex', alignItems: 'center', p: 1.5,
+                                border: '1px solid',
+                                borderColor: isApplied ? '#f5a623' : '#e2e8f0',
+                                borderRadius: '10px',
+                                bgcolor: isApplied ? '#fffdf7' : '#fff',
+                                opacity: isEligible ? 1 : 0.6,
+                                transition: 'all 0.2s',
+                                '&:hover': {
+                                    borderColor: isEligible ? (isApplied ? '#f5a623' : '#cbd5e1') : '#e2e8f0',
+                                    transform: isEligible ? 'translateY(-1px)' : 'none',
+                                    boxShadow: isEligible ? '0 4px 12px rgba(0,0,0,0.03)' : 'none'
+                                }
+                            }}>
+                                <Box sx={{ flex: 1 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                                        <Typography variant="subtitle2" sx={{ fontFamily: '"Playfair Display", serif', fontWeight: 900, color: isApplied ? '#d97706' : '#1e293b', fontSize: '1rem' }}>
+                                            {promo.code}
+                                        </Typography>
+                                        <Chip size="small" label={promo.type === 'PERCENTAGE' ? `Giảm ${promo.discountValue}%` : `Giảm ${fmt(promo.discountValue)}`}
+                                            sx={{ height: 22, fontSize: 11, fontWeight: 800, bgcolor: '#fee2e2', color: '#ef4444', borderRadius: '6px' }} />
+                                    </Box>
+                                    <Typography variant="caption" sx={{ color: '#475569', display: 'block', mb: 0.5, fontWeight: 500, fontSize: '0.8rem' }}>
+                                        {promo.name}
+                                    </Typography>
+                                    {minOrder > 0 && (
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                            <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: isEligible ? '#10b981' : '#ef4444' }} />
+                                            <Typography variant="caption" sx={{ color: isEligible ? '#64748b' : '#ef4444', fontWeight: 600 }}>
+                                                Đơn tối thiểu {fmt(minOrder)}
+                                            </Typography>
+                                        </Box>
+                                    )}
+                                </Box>
+                                <Button
+                                    variant={isApplied ? "contained" : "outlined"}
+                                    size="small"
+                                    disabled={!isEligible && !isApplied}
+                                    onClick={() => {
+                                        if (isApplied) {
+                                            setAppliedPromotions(appliedPromotions.filter((ap: any) => ap.code !== promo.code));
+                                        } else {
+                                            applyCoupon(promo.code);
+                                        }
+                                    }}
+                                    sx={{
+                                        minWidth: 76, height: 34,
+                                        borderRadius: '8px', textTransform: 'none', fontWeight: 800,
+                                        bgcolor: isApplied ? '#f5a623' : 'transparent',
+                                        color: isApplied ? '#fff' : '#2563eb',
+                                        borderColor: isApplied ? '#f5a623' : '#bfdbfe',
+                                        boxShadow: 'none',
+                                        '&:hover': {
+                                            bgcolor: isApplied ? '#d97706' : '#eff6ff',
+                                            boxShadow: 'none'
+                                        }
+                                    }}
+                                >
+                                    {isApplied ? 'Bỏ chọn' : 'Áp dụng'}
+                                </Button>
+                            </Box>
+                        );
+                    })}
+                </Box>
+            </Box>
+        );
     };
 
     if (items.length === 0) {
@@ -193,13 +329,15 @@ const CartPage = () => {
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 2 }}>
                                 <ConfirmationNumber sx={{ color: '#1a1a2e', fontSize: 22 }} />
                                 <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#1a1a2e' }}>Ưu đãi & Mã giảm giá</Typography>
-                                {appliedPromotion && (
+                                {appliedPromotions.map((p: any, idx: number) => (
                                     <Chip
-                                        label={appliedPromotion.type === 'PERCENTAGE' ? `Giảm ${appliedPromotion.discountValue}%` : `Giảm ${fmt(appliedPromotion.discountValue)}`}
+                                        key={idx}
+                                        label={p.type === 'PERCENTAGE' ? `Giảm ${p.discountValue}%` : `Giảm ${fmt(p.discountValue)}`}
                                         size="small"
+                                        onDelete={() => setAppliedPromotions(appliedPromotions.filter((ap: any) => ap.code !== p.code))}
                                         sx={{ bgcolor: '#e8f5e9', color: '#2e7d32', fontWeight: 800, fontSize: '0.75rem' }}
                                     />
-                                )}
+                                ))}
                             </Box>
                             <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
                                 <TextField
@@ -209,11 +347,11 @@ const CartPage = () => {
                                     value={coupon}
                                     onChange={e => { setCoupon(e.target.value); setCouponErr(''); }}
                                     error={!!couponErr}
-                                    helperText={couponErr || (appliedPromotion ? `🎉 Đã áp dụng ưu đãi thành công: ${appliedPromotion.name}` : 'Mỗi đơn hàng có thể áp dụng 1 coupon giảm giá')}
+                                    helperText={couponErr || (appliedPromotions.length > 0 ? `🎉 Đã áp dụng thành công ${appliedPromotions.length} mã ưu đãi` : 'Mỗi đơn hàng có thể áp dụng 1 phí ship & 1 hóa đơn')}
                                     FormHelperTextProps={{
-                                        sx: { color: appliedPromotion ? '#2e7d32' : 'text.secondary', fontWeight: appliedPromotion ? 600 : 400 },
+                                        sx: { color: appliedPromotions.length > 0 ? '#2e7d32' : 'text.secondary', fontWeight: appliedPromotions.length > 0 ? 600 : 400 },
                                     }}
-                                    disabled={!!appliedPromotion || isValidating}
+                                    disabled={isValidating}
                                     sx={{
                                         '& .MuiOutlinedInput-root': {
                                             borderRadius: '8px',
@@ -223,48 +361,32 @@ const CartPage = () => {
                                         },
                                     }}
                                 />
-                                {appliedPromotion ? (
-                                    <Button
-                                        variant="outlined"
-                                        size="large"
-                                        onClick={() => { setAppliedPromotion(null); setCoupon(''); }}
-                                        sx={{
-                                            borderColor: '#ff4d4f',
-                                            color: '#ff4d4f',
-                                            textTransform: 'none',
-                                            fontWeight: 700,
-                                            height: 56,
-                                            px: 3,
-                                            borderRadius: '8px',
-                                            '&:hover': { borderColor: '#d9363e', bgcolor: '#fff0f6' }
-                                        }}
-                                    >
-                                        Hủy mã
-                                    </Button>
-                                ) : (
-                                    <Button
-                                        variant="contained"
-                                        size="large"
-                                        onClick={applyCoupon}
-                                        disabled={isValidating || !coupon.trim()}
-                                        sx={{
-                                            bgcolor: '#1a1a2e',
-                                            color: '#ffffff',
-                                            textTransform: 'none',
-                                            fontWeight: 700,
-                                            height: 56,
-                                            px: 3,
-                                            borderRadius: '8px',
-                                            boxShadow: 'none',
-                                            whiteSpace: 'nowrap',
-                                            '&:hover': { bgcolor: '#f5a623', color: '#1a1a2e' },
-                                            '&:disabled': { bgcolor: '#f0f0f2', color: '#bbb' }
-                                        }}
-                                    >
-                                        {isValidating ? 'Đang xác thực...' : 'Áp dụng'}
-                                    </Button>
-                                )}
+                                <Button
+                                    variant="contained"
+                                    size="large"
+                                    onClick={() => applyCoupon()}
+                                    disabled={isValidating || !coupon.trim()}
+                                    sx={{
+                                        bgcolor: '#1a1a2e',
+                                        color: '#ffffff',
+                                        textTransform: 'none',
+                                        fontWeight: 700,
+                                        height: 56,
+                                        px: 3,
+                                        borderRadius: '8px',
+                                        boxShadow: 'none',
+                                        whiteSpace: 'nowrap',
+                                        '&:hover': { bgcolor: '#f5a623', color: '#1a1a2e' },
+                                        '&:disabled': { bgcolor: '#f0f0f2', color: '#bbb' }
+                                    }}
+                                >
+                                    {isValidating ? 'Đang xác thực...' : 'Áp dụng'}
+                                </Button>
                             </Box>
+
+                            {/* Danh sách mã giảm giá gợi ý */}
+                            {renderPromoList(shippingPromos, 'Mã giảm giá vận chuyển', '🚚')}
+                            {renderPromoList(orderPromos, 'Mã giảm giá đơn hàng', '🎟️')}
                         </Paper>
                     </Grid>
 
@@ -285,22 +407,22 @@ const CartPage = () => {
                                 p: 1.8,
                                 borderRadius: '8px',
                                 mb: 2,
-                                bgcolor: shipFee === 0 ? 'rgba(46, 125, 50, 0.06)' : 'rgba(245, 166, 35, 0.08)',
+                                bgcolor: finalShipFee === 0 ? 'rgba(46, 125, 50, 0.06)' : 'rgba(245, 166, 35, 0.08)',
                                 display: 'flex',
                                 gap: 1.2,
                                 alignItems: 'flex-start',
                             }}>
                                 <LocalShipping sx={{
                                     fontSize: 20,
-                                    color: shipFee === 0 ? '#2e7d32' : '#db941e',
+                                    color: finalShipFee === 0 ? '#2e7d32' : '#db941e',
                                     mt: 0.2,
                                 }} />
                                 <Typography
                                     variant="caption"
-                                    color={shipFee === 0 ? '#2e7d32' : '#db941e'}
+                                    color={finalShipFee === 0 ? '#2e7d32' : '#db941e'}
                                     sx={{ fontWeight: 700, lineHeight: 1.5, fontSize: '0.8rem' }}
                                 >
-                                    {shipFee === 0
+                                    {finalShipFee === 0
                                         ? 'Chúc mừng! Bạn đã nhận ưu đãi Miễn phí vận chuyển.'
                                         : `Mua thêm ${fmt(FREE_SHIP - totalPrice)} để được Miễn phí vận chuyển.`}
                                 </Typography>
@@ -311,7 +433,7 @@ const CartPage = () => {
                                 <Box sx={{
                                     height: '100%',
                                     width: `${Math.min((totalPrice / FREE_SHIP) * 100, 100)}%`,
-                                    bgcolor: shipFee === 0 ? '#2e7d32' : '#f5a623',
+                                    bgcolor: finalShipFee === 0 ? '#2e7d32' : '#f5a623',
                                     borderRadius: 3,
                                     transition: 'width 0.4s ease-out',
                                 }} />
@@ -324,24 +446,34 @@ const CartPage = () => {
                                     <Typography variant="body2" sx={{ fontWeight: 700, color: '#1a1a2e' }}>{fmt(totalPrice)}</Typography>
                                 </Box>
 
-                                {totalSaved > 0 && (
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <Typography variant="body2" color="text.secondary">Tiết kiệm trực tiếp</Typography>
-                                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#2e7d32' }}>-{fmt(totalSaved)}</Typography>
-                                    </Box>
-                                )}
-
-                                {appliedPromotion && (
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <Typography variant="body2" color="text.secondary">Mã giảm giá ({appliedPromotion.code})</Typography>
-                                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#ff4d4f' }}>-{fmt(discount)}</Typography>
-                                    </Box>
-                                )}
+                                {appliedPromotions.map((promo: any, idx: number) => {
+                                    const isShipping = promo.promotionSlot === 'SHIPPING' || promo.code?.toUpperCase().includes('SHIP') || promo.code?.toUpperCase().includes('FREE');
+                                    let d = 0;
+                                    if (promo.discountAmount !== undefined) d = promo.discountAmount;
+                                    else if (promo.type === 'FIXED_AMOUNT') d = promo.discountValue;
+                                    else if (promo.type === 'PERCENTAGE') d = (totalPrice * promo.discountValue) / 100;
+                                    const finalD = isShipping ? Math.min(d, rawShipFee) : Math.min(d, totalPrice);
+                                    
+                                    if (finalD === 0) return null;
+                                    return (
+                                        <Box key={idx} sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <Typography variant="body2" color="text.secondary">Mã giảm giá ({promo.code})</Typography>
+                                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#ff4d4f' }}>-{fmt(finalD)}</Typography>
+                                        </Box>
+                                    );
+                                })}
 
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                                     <Typography variant="body2" color="text.secondary">Phí vận chuyển</Typography>
-                                    <Typography variant="body2" sx={{ fontWeight: 700, color: shipFee === 0 ? '#2e7d32' : '#1a1a2e' }}>
-                                        {shipFee === 0 ? 'Miễn phí' : fmt(shipFee)}
+                                    <Typography variant="body2" sx={{ fontWeight: 700, color: finalShipFee === 0 ? '#2e7d32' : '#1a1a2e' }}>
+                                        {finalShipFee === 0 ? 'Miễn phí' : (
+                                            rawShipFee !== finalShipFee ? (
+                                                <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                  <Box component="span" sx={{ textDecoration: 'line-through', color: '#8c9ba5', fontSize: '0.75rem', fontWeight: 500 }}>{fmt(rawShipFee)}</Box>
+                                                  {fmt(finalShipFee)}
+                                                </Box>
+                                            ) : fmt(rawShipFee)
+                                        )}
                                     </Typography>
                                 </Box>
                             </Box>

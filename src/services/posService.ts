@@ -34,6 +34,12 @@ const posService = {
         );
         return res.data.data;
     },
+
+    // Khởi tạo mã QR thanh toán (VNPay / PayOS)
+    initQrCheckout: async (gateway: string, req: any): Promise<{ checkoutUrl: string; orderCode: string; amount: number; gateway: string }> => {
+        const res = await axiosInstance.post<ApiResponse<any>>(`/pos/qr-checkout-init?gateway=${gateway}`, req);
+        return res.data.data;
+    },
 };
 
 export default posService;

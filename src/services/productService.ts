@@ -14,6 +14,7 @@ const productService = {
         keyword?: string;
         categoryId?: string;
         isActive?: boolean;
+        sortBy?: string;
         page?: number;
         size?: number;
     }): Promise<PageResponse<ProductResponse>> => {
@@ -21,6 +22,7 @@ const productService = {
         if (params.keyword?.trim()) query.set('keyword', params.keyword.trim());
         if (params.categoryId) query.set('categoryId', params.categoryId);
         if (params.isActive !== undefined) query.set('isActive', String(params.isActive));
+        if (params.sortBy) query.set('sortBy', params.sortBy);
         query.set('page', String(params.page ?? 0));
         query.set('size', String(params.size ?? 20));
 
@@ -59,6 +61,12 @@ const productService = {
     // Lấy lịch sử giá
     getPriceHistory: async (id: string): Promise<any[]> => {
         const res = await axiosInstance.get<ApiResponse<any[]>>(`/products/${id}/price-history`);
+        return res.data.data;
+    },
+
+    // Lấy danh sách đánh giá
+    getReviews: async (productId: string, page = 0, size = 10): Promise<PageResponse<any>> => {
+        const res = await axiosInstance.get<ApiResponse<PageResponse<any>>>(`/products/${productId}/reviews?page=${page}&size=${size}`);
         return res.data.data;
     },
 };

@@ -6,8 +6,9 @@ import {
     TableContainer, TableHead, TableRow, TextField,
     InputAdornment, Chip, IconButton, Select, MenuItem,
     FormControl, Skeleton, Alert, Tooltip, Pagination,
-    Button, Grid, Checkbox
+    Button, Grid, Checkbox, Popover, CircularProgress
 } from '@mui/material';
+import toast from 'react-hot-toast';
 import {
     Search, Add, Visibility, Edit, ImageNotSupported,
     Refresh, Print, FilterList, QrCodeScanner
@@ -15,6 +16,7 @@ import {
 import JsBarcode from 'jsbarcode';
 import BarcodePrintDialog, { BarcodePrintItem } from '../../../../components/common/BarcodePrintDialog';
 import ProductFormDialog from './ProductFormDialog';
+import authService from '../../../../services/authService';
 
 // ── Helpers ──────────────────────────────────────────────────
 const fmtCurrency = (n) =>
@@ -61,6 +63,12 @@ const ProductListPage = () => {
     const [minPrice, setMinPrice] = useState('');
     const [maxPrice, setMaxPrice] = useState('');
     const [isActive, setIsActive] = useState('');
+    const currentUser = authService.getCurrentUser()?.user;
+    const isManager = currentUser?.role === 'ROLE_MANAGER';
+
+    const [filterWarehouseId, setFilterWarehouseId] = useState(isManager ? (currentUser?.warehouseId || '') : '');
+    const [warehouses, setWarehouses] = useState<any[]>([]);
+
     const [showFilters, setShowFilters] = useState(false);
     const [suppliers, setSuppliers] = useState([]);
     const [page, setPage] = useState(0);
@@ -69,10 +77,58 @@ const ProductListPage = () => {
 
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [printItems, setPrintItems] = useState<BarcodePrintItem[]>([]);
-    
+
     // ── Dialog state ──
     const [formOpen, setFormOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | undefined>(undefined);
+
+    // ── Popover Stock states ──
+    const [popoverAnchor, setPopoverAnchor] = useState<HTMLElement | null>(null);
+    const [popoverProduct, setPopoverProduct] = useState<any>(null);
+    const [popoverLoading, setPopoverLoading] = useState(false);
+    const [popoverInventories, setPopoverInventories] = useState<any[]>([]);
+
+    const handleStockClick = async (event: React.MouseEvent<HTMLElement>, product: any) => {
+        setPopoverAnchor(event.currentTarget);
+        setPopoverProduct(product);
+        setPopoverLoading(true);
+        setPopoverInventories([]);
+        try {
+            const warehouseRes = await axiosInstance.get('/warehouses');
+            let activeWarehouses = (warehouseRes.data?.data ?? []).filter((w: any) => w.isActive);
+            if (isManager && currentUser?.warehouseId) {
+                activeWarehouses = activeWarehouses.filter((w: any) => w.id === currentUser.warehouseId);
+            }
+
+            const invPromises = activeWarehouses.map((w: any) =>
+                axiosInstance
+                    .get(`/inventory/${product.id}/warehouse/${w.id}`)
+                    .then((r) => ({
+                        warehouseName: w.name,
+                        quantity: r.data?.data?.availableQuantity ?? r.data?.data?.quantity ?? 0,
+                        minQuantity: r.data?.data?.minQuantity ?? 10
+                    }))
+                    .catch(() => ({
+                        warehouseName: w.name,
+                        quantity: 0,
+                        minQuantity: 10
+                    }))
+            );
+            const results = await Promise.all(invPromises);
+            setPopoverInventories(results);
+        } catch (err) {
+            toast.error('Không thể tải chi tiết tồn kho');
+        } finally {
+            setPopoverLoading(false);
+        }
+    };
+
+    const handlePopoverClose = () => {
+        setPopoverAnchor(null);
+        setPopoverProduct(null);
+    };
+
+    const isPopoverOpen = Boolean(popoverAnchor);
 
     const PAGE_SIZE = 15;
 
@@ -83,6 +139,14 @@ const ProductListPage = () => {
             setSuppliers(Array.isArray(data) ? data : (data?.content ?? []));
         } catch { }
     }, []);
+
+    const loadWarehouses = useCallback(async () => {
+        if (isManager) return;
+        try {
+            const res = await axiosInstance.get('/warehouses');
+            setWarehouses(res.data?.data ?? []);
+        } catch { }
+    }, [isManager]);
 
     const loadCategories = useCallback(async () => {
         try {
@@ -104,6 +168,7 @@ const ProductListPage = () => {
             if (minPrice) params.set('minPrice', minPrice);
             if (maxPrice) params.set('maxPrice', maxPrice);
             if (isActive !== '') params.set('isActive', isActive);
+            if (filterWarehouseId) params.set('warehouseId', filterWarehouseId);
 
             const res = await axiosInstance.get(`/products?${params}`);
             const data = res.data?.data;
@@ -115,12 +180,13 @@ const ProductListPage = () => {
         } finally {
             setLoading(false);
         }
-    }, [search, categoryId, supplierId, minPrice, maxPrice, isActive, page]);
+    }, [search, categoryId, supplierId, minPrice, maxPrice, isActive, filterWarehouseId, page]);
 
     useEffect(() => {
         loadCategories();
         loadSuppliers();
-    }, [loadCategories, loadSuppliers]);
+        loadWarehouses();
+    }, [loadCategories, loadSuppliers, loadWarehouses]);
 
     useEffect(() => {
         const t = setTimeout(() => {
@@ -283,7 +349,7 @@ const ProductListPage = () => {
                         size="small" placeholder="Tìm theo tên, SKU, ISBN (Hoặc quét mã vạch)..."
                         value={search} onChange={e => setSearch(e.target.value)}
                         sx={{ flex: 1, minWidth: 240 }}
-                        InputProps={{ 
+                        InputProps={{
                             startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 17, color: '#9ca3af' }} /></InputAdornment>,
                             endAdornment: (
                                 <InputAdornment position="end">
@@ -336,6 +402,17 @@ const ProductListPage = () => {
                                     </Select>
                                 </FormControl>
                             </Grid>
+                            {!isManager && (
+                                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                                    <Typography variant="caption" fontWeight={700} color="#666" display="block" mb={0.5}>KHO / CHI NHÁNH</Typography>
+                                    <FormControl fullWidth size="small">
+                                        <Select value={filterWarehouseId} onChange={e => { setFilterWarehouseId(e.target.value); setPage(0); }} displayEmpty sx={{ fontSize: 13 }}>
+                                            <MenuItem value="">Tất cả kho (Tổng tồn)</MenuItem>
+                                            {warehouses.map((w: any) => <MenuItem key={w.id} value={w.id} sx={{ fontSize: 13 }}>{w.name}</MenuItem>)}
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                            )}
                             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                                 <Box sx={{ display: 'flex', gap: 1 }}>
                                     <Box sx={{ flex: 1 }}>
@@ -357,6 +434,7 @@ const ProductListPage = () => {
                                         setCategoryId('');
                                         setSupplierId('');
                                         setIsActive('');
+                                        if (!isManager) setFilterWarehouseId('');
                                         setMinPrice('');
                                         setMaxPrice('');
                                         setPage(0);
@@ -453,10 +531,23 @@ const ProductListPage = () => {
                                             {fmtCurrency(p.retailPrice)}
                                         </TableCell>
                                         <TableCell>
-                                            <Typography variant="body2" fontWeight={700} fontSize={13}
-                                                color={p.availableQuantity === 0 ? '#ef4444' : p.availableQuantity < 10 ? '#f59e0b' : '#10b981'}>
-                                                {p.availableQuantity?.toLocaleString() ?? 0}
-                                            </Typography>
+                                            <Tooltip title={isManager ? "Xem chi tiết tồn kho" : "Nhấn để xem chi tiết tồn kho tại các chi nhánh"}>
+                                                <Box
+                                                    onClick={(e) => handleStockClick(e, p)}
+                                                    sx={{
+                                                        display: 'inline-flex',
+                                                        cursor: 'pointer',
+                                                        borderBottom: '1px dashed',
+                                                        borderColor: p.availableQuantity === 0 ? '#fca5a5' : p.availableQuantity < 10 ? '#fde047' : '#6ee7b7',
+                                                        '&:hover': { color: '#2563eb' }
+                                                    }}
+                                                >
+                                                    <Typography variant="body2" fontWeight={700} fontSize={13}
+                                                        color={p.availableQuantity === 0 ? '#ef4444' : p.availableQuantity < 10 ? '#f59e0b' : '#10b981'}>
+                                                        {p.availableQuantity?.toLocaleString() ?? 0}
+                                                    </Typography>
+                                                </Box>
+                                            </Tooltip>
                                         </TableCell>
                                         <TableCell><StatusChip isActive={p.isActive} stock={p.availableQuantity ?? 0} /></TableCell>
                                         <TableCell align="center">
@@ -510,12 +601,90 @@ const ProductListPage = () => {
             </Paper>
 
             <BarcodePrintDialog open={printItems.length > 0} onClose={() => setPrintItems([])} items={printItems} />
-            <ProductFormDialog 
-                open={formOpen} 
-                productId={editingId} 
-                onClose={() => setFormOpen(false)} 
-                onSuccess={loadProducts} 
+            <ProductFormDialog
+                open={formOpen}
+                productId={editingId}
+                onClose={() => setFormOpen(false)}
+                onSuccess={loadProducts}
             />
+
+            {/* Popover chi tiết tồn kho ở từng chi nhánh/kho */}
+            <Popover
+                open={isPopoverOpen}
+                anchorEl={popoverAnchor}
+                onClose={handlePopoverClose}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+                transformOrigin={{ vertical: 'top', horizontal: 'center' }}
+                slotProps={{
+                    paper: {
+                        sx: {
+                            p: 2,
+                            width: 290,
+                            borderRadius: 3,
+                            boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
+                            border: '1px solid #f1f5f9',
+                            mt: 0.5
+                        }
+                    }
+                }}
+            >
+                <Typography variant="subtitle2" fontWeight={800} color="#1e293b" mb={0.5}>
+                    Chi tiết tồn kho
+                </Typography>
+                {popoverProduct && (
+                    <Typography variant="caption" color="text.secondary" display="block" mb={1.5} sx={{ wordBreak: 'break-word', fontWeight: 600 }}>
+                        {popoverProduct.name}
+                    </Typography>
+                )}
+
+                {popoverLoading ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 3, gap: 1 }}>
+                        <CircularProgress size={16} />
+                        <Typography variant="caption" color="text.secondary">Đang tải...</Typography>
+                    </Box>
+                ) : popoverInventories.length > 0 ? (
+                    <Table size="small">
+                        <TableBody>
+                            {popoverInventories.map((inv, idx) => {
+                                const qty = inv.quantity;
+                                const isOut = qty === 0;
+                                const isLow = !isOut && qty < inv.minQuantity;
+                                return (
+                                    <TableRow key={idx} sx={{ '&:last-child td': { border: 0 } }}>
+                                        <TableCell sx={{ p: 0.75, fontSize: 12, color: '#475569', fontWeight: 500, borderBottom: '1px solid #f1f5f9' }}>
+                                            {inv.warehouseName}
+                                        </TableCell>
+                                        <TableCell align="right" sx={{ p: 0.75, borderBottom: '1px solid #f1f5f9' }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
+                                                <Typography variant="body2" fontWeight={700} fontSize={12} color={isOut ? '#ef4444' : isLow ? '#f59e0b' : '#10b981'}>
+                                                    {qty.toLocaleString()}
+                                                </Typography>
+                                                <Chip
+                                                    label={isOut ? 'Hết' : isLow ? 'Sắp hết' : 'Còn'}
+                                                    size="small"
+                                                    sx={{
+                                                        height: 16,
+                                                        fontSize: 9,
+                                                        fontWeight: 700,
+                                                        px: 0.5,
+                                                        bgcolor: isOut ? '#fef2f2' : isLow ? '#fef9c3' : '#ecfdf5',
+                                                        color: isOut ? '#ef4444' : isLow ? '#ca8a04' : '#10b981',
+                                                        '& .MuiChip-label': { px: 0.5 }
+                                                    }}
+                                                />
+                                            </Box>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                ) : (
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', py: 1 }}>
+                        Không có dữ liệu tồn kho
+                    </Typography>
+                )}
+            </Popover>
         </Box>
     );
 };

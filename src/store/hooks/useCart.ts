@@ -33,10 +33,10 @@ const cartReducer = (state, action) => {
                 ),
             };
         case 'CLEAR':
-            return { ...state, items: [], appliedPromotion: null };
+            return { ...state, items: [], appliedPromotions: [] };
 
-        case 'SET_PROMOTION':
-            return { ...state, appliedPromotion: action.promotion };
+        case 'SET_PROMOTIONS':
+            return { ...state, appliedPromotions: action.promotions };
 
         default:
             return state;
@@ -45,7 +45,7 @@ const cartReducer = (state, action) => {
 
 const initialState = { 
     items: JSON.parse(localStorage.getItem('cart_items') || '[]'),
-    appliedPromotion: JSON.parse(localStorage.getItem('cart_promo') || 'null')
+    appliedPromotions: JSON.parse(localStorage.getItem('cart_promos') || '[]')
 };
 
 // ── Hook ───────────────────────────────────────────────────────
@@ -59,12 +59,12 @@ export const useCart = () => {
     const clearCart = useCallback(() => {
         dispatch({ type: 'CLEAR' });
         localStorage.removeItem('cart_items');
-        localStorage.removeItem('cart_promo');
+        localStorage.removeItem('cart_promos');
     }, []);
 
-    const setAppliedPromotion = useCallback((promotion) => {
-        dispatch({ type: 'SET_PROMOTION', promotion });
-        localStorage.setItem('cart_promo', JSON.stringify(promotion));
+    const setAppliedPromotions = useCallback((promotions) => {
+        dispatch({ type: 'SET_PROMOTIONS', promotions });
+        localStorage.setItem('cart_promos', JSON.stringify(promotions));
     }, []);
 
     // Sync items to localStorage
@@ -78,12 +78,12 @@ export const useCart = () => {
 
     return { 
         items: state.items, 
-        appliedPromotion: state.appliedPromotion,
+        appliedPromotions: state.appliedPromotions || [],
         addToCart, 
         removeItem, 
         updateQty, 
         clearCart, 
-        setAppliedPromotion,
+        setAppliedPromotions,
         totalItems, 
         totalPrice, 
         totalSaved 

@@ -60,7 +60,7 @@ const OrderSuccessPage = () => {
                             color="secondary" 
                             size="large"
                             startIcon={<ReceiptLong />}
-                            onClick={() => console.log('View order details')}
+                            onClick={() => navigate('/account?tab=orders')}
                             sx={{ borderRadius: '8px', fontWeight: 600 }}
                         >
                             Xem Chi Tiết Đơn Hàng

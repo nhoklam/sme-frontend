@@ -1,6 +1,7 @@
 // src/layouts/AdminLayout.jsx
 import React, { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
     Box, AppBar, Toolbar, Typography, IconButton,
     Drawer, Avatar, Menu, MenuItem, Divider,
@@ -57,11 +58,39 @@ const AdminLayout = () => {
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
     const navigate = useNavigate();
     const location = useLocation();
+    const queryClient = useQueryClient();
 
-    const currentUser = authService.getCurrentUser()?.user;
+    const [profileTrigger, setProfileTrigger] = useState(0);
+    const [avatarUrl, setAvatarUrl] = useState('');
+
+    const currentUser = React.useMemo(() => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const trigger = profileTrigger;
+        return authService.getCurrentUser()?.user;
+    }, [profileTrigger]);
+
     const displayName = currentUser?.fullName || currentUser?.username || 'Admin';
     const role = currentUser?.role || '';
     const roleLabel = role === 'ROLE_ADMIN' ? 'Admin' : role === 'ROLE_MANAGER' ? 'Quản lý' : 'Thu ngân';
+
+    const loadAvatar = React.useCallback(() => {
+        const userObj = authService.getCurrentUser()?.user;
+        if (userObj?.username) {
+            setAvatarUrl(localStorage.getItem('avatar_' + userObj.username) || '');
+        } else {
+            setAvatarUrl('');
+        }
+    }, []);
+
+    React.useEffect(() => {
+        loadAvatar();
+        const handler = () => {
+            setProfileTrigger(prev => prev + 1);
+            loadAvatar();
+        };
+        window.addEventListener('user-profile-updated', handler);
+        return () => window.removeEventListener('user-profile-updated', handler);
+    }, [loadAvatar, currentUser?.username]);
 
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
@@ -84,7 +113,7 @@ const AdminLayout = () => {
             // Lấy 10 thông báo mới nhất (cả đã đọc và chưa đọc)
             const res = await notificationService.getAll({ page: 0, size: 10 });
             setNotifications(res.data?.data?.content || []);
-            
+
             // Vẫn đếm số lượng chưa đọc để hiện ở Badge chuông
             const countRes = await notificationService.countUnread();
             setUnreadCount(countRes.data?.data || 0);
@@ -102,7 +131,7 @@ const AdminLayout = () => {
         onMessage: (payload: WsPayload) => {
             setUnreadCount(prev => prev + 1);
             loadNotifications();
-            
+
             // Hiện Pop-up ngay trên màn hình
             switch (payload.type) {
                 case 'NEW_ORDER':
@@ -134,7 +163,7 @@ const AdminLayout = () => {
                 await notificationService.markAsRead(notif.id);
                 loadNotifications();
             }
-            
+
             setNotifAnchorEl(null);
 
             // Điều hướng dựa trên loại thông báo
@@ -142,8 +171,10 @@ const AdminLayout = () => {
                 navigate('/admin/inventory/import');
             } else if (notif.type === 'TRANSFER_ARRIVED') {
                 navigate('/admin/inventory/transfer');
+            } else if (notif.type === 'NEW_ORDER' && notif.payload?.orderId) {
+                navigate(`/admin/orders/${notif.payload.orderId}`);
             }
-        } catch {}
+        } catch { }
     };
 
     const handleMarkAllAsRead = async () => {
@@ -151,11 +182,12 @@ const AdminLayout = () => {
             await notificationService.markAllAsRead();
             loadNotifications();
             setNotifAnchorEl(null);
-        } catch {}
+        } catch { }
     };
 
     const handleLogout = () => {
         authService.logout();
+        queryClient.clear();
         navigate('/admin/login', { replace: true });
     };
 
@@ -198,7 +230,7 @@ const AdminLayout = () => {
                     {/* Right actions */}
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <BranchSelector />
-                        
+
                         <Tooltip title="Thông báo">
                             <IconButton size="small" sx={{ color: '#666' }} onClick={e => setNotifAnchorEl(e.currentTarget)}>
                                 <Badge badgeContent={unreadCount} color="error" max={99}>
@@ -230,16 +262,16 @@ const AdminLayout = () => {
                                     </Box>
                                 ) : (
                                     notifications.map(notif => (
-                                        <Box 
-                                            key={notif.id} 
-                                            onClick={() => handleMarkAsRead(notif)} 
-                                            sx={{ 
-                                                p: 2, 
-                                                borderBottom: '1px solid #f1f5f9', 
-                                                cursor: 'pointer', 
+                                        <Box
+                                            key={notif.id}
+                                            onClick={() => handleMarkAsRead(notif)}
+                                            sx={{
+                                                p: 2,
+                                                borderBottom: '1px solid #f1f5f9',
+                                                cursor: 'pointer',
                                                 bgcolor: notif.isRead ? '#fff' : '#f0f7ff',
-                                                '&:hover': { bgcolor: notif.isRead ? '#f8fafc' : '#e6f0ff' }, 
-                                                transition: 'all 0.2s' 
+                                                '&:hover': { bgcolor: notif.isRead ? '#f8fafc' : '#e6f0ff' },
+                                                transition: 'all 0.2s'
                                             }}
                                         >
                                             <Box sx={{ display: 'flex', gap: 1.5 }}>
@@ -278,7 +310,7 @@ const AdminLayout = () => {
                                 '&:hover': { bgcolor: '#f5f5f5' },
                             }}
                         >
-                            <Avatar sx={{ width: 30, height: 30, bgcolor: '#2563eb', fontSize: 13, fontWeight: 700 }}>
+                            <Avatar src={avatarUrl} sx={{ width: 30, height: 30, bgcolor: '#2563eb', fontSize: 13, fontWeight: 700 }}>
                                 {displayName.charAt(0).toUpperCase()}
                             </Avatar>
                             <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
@@ -303,7 +335,7 @@ const AdminLayout = () => {
                             <Typography variant="caption" color="text.secondary">{roleLabel}</Typography>
                         </Box>
                         <Divider />
-                        <MenuItem onClick={() => { setAnchorEl(null); }} sx={{ fontSize: 13, gap: 1 }}>
+                        <MenuItem onClick={() => { navigate('/admin/profile'); setAnchorEl(null); }} sx={{ fontSize: 13, gap: 1 }}>
                             <AccountCircle sx={{ fontSize: 18, color: '#666' }} /> Hồ sơ cá nhân
                         </MenuItem>
                         {role === 'ROLE_ADMIN' && (
@@ -392,7 +424,7 @@ const AdminLayout = () => {
                 <Toolbar sx={{ minHeight: '56px !important' }} />
                 <Outlet />
             </Box>
-            {role !== 'ROLE_CASHIER' && <AIChatWidget />}
+            {role === 'ROLE_ADMIN' && <AIChatWidget />}
         </Box>
     );
 };

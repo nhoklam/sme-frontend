@@ -1,13 +1,23 @@
-// src/modules/customer/hooks/useAccount.ts
 import { useQuery } from '@tanstack/react-query';
-import customerAuthService from '../../../services/customerAuthService';
+import { useMemo } from 'react';
+import customerAuthService, { CUSTOMER_STORAGE_KEY } from '../../../services/customerAuthService';
 
 /**
  * Hook lấy thông tin user đang đăng nhập.
  * Nếu chưa đăng nhập → trả null, không gọi API.
  */
 export const useCurrentUser = () => {
-    const storedUser = customerAuthService.getCurrentCustomerAuth();
+    const rawStored = localStorage.getItem(CUSTOMER_STORAGE_KEY);
+
+    const storedUser = useMemo(() => {
+        if (!rawStored) return null;
+        try {
+            return JSON.parse(rawStored);
+        } catch (_) {
+            return null;
+        }
+    }, [rawStored]);
+
     const isLoggedIn = !!storedUser?.accessToken;
 
     const { data, isLoading, isError, error } = useQuery({
@@ -15,10 +25,13 @@ export const useCurrentUser = () => {
         queryFn: () => customerAuthService.getMe(),
         enabled: isLoggedIn,
         staleTime: 5 * 60 * 1000,
+        retry: false, // Không retry khi 401 — tránh vòng lặp vô hạn
     });
 
     // Nếu API thành công thì lấy data từ API (data.data), nếu không lấy từ localStorage
-    const user = data?.data ?? storedUser?.user ?? null;
+    const user = useMemo(() => {
+        return data?.data ?? storedUser?.user ?? null;
+    }, [data?.data, storedUser?.user]);
 
     return {
         user,

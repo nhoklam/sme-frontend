@@ -105,6 +105,8 @@ const DashboardPage: React.FC = () => {
     const [quickFilter, setQuickFilter] = useState<'today' | 'yesterday' | 'last7days' | 'thisMonth' | '30days' | '90days' | 'thisYear'>('thisMonth');
     const [topData, setTopData] = useState<any>({ topProducts: [], topCustomers: [] });
     const [lowStockItems, setLowStockItems] = useState<any[]>([]);
+    const [allLowStockItems, setAllLowStockItems] = useState<any[]>([]);
+    const [uniqueLowStockCount, setUniqueLowStockCount] = useState(0);
     const [pendingShiftsCount, setPendingShiftsCount] = useState(0);
 
     // Top chart filter state
@@ -139,30 +141,46 @@ const DashboardPage: React.FC = () => {
         if (isStaff) return;
         setLoading(true);
 
+        // 1. Tải thống kê tổng hợp (Doanh thu ngày/tuần/tháng/năm)
         try {
-            const [extStats, tData, lowStock] = await Promise.all([
-                dashboardService.getExtendedStats(currentUser?.warehouseId),
-                dashboardService.getTopData(currentUser?.warehouseId),
-                inventoryService.getLowStock(currentUser?.warehouseId),
-            ]);
-
+            const extStats = await dashboardService.getExtendedStats(currentUser?.warehouseId);
             setStats(extStats);
-            setTopData(tData);
-            setLowStockItems(lowStock.slice(0, 10));
+        } catch (err) {
+            console.error("Lỗi tải thống kê doanh thu:", err);
+        }
 
-            // Mặc định: Hiện toàn bộ tháng hiện tại
+        // 2. Tải dữ liệu top sản phẩm/khách hàng
+        try {
+            const tData = await dashboardService.getTopData(currentUser?.warehouseId);
+            setTopData(tData);
+        } catch (err) {
+            console.error("Lỗi tải top dữ liệu bán hàng:", err);
+        }
+
+        // 3. Tải danh sách sản phẩm sắp hết hàng
+        try {
+            const lowStock = await inventoryService.getLowStock(currentUser?.warehouseId);
+            setAllLowStockItems(lowStock);
+            setLowStockItems(lowStock.slice(0, 10));
+            // Tính số lượng sản phẩm duy nhất sắp hết hàng
+            const uniqueIds = new Set(lowStock.map(item => item.productId));
+            setUniqueLowStockCount(uniqueIds.size);
+        } catch (err) {
+            console.error("Lỗi tải cảnh báo hết hàng:", err);
+        }
+
+        // 4. Tải dữ liệu biểu đồ xu hướng doanh thu
+        try {
             const now = new Date();
             const from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
             const trend = await dashboardService.getRevenueByRange(from, now.toISOString(), 'day', currentUser?.warehouseId);
             setRevenueTrend(trend);
             setChartPeriod('day');
-
         } catch (err) {
-            console.error(err);
-            toast.error("Không thể tải dữ liệu dashboard");
-        } finally {
-            setLoading(false);
+            console.error("Lỗi tải biểu đồ doanh thu:", err);
         }
+
+        setLoading(false);
     }, [isStaff, currentUser?.warehouseId]);
 
     useEffect(() => { loadData(); }, [loadData]);
@@ -317,37 +335,44 @@ const DashboardPage: React.FC = () => {
             </Paper>
 
             {/* ── LOW STOCK ALERT BANNER ── */}
-            {!loading && lowStockItems.length > 0 && (
-                <Paper elevation={0} sx={{
-                    p: 2, mb: 2, borderRadius: 3,
-                    bgcolor: '#fef2f2', border: '1px solid #fecaca',
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <Warning sx={{ color: '#ef4444', fontSize: 24 }} />
-                        <Box>
-                            <Typography fontWeight={700} fontSize={14} color="#991b1b">
-                                {lowStockItems.filter(i => (i.quantity ?? 0) === 0).length > 0
-                                    ? `⚠️ ${lowStockItems.filter(i => (i.quantity ?? 0) === 0).length} sản phẩm hết hàng`
-                                    : ''}
-                                {lowStockItems.filter(i => (i.quantity ?? 0) === 0).length > 0 && lowStockItems.filter(i => (i.quantity ?? 0) > 0).length > 0 ? ' và ' : ''}
-                                {lowStockItems.filter(i => (i.quantity ?? 0) > 0).length > 0
-                                    ? `${lowStockItems.filter(i => (i.quantity ?? 0) > 0).length} sản phẩm sắp hết hàng`
-                                    : ''}
-                            </Typography>
-                            <Typography fontSize={12} color="#b91c1c">Vui lòng nhập hàng bổ sung để đảm bảo hoạt động bán hàng</Typography>
+            {!loading && allLowStockItems.length > 0 && (() => {
+                const uniqueOutOfStockCount = new Set(allLowStockItems.filter(i => (i.quantity ?? 0) === 0).map(i => i.productId)).size;
+                const uniqueLowStockCountNotZero = new Set(allLowStockItems.filter(i => (i.quantity ?? 0) > 0).map(i => i.productId)).size;
+
+                if (uniqueOutOfStockCount === 0 && uniqueLowStockCountNotZero === 0) return null;
+
+                return (
+                    <Paper elevation={0} sx={{
+                        p: 2, mb: 2, borderRadius: 3,
+                        bgcolor: '#fef2f2', border: '1px solid #fecaca',
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                            <Warning sx={{ color: '#ef4444', fontSize: 24 }} />
+                            <Box>
+                                <Typography fontWeight={700} fontSize={14} color="#991b1b">
+                                    {uniqueOutOfStockCount > 0
+                                        ? `⚠️ ${uniqueOutOfStockCount} sản phẩm hết hàng`
+                                        : ''}
+                                    {uniqueOutOfStockCount > 0 && uniqueLowStockCountNotZero > 0 ? ' và ' : ''}
+                                    {uniqueLowStockCountNotZero > 0
+                                        ? `${uniqueLowStockCountNotZero} sản phẩm sắp hết hàng`
+                                        : ''}
+                                </Typography>
+                                <Typography fontSize={12} color="#b91c1c">Vui lòng nhập hàng bổ sung để đảm bảo hoạt động bán hàng</Typography>
+                            </Box>
                         </Box>
-                    </Box>
-                    <Button
-                        size="small"
-                        variant="contained"
-                        onClick={() => navigate('/admin/inventory/alerts')}
-                        sx={{ bgcolor: '#ef4444', textTransform: 'none', fontWeight: 700, borderRadius: 2, '&:hover': { bgcolor: '#dc2626' } }}
-                    >
-                        Xem chi tiết
-                    </Button>
-                </Paper>
-            )}
+                        <Button
+                            size="small"
+                            variant="contained"
+                            onClick={() => navigate('/admin/inventory/alerts')}
+                            sx={{ bgcolor: '#ef4444', textTransform: 'none', fontWeight: 700, borderRadius: 2, '&:hover': { bgcolor: '#dc2626' } }}
+                        >
+                            Xem chi tiết
+                        </Button>
+                    </Paper>
+                );
+            })()}
 
             {/* ── ROW 1: REVENUE STATS ── */}
             <Grid container spacing={2} sx={{ mb: 2 }}>
@@ -368,7 +393,7 @@ const DashboardPage: React.FC = () => {
                 {[
                     { title: 'Đơn hàng hôm nay', value: stats?.todayOrders ?? 0, icon: <ShoppingCart />, iconBg: '#eff6ff', iconColor: '#3b82f6' },
                     { title: 'Khách hàng mới', value: topData.topCustomers.length, icon: <People />, iconBg: '#faf5ff', iconColor: '#8b5cf6' },
-                    { title: 'Sản phẩm sắp hết hàng', value: lowStockItems.length, icon: <Warning />, iconBg: '#fffbeb', iconColor: '#f59e0b', color: '#f59e0b', onClick: () => navigate('/admin/inventory/alerts') },
+                    { title: 'Sản phẩm sắp hết hàng', value: uniqueLowStockCount, icon: <Warning />, iconBg: '#fffbeb', iconColor: '#f59e0b', color: '#f59e0b', onClick: () => navigate('/admin/inventory/alerts') },
                     { title: 'Ca chờ duyệt', value: pendingShiftsCount, icon: <Schedule />, iconBg: '#ede9fe', iconColor: '#7c3aed' },
                 ].map((card, i) => (
                     <Grid size={{ xs: 12, sm: 6, md: 3 }} key={i}>
@@ -727,6 +752,9 @@ const DashboardPage: React.FC = () => {
                             <TableHead sx={{ bgcolor: '#f8fafc' }}>
                                 <TableRow>
                                     <TableCell sx={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Sản phẩm</TableCell>
+                                    {!isStaff && !currentUser?.warehouseId && (
+                                        <TableCell sx={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Kho</TableCell>
+                                    )}
                                     <TableCell align="right" sx={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Tồn kho</TableCell>
                                     <TableCell align="right" sx={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Tối thiểu</TableCell>
                                     <TableCell align="center" sx={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Trạng thái</TableCell>
@@ -736,6 +764,9 @@ const DashboardPage: React.FC = () => {
                                 {lowStockItems.length > 0 ? lowStockItems.map((item, i) => (
                                     <TableRow key={i} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
                                         <TableCell sx={{ fontSize: 14, fontWeight: 700, color: '#334155' }}>{item.productName}</TableCell>
+                                        {!isStaff && !currentUser?.warehouseId && (
+                                            <TableCell sx={{ fontSize: 13, color: '#64748b' }}>{item.warehouseName || '—'}</TableCell>
+                                        )}
                                         <TableCell align="right" sx={{ fontSize: 14, color: '#ef4444', fontWeight: 900 }}>{item.quantity}</TableCell>
                                         <TableCell align="right" sx={{ fontSize: 14, color: '#64748b', fontWeight: 600 }}>{item.minQuantity}</TableCell>
                                         <TableCell align="center">

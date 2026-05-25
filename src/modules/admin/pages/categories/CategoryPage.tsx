@@ -100,7 +100,20 @@ const CategoryFormDialog: React.FC<CategoryFormProps> = ({
         }
     };
 
-    const parentOptions = categories.filter((c) => c.id !== editData?.id);
+    const allowedParents = React.useMemo(() => {
+        const allowed: { cat: Category; level: number }[] = [];
+        const buildTree = (parentId: string | null, level: number) => {
+            const children = categories.filter(c => c.parentId === parentId);
+            for (const child of children) {
+                // Ignore the category being edited and all its descendants
+                if (child.id === editData?.id) continue;
+                allowed.push({ cat: child, level });
+                buildTree(child.id, level + 1);
+            }
+        };
+        buildTree(null, 0);
+        return allowed;
+    }, [categories, editData]);
 
     return (
         <Dialog
@@ -161,9 +174,9 @@ const CategoryFormDialog: React.FC<CategoryFormProps> = ({
                         displayEmpty
                     >
                         <MenuItem value="">— Không có (danh mục gốc) —</MenuItem>
-                        {parentOptions.map((c) => (
-                            <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>
-                                {c.name}
+                        {allowedParents.map((item) => (
+                            <MenuItem key={item.cat.id} value={item.cat.id} sx={{ fontSize: 13, pl: 2 + item.level * 2 }}>
+                                {'—'.repeat(item.level)}{item.level > 0 ? ' ' : ''}{item.cat.name}
                             </MenuItem>
                         ))}
                     </Select>

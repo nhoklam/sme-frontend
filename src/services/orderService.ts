@@ -15,17 +15,48 @@ const orderService = {
         paymentStatus?: string;
         page?: number;
         size?: number;
+        warehouseId?: string;
     }): Promise<PageResponse<OrderResponse>> => {
         const query = new URLSearchParams();
         if (params.keyword?.trim()) query.set('keyword', params.keyword.trim());
         if (params.status) query.set('status', params.status);
         if (params.paymentStatus) query.set('paymentStatus', params.paymentStatus);
+        if (params.warehouseId) query.set('warehouseId', params.warehouseId);
         query.set('page', String(params.page ?? 0));
         query.set('size', String(params.size ?? 20));
 
         const res = await axiosInstance.get<ApiResponse<PageResponse<OrderResponse>>>(
             `/orders?${query}`
         );
+        return res.data.data;
+    },
+
+    // Lấy thống kê đơn hàng theo bộ lọc
+    getStats: async (params: {
+        keyword?: string;
+        status?: string;
+        paymentStatus?: string;
+        warehouseId?: string;
+        source?: string;
+    }): Promise<{
+        totalCount: number;
+        pendingCount: number;
+        paidCount: number;
+        totalRevenue: number;
+    }> => {
+        const query = new URLSearchParams();
+        if (params.keyword?.trim()) query.set('keyword', params.keyword.trim());
+        if (params.status) query.set('status', params.status);
+        if (params.paymentStatus) query.set('paymentStatus', params.paymentStatus);
+        if (params.warehouseId) query.set('warehouseId', params.warehouseId);
+        if (params.source) query.set('source', params.source);
+
+        const res = await axiosInstance.get<ApiResponse<{
+            totalCount: number;
+            pendingCount: number;
+            paidCount: number;
+            totalRevenue: number;
+        }>>(`/orders/stats?${query}`);
         return res.data.data;
     },
 
@@ -78,10 +109,10 @@ const orderService = {
     },
 
     // Chỉ định kho xử lý đơn hàng (Smart Routing override)
-    assignWarehouse: async (id: string, warehouseId: string): Promise<OrderResponse> => {
+    assignWarehouse: async (id: string, warehouseId: string, reason?: string): Promise<OrderResponse> => {
         const res = await axiosInstance.patch<ApiResponse<OrderResponse>>(
             `/orders/${id}/assign-warehouse`,
-            { warehouseId }
+            { warehouseId, reason }
         );
         return res.data.data;
     },
@@ -89,6 +120,18 @@ const orderService = {
     // Đối soát COD hàng loạt
     reconcileCod: async (orderIds: string[]): Promise<void> => {
         await axiosInstance.post('/orders/reconcile-cod', { orderIds });
+    },
+
+    // Tạo link thanh toán VNPay
+    createVnPayUrl: async (orderId: string, returnUrl?: string): Promise<{ checkoutUrl: string; orderCode: string; gateway: string }> => {
+        const res = await axiosInstance.post(`/payments/vnpay/create/${orderId}`, { returnUrl });
+        return res.data.data;
+    },
+
+    // Tạo link thanh toán PayOS
+    createPayosUrl: async (orderId: string, returnUrl?: string, cancelUrl?: string): Promise<{ checkoutUrl: string; orderCode: string; gateway: string }> => {
+        const res = await axiosInstance.post(`/payments/payos/create/${orderId}`, { returnUrl, cancelUrl });
+        return res.data.data;
     },
 };
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { 
-    Dialog, DialogContent, IconButton, Typography, Box, 
+import {
+    Dialog, DialogContent, IconButton, Typography, Box,
     Grid, Button, Rating, Divider, useTheme
 } from '@mui/material';
 import { Close, ShoppingCartOutlined, FavoriteBorder, Favorite } from '@mui/icons-material';
@@ -29,25 +29,25 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ open, onClose, product,
     };
 
     return (
-        <Dialog 
-            open={open} 
+        <Dialog
+            open={open}
             onClose={onClose}
             maxWidth="md"
             fullWidth
             PaperProps={{ sx: { borderRadius: '16px', overflow: 'hidden' } }}
         >
-            <IconButton 
+            <IconButton
                 onClick={onClose}
                 sx={{ position: 'absolute', right: 16, top: 16, zIndex: 10, bgcolor: 'rgba(255,255,255,0.8)', '&:hover': { bgcolor: 'white' } }}
             >
                 <Close />
             </IconButton>
-            
+
             <DialogContent sx={{ p: 0 }}>
                 <Grid container>
                     {/* Image Section */}
                     <Grid size={{ xs: 12, md: 5 }} sx={{ bgcolor: '#f5f5f5', p: 4, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                        <Box 
+                        <Box
                             component="img"
                             src={product.coverImage || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=500&auto=format&fit=crop&q=80'}
                             alt={product.title || product.name}
@@ -92,10 +92,10 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ open, onClose, product,
                                 <Button onClick={() => setQuantity(quantity + 1)} sx={{ minWidth: 40, p: 0, color: 'text.primary' }}>+</Button>
                             </Box>
 
-                            <Button 
-                                variant="contained" 
-                                color="secondary" 
-                                fullWidth 
+                            <Button
+                                variant="contained"
+                                color="secondary"
+                                fullWidth
                                 startIcon={<ShoppingCartOutlined />}
                                 onClick={handleAddToCart}
                                 sx={{ borderRadius: '8px', fontWeight: 600, fontSize: '1rem' }}
@@ -103,7 +103,7 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ open, onClose, product,
                                 Thêm vào giỏ
                             </Button>
 
-                            <IconButton 
+                            <IconButton
                                 onClick={() => setIsWishlisted(!isWishlisted)}
                                 sx={{ border: '1px solid var(--color-border)', borderRadius: '8px', color: isWishlisted ? 'var(--color-error)' : 'text.primary' }}
                             >

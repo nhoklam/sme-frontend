@@ -15,7 +15,8 @@ import {
 } from '@mui/icons-material';
 import orderService from '../../../../services/orderService';
 import warehouseService from '../../../../services/warehouseService';
-import { OrderResponse, OrderStatus, PaymentStatus, Warehouse } from '../../../../types';
+import { transferService } from '../../../../services/transferService';
+import { OrderResponse, OrderStatus, PaymentStatus, Warehouse, InternalTransfer } from '../../../../types';
 
 // ── Helpers ─────────────────────────────────────────────────
 const fmt = (n?: number) => {
@@ -23,13 +24,15 @@ const fmt = (n?: number) => {
     return n.toLocaleString('vi-VN') + ' đ';
 };
 
-const STATUS_MAP: Record<OrderStatus, { label: string; color: string; bg: string; step: number }> = {
-    PENDING: { label: 'Chờ xử lý', color: '#e65100', bg: '#fff3e0', step: 0 },
-    PACKING: { label: 'Đóng gói', color: '#1976d2', bg: '#e3f2fd', step: 1 },
-    SHIPPING: { label: 'Đang giao', color: '#6a1b9a', bg: '#f3e5f5', step: 2 },
-    DELIVERED: { label: 'Hoàn thành', color: '#2e7d32', bg: '#e8f5e9', step: 3 },
-    CANCELLED: { label: 'Đã hủy', color: '#888', bg: '#f5f5f5', step: -1 },
-    RETURNED: { label: 'Hoàn trả', color: '#ef4444', bg: '#fef2f2', step: -1 },
+const STATUS_MAP: Record<OrderStatus | string, { label: string; color: string; bg: string; step: number }> = {
+    PAYMENT_PENDING: { label: 'Chờ thanh toán', color: '#b45309', bg: '#fef3c7', step: 0 },
+    PENDING: { label: 'Chờ xử lý', color: '#1d4ed8', bg: '#dbeafe', step: 1 },
+    WAITING_FOR_CONSOLIDATION: { label: 'Đang gom hàng', color: '#c2410c', bg: '#ffedd5', step: 1 },
+    PACKING: { label: 'Đóng gói', color: '#6d28d9', bg: '#ede9fe', step: 2 },
+    SHIPPING: { label: 'Đang giao', color: '#15803d', bg: '#dcfce3', step: 3 },
+    DELIVERED: { label: 'Hoàn thành', color: '#166534', bg: '#d1fae5', step: 4 },
+    CANCELLED: { label: 'Đã hủy', color: '#6b7280', bg: '#f3f4f6', step: -1 },
+    RETURNED: { label: 'Hoàn trả', color: '#b91c1c', bg: '#fef2f2', step: -1 },
 };
 
 const PAYMENT_STATUS_MAP: Record<PaymentStatus, { label: string; color: string }> = {
@@ -69,16 +72,18 @@ const FieldRow = ({ label, value, color }: { label: string; value: React.ReactNo
 const AssignWarehouseDialog: React.FC<{
     open: boolean;
     onClose: () => void;
-    onConfirm: (whId: string) => void;
+    onConfirm: (whId: string, reason: string) => void;
     loading: boolean;
 }> = ({ open, onClose, onConfirm, loading }) => {
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
     const [selected, setSelected] = useState('');
+    const [reason, setReason] = useState('');
     const [fetching, setFetching] = useState(false);
 
     useEffect(() => {
         if (open) {
             setFetching(true);
+            setReason('');
             warehouseService.getAll().then(setWarehouses).finally(() => setFetching(false));
         }
     }, [open]);
@@ -86,45 +91,57 @@ const AssignWarehouseDialog: React.FC<{
     return (
         <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 2.5 } }}>
             <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography fontWeight={800}>Chỉ định kho xử lý</Typography>
+                <Typography fontWeight={800}>Điều hướng thủ công (Override Routing)</Typography>
                 <IconButton size="small" onClick={onClose}><Close sx={{ fontSize: 18 }} /></IconButton>
             </DialogTitle>
             <Divider />
             <DialogContent sx={{ py: 3 }}>
                 <Typography variant="body2" color="text.secondary" mb={2}>
-                    Chọn chi nhánh/kho sẽ chịu trách nhiệm đóng gói và giao đơn hàng này.
+                    Chọn chi nhánh/kho sẽ chịu trách nhiệm đóng gói đơn hàng này. Lưu ý: Việc này có thể ảnh hưởng đến chi phí và thời gian giao hàng.
                 </Typography>
                 {fetching ? (
                     <Box sx={{ textAlign: 'center', py: 2 }}><CircularProgress size={24} /></Box>
                 ) : (
-                    <FormControl fullWidth size="small">
-                        <InputLabel>Chọn kho</InputLabel>
-                        <Select
-                            value={selected}
-                            onChange={(e) => setSelected(e.target.value as string)}
-                            label="Chọn kho"
-                        >
-                            {warehouses.map(w => (
-                                <MenuItem key={w.id} value={w.id}>
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-                                        <Typography variant="body2" fontWeight={600}>{w.name}</Typography>
-                                        <Typography variant="caption" color="text.secondary">{w.provinceCode}</Typography>
-                                    </Box>
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
+                    <>
+                        <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+                            <InputLabel>Chọn kho</InputLabel>
+                            <Select
+                                value={selected}
+                                onChange={(e) => setSelected(e.target.value as string)}
+                                label="Chọn kho"
+                            >
+                                {warehouses.map(w => (
+                                    <MenuItem key={w.id} value={w.id}>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                                            <Typography variant="body2" fontWeight={600}>{w.name}</Typography>
+                                            <Typography variant="caption" color="text.secondary">{w.provinceCode}</Typography>
+                                        </Box>
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                        <TextField 
+                            fullWidth 
+                            size="small" 
+                            label="Lý do thay đổi (bắt buộc)" 
+                            value={reason} 
+                            onChange={(e) => setReason(e.target.value)} 
+                            multiline 
+                            rows={2} 
+                            required 
+                        />
+                    </>
                 )}
             </DialogContent>
             <DialogActions sx={{ px: 3, pb: 2.5 }}>
                 <Button onClick={onClose} variant="outlined" sx={{ textTransform: 'none', borderRadius: 1.5 }}>Hủy</Button>
                 <Button
                     variant="contained"
-                    disabled={loading || !selected || fetching}
-                    onClick={() => onConfirm(selected)}
+                    disabled={loading || !selected || !reason.trim() || fetching}
+                    onClick={() => onConfirm(selected, reason)}
                     sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, bgcolor: '#2563eb', '&:hover': { bgcolor: '#1d4ed8' } }}
                 >
-                    {loading ? 'Đang gán...' : 'Gán đơn hàng'}
+                    {loading ? 'Đang gán...' : 'Xác nhận chuyển kho'}
                 </Button>
             </DialogActions>
         </Dialog>
@@ -220,6 +237,8 @@ const OrderDetailPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
 
     const [order, setOrder] = useState<OrderResponse | null>(null);
+    const [transfers, setTransfers] = useState<InternalTransfer[]>([]);
+    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
@@ -233,8 +252,14 @@ const OrderDetailPage: React.FC = () => {
         setLoading(true);
         setError('');
         try {
-            const data = await orderService.getById(id);
-            setOrder(data);
+            const [orderData, transfersData, warehousesData] = await Promise.all([
+                orderService.getById(id),
+                transferService.getByOrderId(id).catch(() => []),
+                warehouseService.getAll().catch(() => [])
+            ]);
+            setOrder(orderData);
+            setTransfers(transfersData);
+            setWarehouses(warehousesData);
         } catch (e: any) {
             setError(e.response?.data?.message || 'Không thể tải chi tiết đơn hàng');
         } finally {
@@ -259,11 +284,11 @@ const OrderDetailPage: React.FC = () => {
         }
     };
 
-    const handleAssignWarehouse = async (warehouseId: string) => {
+    const handleAssignWarehouse = async (warehouseId: string, reason: string) => {
         if (!order) return;
         setAssigning(true);
         try {
-            const updated = await orderService.assignWarehouse(order.id, warehouseId);
+            const updated = await orderService.assignWarehouse(order.id, warehouseId, reason);
             setOrder(updated);
             setAssignDialogOpen(false);
             setSnack({ message: 'Đã gán kho xử lý thành công', severity: 'success' });
@@ -411,7 +436,7 @@ const OrderDetailPage: React.FC = () => {
                     <Box>
                         <Typography variant="caption" color="text.secondary">Thanh toán</Typography>
                         <Typography variant="body2" fontWeight={700} fontSize={13} color={payStatus.color}>
-                            {payStatus.label} · {order.paymentMethod}
+                            {payStatus.label} · {order.paymentMethod === 'COD' ? 'COD' : order.paymentMethod === 'BANK_TRANSFER' ? 'Chuyển khoản' : order.paymentMethod === 'CASH' ? 'Tiền mặt' : order.paymentMethod === 'MOMO' ? 'MoMo' : order.paymentMethod === 'VNPAY' ? 'VNPay' : order.paymentMethod === 'PAYOS' ? 'PayOS' : order.paymentMethod}
                         </Typography>
                     </Box>
                     {order.codReconciled && (
@@ -466,7 +491,7 @@ const OrderDetailPage: React.FC = () => {
                     <InfoSection icon={<LocalShipping sx={{ fontSize: 16 }} />} title="VẬN CHUYỂN">
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
                             <Typography variant="caption" color="text.secondary">Kho đóng gói</Typography>
-                            {!isCancelled && order.status === 'PENDING' && (
+                            {!isCancelled && ['PENDING', 'WAITING_FOR_CONSOLIDATION'].includes(order.status) && (
                                 <IconButton size="small" onClick={() => setAssignDialogOpen(true)}
                                     sx={{ p: 0.25, color: '#1976d2', bgcolor: '#e3f2fd', '&:hover': { bgcolor: '#bbdefb' } }}>
                                     <Edit sx={{ fontSize: 14 }} />
@@ -536,6 +561,80 @@ const OrderDetailPage: React.FC = () => {
                             <Typography variant="caption" color="text.secondary">Tổng giá trị đơn hàng</Typography>
                             <Typography variant="h6" fontWeight={800} color="#ef4444">{fmt(order.finalAmount)}</Typography>
                         </Box>
+                    </Box>
+                </Paper>
+            )}
+
+            {/* ── TIẾN ĐỘ GOM HÀNG (CONSOLIDATION) ── */}
+            {transfers && transfers.length > 0 && (
+                <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid #f0f0f0', mb: 2, overflow: 'hidden' }}>
+                    <Box sx={{ px: 2.5, py: 1.75, borderBottom: '1px solid #f0f0f0', bgcolor: '#fff8e1', display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <LocalShipping sx={{ fontSize: 16, color: '#f57c00' }} />
+                        <Typography variant="caption" fontWeight={700} color="#e65100" letterSpacing={0.3}>
+                            TIẾN ĐỘ GOM HÀNG TỪ CÁC KHO KHÁC
+                        </Typography>
+                    </Box>
+                    <Box sx={{ p: 2 }}>
+                        {transfers.map((t, idx) => {
+                            const fromWh = warehouses.find(w => w.id === t.fromWarehouseId)?.name || t.fromWarehouseId;
+                            const toWh = warehouses.find(w => w.id === t.toWarehouseId)?.name || t.toWarehouseId;
+                            const tStatus = t.status === 'RECEIVED' ? { label: 'Đã nhận', color: 'success' as const } 
+                                          : t.status === 'DISPATCHED' ? { label: 'Đang giao', color: 'warning' as const } 
+                                          : t.status === 'CANCELLED' ? { label: 'Đã hủy', color: 'error' as const }
+                                          : { label: 'Nháp', color: 'default' as const };
+                            return (
+                                <Box key={t.id} sx={{ mb: idx < transfers.length - 1 ? 2 : 0, p: 1.5, border: '1px solid #e0e0e0', borderRadius: 1.5, bgcolor: '#fafafa' }}>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, alignItems: 'center' }}>
+                                        <Box>
+                                            <Typography variant="caption" fontWeight={700} fontFamily="monospace" color="#1976d2" sx={{ mr: 1 }}>{t.code}</Typography>
+                                            <Typography variant="caption" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                                                Từ <Typography component="span" variant="caption" fontWeight={700}>{fromWh}</Typography> 
+                                                đến <Typography component="span" variant="caption" fontWeight={700}>{toWh}</Typography>
+                                            </Typography>
+                                        </Box>
+                                        <Chip label={tStatus.label} size="small" color={tStatus.color} sx={{ height: 22, fontSize: 10, fontWeight: 700 }} />
+                                    </Box>
+                                    <Table size="small">
+                                        <TableHead>
+                                            <TableRow sx={{ bgcolor: '#fff' }}>
+                                                <TableCell sx={{ fontSize: 11, fontWeight: 700, py: 0.75 }}>Sản phẩm</TableCell>
+                                                <TableCell align="center" sx={{ fontSize: 11, fontWeight: 700, py: 0.75 }}>Yêu cầu</TableCell>
+                                                <TableCell align="center" sx={{ fontSize: 11, fontWeight: 700, py: 0.75 }}>Thực nhận</TableCell>
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {t.items.map((item, i) => {
+                                                const productInfo = order.items?.find(oi => oi.productId === item.productId);
+                                                return (
+                                                    <TableRow key={i}>
+                                                        <TableCell sx={{ py: 0.75 }}>
+                                                            <Typography variant="body2" fontSize={12} fontWeight={600}>
+                                                                {productInfo?.productName || item.productId}
+                                                            </Typography>
+                                                        </TableCell>
+                                                        <TableCell align="center" sx={{ py: 0.75 }}>
+                                                            <Typography variant="body2" fontSize={12} fontWeight={600}>{item.quantity}</Typography>
+                                                        </TableCell>
+                                                        <TableCell align="center" sx={{ py: 0.75 }}>
+                                                            <Typography variant="body2" fontSize={12} 
+                                                                        color={t.status === 'RECEIVED' ? (item.receivedQty < item.quantity ? '#d32f2f' : '#2e7d32') : '#888'} 
+                                                                        fontWeight={700}>
+                                                                {t.status === 'RECEIVED' ? item.receivedQty : '—'}
+                                                            </Typography>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
+                                        </TableBody>
+                                    </Table>
+                                    {t.note && (
+                                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, p: 1, bgcolor: '#fff', borderRadius: 1, border: '1px dashed #ccc' }}>
+                                            Ghi chú: {t.note}
+                                        </Typography>
+                                    )}
+                                </Box>
+                            );
+                        })}
                     </Box>
                 </Paper>
             )}
