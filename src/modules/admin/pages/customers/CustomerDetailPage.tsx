@@ -11,13 +11,15 @@ import {
     ArrowBack, Edit, ShoppingBag, History,
     Person, LocalPhone, Email, LocationOn,
     Star, WorkspacePremium, ReceiptLong,
-    TrendingUp, Event, Notes, Save, Cancel
+    TrendingUp, Event, Notes, Save, Cancel,
+    Wc, CheckCircle, Block, Storefront, Language
 } from '@mui/icons-material';
 import toast from 'react-hot-toast';
 import customerService from '../../../../services/customerService';
 import axiosInstance from '../../../../services/axiosConfig';
 import { Customer, CustomerTier } from '../../../../types';
 import PrintInvoiceDialog from '../../../employee/components/pos/PrintInvoiceDialog';
+import CustomerDialog from './CustomerDialog';
 
 const fmtCurrency = (n?: number) =>
     n == null ? '—' : new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n);
@@ -63,6 +65,9 @@ export default function CustomerDetailPage() {
 
     const [printInvoice, setPrintInvoice] = useState<any>(null);
     const [printDialogOpen, setPrintDialogOpen] = useState(false);
+    
+    // Add / Edit Dialog state
+    const [dialogOpen, setDialogOpen] = useState(false);
 
     const handleViewPOSInvoice = async (invoiceId: string) => {
         try {
@@ -138,7 +143,9 @@ export default function CustomerDetailPage() {
                     <Typography variant="h5" fontWeight={900} color="#1a1a2e">{customer.fullName}</Typography>
                 </Box>
                 <Box sx={{ flex: 1 }} />
-                <Button variant="outlined" startIcon={<Edit />} sx={{ textTransform: 'none', borderRadius: 2, fontWeight: 700 }}>
+                <Button variant="outlined" startIcon={<Edit />} 
+                    onClick={() => setDialogOpen(true)}
+                    sx={{ textTransform: 'none', borderRadius: 2, fontWeight: 700 }}>
                     Chỉnh sửa hồ sơ
                 </Button>
             </Box>
@@ -177,9 +184,23 @@ export default function CustomerDetailPage() {
                                 <LocationOn sx={{ fontSize: 18, color: '#1976d2' }} />
                                 <Typography variant="body2">{customer.address || 'Chưa cập nhật'}</Typography>
                             </Box>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
                                 <Event sx={{ fontSize: 18, color: '#1976d2' }} />
                                 <Typography variant="body2">Ngày sinh: {fmtDate(customer.dateOfBirth)}</Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
+                                <Wc sx={{ fontSize: 18, color: '#1976d2' }} />
+                                <Typography variant="body2">Giới tính: {customer.gender === 'MALE' ? 'Nam' : customer.gender === 'FEMALE' ? 'Nữ' : customer.gender === 'OTHER' ? 'Khác' : 'Chưa cập nhật'}</Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
+                                {customer.isActive ? <CheckCircle sx={{ fontSize: 18, color: '#2e7d32' }} /> : <Block sx={{ fontSize: 18, color: '#d32f2f' }} />}
+                                <Typography variant="body2" color={customer.isActive ? '#2e7d32' : '#d32f2f'} fontWeight={600}>
+                                    Trạng thái: {customer.isActive ? 'Đang hoạt động' : 'Đã khóa'}
+                                </Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                {customer.acquisitionChannel === 'ONLINE' ? <Language sx={{ fontSize: 18, color: '#1976d2' }} /> : <Storefront sx={{ fontSize: 18, color: '#1976d2' }} />}
+                                <Typography variant="body2">Nguồn khách: {customer.acquisitionChannel === 'ONLINE' ? 'Trực tuyến (App/Web)' : 'Tại quầy (POS)'}</Typography>
                             </Box>
                         </Box>
 
@@ -245,6 +266,7 @@ export default function CustomerDetailPage() {
                                             <TableRow sx={{ '& th': { border: 0, color: '#888', fontWeight: 800, fontSize: 11, py: 1.5 } }}>
                                                 <TableCell>MÃ ĐƠN</TableCell>
                                                 <TableCell>NGÀY MUA</TableCell>
+                                                <TableCell align="center">SẢN PHẨM</TableCell>
                                                 <TableCell align="right">GIÁ TRỊ</TableCell>
                                                 <TableCell align="center">TRẠNG THÁI</TableCell>
                                                 <TableCell align="right"></TableCell>
@@ -252,7 +274,7 @@ export default function CustomerDetailPage() {
                                         </TableHead>
                                         <TableBody>
                                             {history.invoices.length === 0 && history.orders.length === 0 ? (
-                                                <TableRow><TableCell colSpan={5} align="center" sx={{ py: 4, color: 'text.secondary' }}>Chưa có giao dịch nào</TableCell></TableRow>
+                                                <TableRow><TableCell colSpan={6} align="center" sx={{ py: 4, color: 'text.secondary' }}>Chưa có giao dịch nào</TableCell></TableRow>
                                             ) : (
                                                 [...history.invoices.map(i => ({...i, source: 'POS'})), ...history.orders.map(o => ({...o, source: 'ONLINE'}))]
                                                     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -265,6 +287,11 @@ export default function CustomerDetailPage() {
                                                                 <Chip label={inv.source} size="small" sx={{ height: 16, fontSize: 9, fontWeight: 800, mt: 0.5, bgcolor: inv.source === 'POS' ? '#f3f4f6' : '#e0f2fe' }} />
                                                             </TableCell>
                                                             <TableCell><Typography variant="caption" color="text.secondary">{fmtDate(inv.createdAt)}</Typography></TableCell>
+                                                            <TableCell align="center">
+                                                                <Typography variant="body2" color="text.secondary">
+                                                                    {inv.items ? inv.items.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0) : 0} SP
+                                                                </Typography>
+                                                            </TableCell>
                                                             <TableCell align="right"><Typography variant="body2" fontWeight={700} color={status.label === 'Đã hủy' ? 'text.secondary' : 'inherit'}>{fmtCurrency(inv.finalAmount)}</Typography></TableCell>
                                                             <TableCell align="center">
                                                                 <Chip 
@@ -343,6 +370,16 @@ export default function CustomerDetailPage() {
                     onClose={() => setPrintDialogOpen(false)}
                 />
             )}
+
+            {/* Edit Dialog */}
+            <CustomerDialog 
+                open={dialogOpen} 
+                onClose={() => setDialogOpen(false)} 
+                initialData={customer}
+                onSuccess={(updatedCustomer) => {
+                    setCustomer(updatedCustomer);
+                }}
+            />
         </Box>
     );
 }

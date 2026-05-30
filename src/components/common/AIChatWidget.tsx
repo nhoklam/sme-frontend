@@ -100,6 +100,10 @@ export default function AIChatWidget() {
             };
 
             setMessages(prev => [...prev, assistantMsg]);
+
+            // Phát âm thanh khi AI trả lời
+            const audio = new Audio('/assets/ting.mp3');
+            audio.play().catch(e => console.log('Audio error:', e));
         } catch (error) {
             toast.error('AI đang bận, vui lòng thử lại sau');
         } finally {
@@ -118,7 +122,7 @@ export default function AIChatWidget() {
     };
 
     return (
-        <Box sx={{ position: 'fixed', bottom: 24, right: 24, zIndex: 9999 }}>
+        <Box sx={{ position: 'fixed', bottom: 100, right: 30, zIndex: 9999 }}>
             {/* Floating Action Button (FAB) */}
             <Zoom in={!isOpen}>
                 <Box sx={{ position: 'relative' }}>

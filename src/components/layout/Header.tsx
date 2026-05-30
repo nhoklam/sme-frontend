@@ -99,10 +99,10 @@ const Header = () => {
                         {/* Trái: SĐT + Email */}
                         <Box sx={{ display: 'flex', gap: 2.5, alignItems: 'center' }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, color: 'rgba(255,255,255,0.75)', fontSize: '11px', fontWeight: 500 }}>
-                                <Phone sx={{ fontSize: 13, color: '#f5a623' }} /> 1800 6655
+                                <Phone sx={{ fontSize: 13, color: '#f5a623' }} /> 0367287044
                             </Box>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, color: 'rgba(255,255,255,0.75)', fontSize: '11px', fontWeight: 500 }}>
-                                <Email sx={{ fontSize: 13, color: '#f5a623' }} /> cskh@bookly.vn
+                                <Email sx={{ fontSize: 13, color: '#f5a623' }} /> nguyenhuuquang150805@gmail.com
                             </Box>
                         </Box>
 
@@ -150,13 +150,11 @@ const Header = () => {
                             <Box onClick={() => navigate('/')} sx={{ display: 'flex', alignItems: 'center', gap: 1.2, cursor: 'pointer' }}>
                                 <Box sx={{
                                     width: 36, height: 36,
-                                    bgcolor: '#1a1a2e',
-                                    borderRadius: '50%',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                 }}>
-                                    <Typography sx={{ fontSize: 18 }}>📚</Typography>
+                                    <img src="/LogoBookLy.svg" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                                 </Box>
                                 <Box>
                                     <Typography sx={{

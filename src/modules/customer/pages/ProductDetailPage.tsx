@@ -287,7 +287,19 @@ const ProductDetailPage = () => {
                                 <Typography variant="body1" fontWeight={700} color="var(--color-primary, #0a192f)">Số lượng:</Typography>
                                 <Box sx={{ display: 'flex', alignItems: 'center', border: '1px solid #e2e8f0', borderRadius: 2, bgcolor: '#fff', p: 0.5 }}>
                                     <IconButton size="small" onClick={() => setQty(Math.max(1, qty - 1))} sx={{ bgcolor: '#f8f9fa', '&:hover': { bgcolor: '#edf2f7' } }}><Remove fontSize="small" /></IconButton>
-                                    <Typography sx={{ px: 2.5, minWidth: 40, textAlign: 'center', fontWeight: 800, fontSize: 16 }}>{qty}</Typography>
+                                    <input 
+                                        type="number" 
+                                        value={qty} 
+                                        onChange={(e) => {
+                                            const v = parseInt(e.target.value);
+                                            if (!isNaN(v)) {
+                                                setQty(Math.max(1, Math.min(product.stock, v)));
+                                            } else if (e.target.value === '') {
+                                                setQty(1);
+                                            }
+                                        }}
+                                        style={{ width: 48, textAlign: 'center', fontWeight: 800, fontSize: 16, border: 'none', outline: 'none', padding: 0, WebkitAppearance: 'none', MozAppearance: 'textfield' }} 
+                                    />
                                     <IconButton size="small" onClick={() => setQty(Math.min(product.stock, qty + 1))} sx={{ bgcolor: '#f8f9fa', '&:hover': { bgcolor: '#edf2f7' } }}><Add fontSize="small" /></IconButton>
                                 </Box>
                                 <Typography variant="body2" color="text.secondary">(Còn {product.stock})</Typography>

@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import {
     Box, Grid, Typography, Paper, Chip, Avatar,
     Skeleton, IconButton, Button,
-    Table, TableBody, TableCell, TableHead, TableRow,
+    Table, TableBody, TableCell, TableHead, TableRow, TablePagination,
     Tooltip, Divider, Card, CardContent, CardHeader,
 } from '@mui/material';
 import {
@@ -108,6 +108,10 @@ const DashboardPage: React.FC = () => {
     const [allLowStockItems, setAllLowStockItems] = useState<any[]>([]);
     const [uniqueLowStockCount, setUniqueLowStockCount] = useState(0);
     const [pendingShiftsCount, setPendingShiftsCount] = useState(0);
+    
+    // Pagination state for low stock items
+    const [lowStockPage, setLowStockPage] = useState(0);
+    const [lowStockRowsPerPage, setLowStockRowsPerPage] = useState(5);
 
     // Top chart filter state
     const [topProductPeriod, setTopProductPeriod] = useState('thisMonth');
@@ -161,7 +165,6 @@ const DashboardPage: React.FC = () => {
         try {
             const lowStock = await inventoryService.getLowStock(currentUser?.warehouseId);
             setAllLowStockItems(lowStock);
-            setLowStockItems(lowStock.slice(0, 10));
             // Tính số lượng sản phẩm duy nhất sắp hết hàng
             const uniqueIds = new Set(lowStock.map(item => item.productId));
             setUniqueLowStockCount(uniqueIds.size);
@@ -634,6 +637,7 @@ const DashboardPage: React.FC = () => {
                                                     tickLine={false}
                                                     tick={{ fontSize: 11, fill: '#334155', fontWeight: 600 }}
                                                     width={140}
+                                                    tickFormatter={(val: string) => val.length > 20 ? val.substring(0, 20) + '...' : val}
                                                 />
                                                 <RTooltip
                                                     contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
@@ -761,7 +765,7 @@ const DashboardPage: React.FC = () => {
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {lowStockItems.length > 0 ? lowStockItems.map((item, i) => (
+                                {allLowStockItems.length > 0 ? allLowStockItems.slice(lowStockPage * lowStockRowsPerPage, lowStockPage * lowStockRowsPerPage + lowStockRowsPerPage).map((item, i) => (
                                     <TableRow key={i} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
                                         <TableCell sx={{ fontSize: 14, fontWeight: 700, color: '#334155' }}>{item.productName}</TableCell>
                                         {!isStaff && !currentUser?.warehouseId && (
@@ -785,6 +789,22 @@ const DashboardPage: React.FC = () => {
                                 )}
                             </TableBody>
                         </Table>
+                        {allLowStockItems.length > 0 && (
+                            <TablePagination
+                                rowsPerPageOptions={[5, 10, 20]}
+                                component="div"
+                                count={allLowStockItems.length}
+                                rowsPerPage={lowStockRowsPerPage}
+                                page={lowStockPage}
+                                onPageChange={(_, newPage) => setLowStockPage(newPage)}
+                                onRowsPerPageChange={(e) => {
+                                    setLowStockRowsPerPage(parseInt(e.target.value, 10));
+                                    setLowStockPage(0);
+                                }}
+                                labelRowsPerPage="Số dòng:"
+                                labelDisplayedRows={({ from, to, count }) => `${from}-${to} của ${count}`}
+                            />
+                        )}
                     </Card>
                 </Grid>
             </Grid>

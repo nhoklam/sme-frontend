@@ -132,6 +132,19 @@ const AdminLayout = () => {
             setUnreadCount(prev => prev + 1);
             loadNotifications();
 
+            // Invalidate React Query caches để tự động cập nhật danh sách
+            queryClient.invalidateQueries({ queryKey: ['orders'] });
+            queryClient.invalidateQueries({ queryKey: ['notifications'] });
+            queryClient.invalidateQueries({ queryKey: ['inventory'] });
+
+            // Phát âm thanh thông báo
+            try {
+                const audio = new Audio('/assets/ting.mp3');
+                audio.play().catch(e => console.log('Audio play error (blocked by browser):', e));
+            } catch (e) {
+                console.log('Audio init error:', e);
+            }
+
             // Hiện Pop-up ngay trên màn hình
             switch (payload.type) {
                 case 'NEW_ORDER':
@@ -381,11 +394,11 @@ const AdminLayout = () => {
                 }}>
                     <Box sx={{
                         width: 32, height: 32, borderRadius: 1.5,
-                        bgcolor: '#2563eb', display: 'flex',
+                        display: 'flex',
                         alignItems: 'center', justifyContent: 'center',
                         flexShrink: 0,
                     }}>
-                        <Typography fontSize={16}>🛒</Typography>
+                        <img src="/LogoBookLy.svg" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                     </Box>
                     {open && (
                         <Box>

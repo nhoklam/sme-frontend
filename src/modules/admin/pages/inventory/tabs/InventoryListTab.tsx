@@ -439,7 +439,7 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
                     <Table size="small">
                         <TableHead>
                             <TableRow sx={{ bgcolor: '#fafafa' }}>
-                                {['Sản phẩm', 'Danh mục', 'Đang về', 'Khả dụng', 'Thực tế', 'Min', 'Trạng thái', 'Thao tác'].map(c => (
+                                {['Sản phẩm', 'Danh mục', 'Chi nhánh', 'Đang về', 'Khả dụng', 'Thực tế', 'Min', 'Trạng thái', 'Thao tác'].map(c => (
                                     <TableCell key={c} sx={{ fontWeight: 800, fontSize: 11, color: '#888', py: 1.5, letterSpacing: 0.3, bgcolor: '#fafafa' }}>
                                         {c.toUpperCase()}
                                     </TableCell>
@@ -450,7 +450,7 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
                             {isLoading || loadingProducts ? (
                                 [1, 2, 3, 4, 5].map(i => (
                                     <TableRow key={i}>
-                                        {[1, 2, 3, 4, 5, 6, 7, 8].map(j => <TableCell key={j}><Skeleton height={20} /></TableCell>)}
+                                        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(j => <TableCell key={j}><Skeleton height={20} /></TableCell>)}
                                     </TableRow>
                                 ))
                             ) : paged.length > 0 ? (
@@ -464,16 +464,14 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
                                                     <ProductThumb url={inv.imageUrl} name={inv.productName ?? ''} />
                                                     <Box>
                                                         <Typography variant="body2" fontWeight={600} fontSize={13}>{inv.productName}</Typography>
-                                                        {inv.productSku && (
-                                                            <Typography variant="caption" color="text.secondary" fontFamily="monospace">
-                                                                SKU: {inv.productSku}
-                                                            </Typography>
-                                                        )}
                                                     </Box>
                                                 </Box>
                                             </TableCell>
                                             <TableCell sx={{ py: 1.5 }}>
                                                 <Typography variant="caption" color="text.secondary">{inv.categoryName || '—'}</Typography>
+                                            </TableCell>
+                                            <TableCell sx={{ py: 1.5 }}>
+                                                <Typography variant="body2" fontWeight={600} color="#1a1a2e">{inv.warehouseName}</Typography>
                                             </TableCell>
                                             <TableCell sx={{ py: 1.5 }}>
                                                 {inv.inTransit > 0 ? (

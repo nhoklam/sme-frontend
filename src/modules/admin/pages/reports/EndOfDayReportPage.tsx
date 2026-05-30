@@ -14,6 +14,12 @@ import reportService from '../../../../services/reportService';
 import warehouseService from '../../../../services/warehouseService';
 import type { Warehouse, InvoiceResponse } from '../../../../types';
 import { formatCurrency } from '../../../../utils/formatters';
+import {
+    PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend,
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer
+} from 'recharts';
+
+const PIE_COLORS = ['#2196f3', '#4caf50', '#9c27b0', '#ffc107'];
 
 // ─── Helpers ──────────────────────────────────────────────────
 const toISO = (d: Date) => d.toISOString();
@@ -174,6 +180,44 @@ const EndOfDayReportPage: React.FC = () => {
     const { from, to } = getDateRange(quickFilter);
     const dateRangeStr = `${from.toLocaleDateString('vi-VN')} - ${to.toLocaleDateString('vi-VN')}`;
 
+    // ─── Chart Data Preparation ────────────────────────────────────
+    const pieData = [
+        { name: 'Tiền mặt', value: cashTotal, fill: PIE_COLORS[0] },
+        { name: 'Chuyển khoản', value: transferTotal, fill: PIE_COLORS[1] },
+        { name: 'Thẻ POS', value: posTotal, fill: PIE_COLORS[2] },
+        { name: 'Ví điện tử', value: ewalletTotal, fill: PIE_COLORS[3] }
+    ].filter(item => item.value > 0);
+
+    const isHourly = ['today', 'yesterday'].includes(quickFilter);
+    const chartDataMap = new Map<string, number>();
+
+    validInvoices.forEach(inv => {
+        const d = new Date(inv.createdAt);
+        let key = '';
+        if (isHourly) {
+            key = `${d.getHours()}h`;
+        } else {
+            const day = String(d.getDate()).padStart(2, '0');
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            key = `${day}/${month}`;
+        }
+        const current = chartDataMap.get(key) || 0;
+        chartDataMap.set(key, current + inv.finalAmount);
+    });
+
+    const barData = Array.from(chartDataMap.entries())
+        .map(([name, revenue]) => {
+            let sortVal = 0;
+            if (isHourly) {
+                sortVal = parseInt(name.replace('h', ''));
+            } else {
+                const [d, m] = name.split('/');
+                sortVal = parseInt(m) * 100 + parseInt(d);
+            }
+            return { name, revenue, sortVal };
+        })
+        .sort((a, b) => a.sortVal - b.sortVal);
+
     return (
         <Box sx={{ bgcolor: '#f8f9fa', minHeight: '100vh', p: '20px 24px' }}>
             {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
@@ -275,6 +319,55 @@ const EndOfDayReportPage: React.FC = () => {
                             <PaymentBlock title="Thẻ POS" value={formatCurrency(posTotal)} bgColor="#f3e5f5" loading={loading} />
                             <PaymentBlock title="Ví điện tử" value={formatCurrency(ewalletTotal)} bgColor="#fff8e1" loading={loading} />
                         </Box>
+
+                        {/* Charts Section */}
+                        {validInvoices.length > 0 && !loading && (
+                            <Grid container spacing={3} sx={{ mb: 4 }}>
+                                <Grid size={{ xs: 12, md: 5 }}>
+                                    <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #f0f0f0', height: '100%' }}>
+                                        <Typography variant="subtitle2" fontWeight={700} mb={2}>Cơ cấu thanh toán</Typography>
+                                        <Box sx={{ width: '100%', height: 250 }}>
+                                            <ResponsiveContainer>
+                                                <PieChart>
+                                                    <Pie
+                                                        data={pieData}
+                                                        dataKey="value"
+                                                        nameKey="name"
+                                                        cx="50%"
+                                                        cy="50%"
+                                                        innerRadius={60}
+                                                        outerRadius={80}
+                                                        paddingAngle={5}
+                                                    >
+                                                        {pieData.map((entry, index) => (
+                                                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                                                        ))}
+                                                    </Pie>
+                                                    <RechartsTooltip formatter={(value: number) => formatCurrency(value)} />
+                                                    <Legend />
+                                                </PieChart>
+                                            </ResponsiveContainer>
+                                        </Box>
+                                    </Paper>
+                                </Grid>
+                                <Grid size={{ xs: 12, md: 7 }}>
+                                    <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #f0f0f0', height: '100%' }}>
+                                        <Typography variant="subtitle2" fontWeight={700} mb={2}>Doanh thu theo {isHourly ? 'giờ' : 'ngày'}</Typography>
+                                        <Box sx={{ width: '100%', height: 250 }}>
+                                            <ResponsiveContainer>
+                                                <BarChart data={barData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#888' }} />
+                                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#888' }} tickFormatter={(value) => `${value / 1000}k`} />
+                                                    <RechartsTooltip cursor={{ fill: '#f5f5f5' }} formatter={(value: number) => [formatCurrency(value), 'Doanh thu']} />
+                                                    <Bar dataKey="revenue" fill="#1976d2" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        </Box>
+                                    </Paper>
+                                </Grid>
+                            </Grid>
+                        )}
 
                         {/* Invoice List */}
                         <Typography variant="subtitle2" fontWeight={700} mb={2}>Danh sách đơn hàng trong ngày</Typography>

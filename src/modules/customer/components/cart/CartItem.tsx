@@ -52,9 +52,19 @@ const CartItem = ({ item, onUpdateQty, onRemove }) => {
                             sx={{ p: 0.4, '&:disabled': { opacity: 0.35 } }}>
                             <Remove sx={{ fontSize: 14 }} />
                         </IconButton>
-                        <Typography sx={{ px: 1.5, fontSize: 13, fontWeight: 700, minWidth: 24, textAlign: 'center' }}>
-                            {item.qty}
-                        </Typography>
+                        <input 
+                            type="number" 
+                            value={item.qty} 
+                            onChange={(e) => {
+                                const v = parseInt(e.target.value);
+                                if (!isNaN(v) && v >= 1) {
+                                    onUpdateQty(item.id, Math.min(item.stock, v));
+                                } else if (e.target.value === '') {
+                                    onUpdateQty(item.id, 1);
+                                }
+                            }}
+                            style={{ width: 40, textAlign: 'center', fontWeight: 700, fontSize: 13, border: 'none', outline: 'none', padding: 0, WebkitAppearance: 'none', MozAppearance: 'textfield' }} 
+                        />
                         <IconButton size="small" onClick={() => onUpdateQty(item.id, item.qty + 1)}
                             disabled={item.qty >= item.stock}
                             sx={{ p: 0.4, '&:disabled': { opacity: 0.35 } }}>

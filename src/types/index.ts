@@ -138,6 +138,7 @@ export interface Customer {
   id: string;
   phoneNumber: string;
   fullName: string;
+  acquisitionChannel?: string;
   email?: string;
   address?: string;
   dateOfBirth?: string;
@@ -173,6 +174,10 @@ export interface ProductResponse {
   imageUrls?: string[];
   unit: string;
   weight?: number;
+  author?: string;
+  publisher?: string;
+  publishYear?: number;
+  numberOfPages?: number;
   isActive: boolean;
   availableQuantity?: number;
   createdAt: string;
@@ -191,6 +196,10 @@ export interface CreateProductRequest {
   imageUrls?: string[];
   unit?: string;
   weight?: number;
+  author?: string;
+  publisher?: string;
+  publishYear?: number;
+  numberOfPages?: number;
 }
 
 export interface UpdateProductRequest {
@@ -207,6 +216,10 @@ export interface UpdateProductRequest {
   imageUrls?: string[];
   unit?: string;
   weight?: number;
+  author?: string;
+  publisher?: string;
+  publishYear?: number;
+  numberOfPages?: number;
   isActive?: boolean;
 }
 
@@ -393,7 +406,7 @@ export interface InvoiceResponse {
   customerId?: string;
   customerName?: string;
   customerPhone?: string;
-  type: 'SALE' | 'RETURN';
+  type: 'SALE' | 'RETURN' | 'VOIDED';
   totalAmount: number;
   discountAmount: number;
   finalAmount: number;
@@ -491,6 +504,7 @@ export interface OrderItemResponse {
   unitPrice: number;
   subtotal: number;
   isReviewed?: boolean;
+  imageUrl?: string;
 }
 
 export interface OrderStatusHistoryResponse {

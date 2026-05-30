@@ -128,7 +128,7 @@ const PurchaseOrderDetailDialog: React.FC<{
                 body { font-family: 'Times New Roman', serif; font-size: 13px; color: #000; padding: 20px; }
                 .header { text-align: center; margin-bottom: 16px; }
                 .header h1 { font-size: 22px; font-weight: bold; margin-bottom: 4px; }
-                .header .sub { font-size: 12px; color: #555; }
+                .header .sub { font-size: 12px; color: #555; display: block; margin-top: 4px; }
                 .info-grid { display: flex; gap: 24px; margin-bottom: 16px; }
                 .info-grid .col { flex: 1; }
                 .info-row { display: flex; margin-bottom: 4px; }
@@ -189,48 +189,48 @@ const PurchaseOrderDetailDialog: React.FC<{
             <DialogContent sx={{ px: 3, pt: 2 }}>
                 <Box ref={printRef}>
                     {/* Receipt Header */}
-                    <Box sx={{ textAlign: 'center', mb: 2.5, '@media print': { mb: 1 } }}>
-                        <Typography fontWeight={900} fontSize={20} letterSpacing={1} color="#1a1a2e">
+                    <Box className="header" sx={{ textAlign: 'center', mb: 2.5, '@media print': { mb: 1 } }}>
+                        <Typography component="h1" fontWeight={900} fontSize={20} letterSpacing={1} color="#1a1a2e">
                             PHIẾU NHẬP HÀNG
                         </Typography>
-                        <Typography variant="caption" color="#64748b" display="block" fontSize={12}>
+                        <Typography className="sub" variant="caption" color="#64748b" display="block" fontSize={12}>
                             Số phiếu: {order?.code}
                         </Typography>
-                        <Typography variant="caption" color="#64748b" display="block" fontSize={12}>
+                        <Typography className="sub" variant="caption" color="#64748b" display="block" fontSize={12}>
                             Ngày: {formatDate(order?.createdAt)}
                         </Typography>
                     </Box>
 
                     {/* Info Grid */}
-                    <Box sx={{ display: 'flex', gap: 3, mb: 2.5, flexWrap: 'wrap' }}>
-                        <Box sx={{ flex: 1, minWidth: 260 }}>
-                            <Box sx={{ display: 'flex', mb: 0.75, alignItems: 'baseline' }}>
-                                <Typography variant="body2" fontWeight={700} sx={{ minWidth: 130 }} color="#475569">Mã phiếu:</Typography>
-                                <Typography variant="body2" fontWeight={700} fontFamily="monospace" color="#1976d2">{order?.code}</Typography>
+                    <Box className="info-grid" sx={{ display: 'flex', gap: 3, mb: 2.5, flexWrap: 'wrap' }}>
+                        <Box className="col" sx={{ flex: 1, minWidth: 260 }}>
+                            <Box className="info-row" sx={{ display: 'flex', mb: 0.75, alignItems: 'baseline' }}>
+                                <Typography className="info-label" variant="body2" fontWeight={700} sx={{ minWidth: 130 }} color="#475569">Mã phiếu:</Typography>
+                                <Typography className="info-value" variant="body2" fontWeight={700} fontFamily="monospace" color="#1976d2">{order?.code}</Typography>
                             </Box>
-                            <Box sx={{ display: 'flex', mb: 0.75, alignItems: 'baseline' }}>
-                                <Typography variant="body2" fontWeight={700} sx={{ minWidth: 130 }} color="#475569">Nhà cung cấp:</Typography>
-                                <Typography variant="body2" fontWeight={600}>{supplier?.name || order?.supplierId}</Typography>
+                            <Box className="info-row" sx={{ display: 'flex', mb: 0.75, alignItems: 'baseline' }}>
+                                <Typography className="info-label" variant="body2" fontWeight={700} sx={{ minWidth: 130 }} color="#475569">Nhà cung cấp:</Typography>
+                                <Typography className="info-value" variant="body2" fontWeight={600}>{supplier?.name || order?.supplierId}</Typography>
                             </Box>
-                            <Box sx={{ display: 'flex', mb: 0.75, alignItems: 'baseline' }}>
-                                <Typography variant="body2" fontWeight={700} sx={{ minWidth: 130 }} color="#475569">Ngày tạo:</Typography>
-                                <Typography variant="body2">{formatDateTime(order?.createdAt)}</Typography>
+                            <Box className="info-row" sx={{ display: 'flex', mb: 0.75, alignItems: 'baseline' }}>
+                                <Typography className="info-label" variant="body2" fontWeight={700} sx={{ minWidth: 130 }} color="#475569">Ngày tạo:</Typography>
+                                <Typography className="info-value" variant="body2">{formatDateTime(order?.createdAt)}</Typography>
                             </Box>
-                            <Box sx={{ display: 'flex', mb: 0.75, alignItems: 'baseline' }}>
-                                <Typography variant="body2" fontWeight={700} sx={{ minWidth: 130 }} color="#475569">Kho nhập:</Typography>
-                                <Typography variant="body2" fontWeight={600}>{warehouse?.name || order?.warehouseId}</Typography>
+                            <Box className="info-row" sx={{ display: 'flex', mb: 0.75, alignItems: 'baseline' }}>
+                                <Typography className="info-label" variant="body2" fontWeight={700} sx={{ minWidth: 130 }} color="#475569">Kho nhập:</Typography>
+                                <Typography className="info-value" variant="body2" fontWeight={600}>{warehouse?.name || order?.warehouseId}</Typography>
                             </Box>
                         </Box>
-                        <Box sx={{ flex: 1, minWidth: 200 }}>
-                            <Box sx={{ display: 'flex', mb: 0.75, alignItems: 'center' }}>
-                                <Typography variant="body2" fontWeight={700} sx={{ minWidth: 100 }} color="#475569">Trạng thái:</Typography>
+                        <Box className="col" sx={{ flex: 1, minWidth: 200 }}>
+                            <Box className="info-row" sx={{ display: 'flex', mb: 0.75, alignItems: 'center' }}>
+                                <Typography className="info-label" variant="body2" fontWeight={700} sx={{ minWidth: 100 }} color="#475569">Trạng thái:</Typography>
                                 <Chip label={statusInfo.label} size="small"
                                     sx={{ bgcolor: statusInfo.bg, color: statusInfo.color, fontWeight: 700, height: 24, fontSize: 12 }} />
                             </Box>
                             {order?.note && (
-                                <Box sx={{ display: 'flex', mb: 0.75, alignItems: 'baseline' }}>
-                                    <Typography variant="body2" fontWeight={700} sx={{ minWidth: 100 }} color="#475569">Ghi chú:</Typography>
-                                    <Typography variant="body2" color="#555">{order.note}</Typography>
+                                <Box className="info-row" sx={{ display: 'flex', mb: 0.75, alignItems: 'baseline' }}>
+                                    <Typography className="info-label" variant="body2" fontWeight={700} sx={{ minWidth: 100 }} color="#475569">Ghi chú:</Typography>
+                                    <Typography className="info-value" variant="body2" color="#555">{order.note}</Typography>
                                 </Box>
                             )}
                         </Box>
@@ -303,18 +303,18 @@ const PurchaseOrderDetailDialog: React.FC<{
                     </TableContainer>
 
                     {/* Signatures */}
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4, textAlign: 'center' }}>
-                        <Box sx={{ flex: 1 }}>
-                            <Typography variant="body2" fontWeight={700} mb={0.5}>Người lập phiếu</Typography>
-                            <Typography variant="caption" color="#94a3b8" fontStyle="italic">(Ký và ghi rõ họ tên)</Typography>
+                    <Box className="signatures" sx={{ display: 'flex', justifyContent: 'space-between', mt: 4, textAlign: 'center' }}>
+                        <Box className="sig" sx={{ flex: 1 }}>
+                            <Typography className="title" variant="body2" fontWeight={700} mb={0.5}>Người lập phiếu</Typography>
+                            <Typography className="note" variant="caption" color="#94a3b8" fontStyle="italic">(Ký và ghi rõ họ tên)</Typography>
                         </Box>
-                        <Box sx={{ flex: 1 }}>
-                            <Typography variant="body2" fontWeight={700} mb={0.5}>Người giao hàng</Typography>
-                            <Typography variant="caption" color="#94a3b8" fontStyle="italic">(Ký và ghi rõ họ tên)</Typography>
+                        <Box className="sig" sx={{ flex: 1 }}>
+                            <Typography className="title" variant="body2" fontWeight={700} mb={0.5}>Người giao hàng</Typography>
+                            <Typography className="note" variant="caption" color="#94a3b8" fontStyle="italic">(Ký và ghi rõ họ tên)</Typography>
                         </Box>
-                        <Box sx={{ flex: 1 }}>
-                            <Typography variant="body2" fontWeight={700} mb={0.5}>Thủ kho</Typography>
-                            <Typography variant="caption" color="#94a3b8" fontStyle="italic">(Ký và ghi rõ họ tên)</Typography>
+                        <Box className="sig" sx={{ flex: 1 }}>
+                            <Typography className="title" variant="body2" fontWeight={700} mb={0.5}>Thủ kho</Typography>
+                            <Typography className="note" variant="caption" color="#94a3b8" fontStyle="italic">(Ký và ghi rõ họ tên)</Typography>
                         </Box>
                     </Box>
                 </Box>

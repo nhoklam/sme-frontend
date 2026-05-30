@@ -703,8 +703,23 @@ const EmployeePOSPage: React.FC = () => {
                                                         <Box sx={{ width: 40, height: 40, bgcolor: '#f5f5f5', borderRadius: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #f0f0f0' }}>
                                                             {item.imageUrl ? <img src={item.imageUrl} alt={item.productName} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <ShoppingBasket sx={{ color: '#d9d9d9' }} />}
                                                         </Box>
-                                                        <Box>
-                                                            <Typography fontSize={14} fontWeight={500} color="#262626">{item.productName}</Typography>
+                                                        <Box sx={{ width: 250 }}>
+                                                            <Tooltip title={item.productName} placement="top-start">
+                                                                <Typography 
+                                                                    fontSize={14} 
+                                                                    fontWeight={500} 
+                                                                    color="#262626"
+                                                                    sx={{
+                                                                        display: '-webkit-box',
+                                                                        WebkitLineClamp: 2,
+                                                                        WebkitBoxOrient: 'vertical',
+                                                                        overflow: 'hidden',
+                                                                        textOverflow: 'ellipsis'
+                                                                    }}
+                                                                >
+                                                                    {item.productName}
+                                                                </Typography>
+                                                            </Tooltip>
                                                             <Typography fontSize={12} color="#8c8c8c">{item.isbnBarcode}</Typography>
                                                         </Box>
                                                     </Box>

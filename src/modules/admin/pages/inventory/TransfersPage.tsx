@@ -283,20 +283,19 @@ const CreateTransferDialog: React.FC<{
     onClose: () => void;
     onCreated: () => void;
     warehouses: Warehouse[];
-}> = ({ open, onClose, onCreated, warehouses }) => {
+    products: ProductResponse[];
+}> = ({ open, onClose, onCreated, warehouses, products }) => {
     const [fromWid, setFromWid] = useState('');
     const [toWid, setToWid] = useState('');
     const [note, setNote] = useState('');
     const [cart, setCart] = useState<TransferCartItem[]>([]);
     const [kw, setKw] = useState('');
-    const [results, setResults] = useState<ProductResponse[]>([]);
-    const [searching, setSearching] = useState(false);
     const [creating, setCreating] = useState(false);
     const [invMap, setInvMap] = useState<Map<string, Inventory>>(new Map());
     const [snack, setSnack] = useState<{ msg: string; sev: 'success' | 'error' } | null>(null);
 
     React.useEffect(() => {
-        if (!open) { setFromWid(''); setToWid(''); setNote(''); setCart([]); setKw(''); setResults([]); }
+        if (!open) { setFromWid(''); setToWid(''); setNote(''); setCart([]); setKw(''); }
     }, [open]);
 
     React.useEffect(() => {
@@ -307,18 +306,20 @@ const CreateTransferDialog: React.FC<{
         } else { setInvMap(new Map()); }
     }, [fromWid, open]);
 
-    React.useEffect(() => {
-        const t = setTimeout(() => {
-            if (kw.trim().length >= 2 && fromWid && open) {
-                setSearching(true);
-                productService.search({ keyword: kw, size: 10, isActive: true })
-                    .then(r => setResults(r.content.filter(p => !cart.some(c => c.productId === p.id) && (invMap.get(p.id)?.availableQuantity || 0) > 0)))
-                    .catch(() => setResults([]))
-                    .finally(() => setSearching(false));
-            } else { setResults([]); }
-        }, 400);
-        return () => clearTimeout(t);
-    }, [kw, fromWid, open, cart, invMap]);
+    const availableProducts = React.useMemo(() => {
+        if (!fromWid) return [];
+        let list = products.filter(p => {
+            const av = invMap.get(p.id)?.availableQuantity || 0;
+            return av > 0 && !cart.some(c => c.productId === p.id);
+        });
+        if (kw.trim()) {
+            const lowerKw = kw.toLowerCase();
+            list = list.filter(p => p.name.toLowerCase().includes(lowerKw) || 
+                                     p.sku?.toLowerCase().includes(lowerKw) || 
+                                     p.isbnBarcode?.toLowerCase().includes(lowerKw));
+        }
+        return list;
+    }, [fromWid, invMap, cart, kw, products]);
 
     const addProduct = (p: ProductResponse) => {
         const inv = invMap.get(p.id);
@@ -328,7 +329,8 @@ const CreateTransferDialog: React.FC<{
             if (ex) return prev.map(i => i.productId === p.id ? { ...i, quantity: Math.min(i.quantity + 1, i.availableStock) } : i);
             return [...prev, { productId: p.id, productName: p.name, isbnBarcode: p.isbnBarcode, sku: p.sku, quantity: 1, availableStock: available, imageUrl: p.imageUrl }];
         });
-        setKw(''); setResults([]);
+        setKw('');
+
     };
 
     const updateQty = (id: string, qty: number) => {
@@ -391,36 +393,59 @@ const CreateTransferDialog: React.FC<{
 
                 {!fromWid ? (
                     <Box sx={{ p: 4, textAlign: 'center', bgcolor: '#fafafa', borderRadius: 1.5, mb: 2 }}>
-                        <Typography variant="body2" color="text.secondary">Vui lòng chọn kho xuất để tìm sản phẩm.</Typography>
+                        <Typography variant="body2" color="text.secondary">Vui lòng chọn kho xuất để tải danh sách sản phẩm.</Typography>
                     </Box>
                 ) : (
                     <>
                         <TextField fullWidth size="small" placeholder="Tìm sản phẩm theo tên, ISBN, SKU..."
                             value={kw} onChange={e => setKw(e.target.value)} sx={{ mb: 1.5 }}
                             InputProps={{
-                                startAdornment: <InputAdornment position="start"><Search /></InputAdornment>,
-                                endAdornment: searching && <CircularProgress size={20} />,
+                                startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 18, color: '#999' }} /></InputAdornment>,
                             }} />
-                        {results.length > 0 && (
-                            <Paper elevation={2} sx={{ mb: 2, maxHeight: 200, overflowY: 'auto', borderRadius: 1.5 }}>
-                                {results.map(p => {
-                                    const av = invMap.get(p.id)?.availableQuantity || 0;
-                                    return (
-                                        <Box key={p.id} onClick={() => addProduct(p)} sx={{
-                                            px: 2, py: 1.25, cursor: 'pointer', borderBottom: '1px solid #f5f5f5',
-                                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                            '&:hover': { bgcolor: '#f5f9ff' },
-                                        }}>
-                                            <Box>
-                                                <Typography fontWeight={600} fontSize={13}>{p.name}</Typography>
-                                                <Typography variant="caption" color="text.secondary">{p.sku} · Tồn: <strong>{av}</strong></Typography>
-                                            </Box>
-                                            <Button size="small" variant="outlined">Thêm</Button>
-                                        </Box>
-                                    );
-                                })}
-                            </Paper>
-                        )}
+                        <Paper elevation={0} sx={{ border: '1px solid #f0f0f0', borderRadius: 1.5, mb: 2, maxHeight: 220, overflowY: 'auto' }}>
+                            {availableProducts.length === 0 ? (
+                                <Box sx={{ p: 3, textAlign: 'center' }}>
+                                    <Typography variant="body2" color="text.secondary">Không tìm thấy sản phẩm nào có sẵn trong kho này.</Typography>
+                                </Box>
+                            ) : (
+                                <Table size="small" stickyHeader>
+                                    <TableHead>
+                                        <TableRow sx={{ bgcolor: '#fafafa' }}>
+                                            {['Sản phẩm', 'Mã vạch', 'Tồn kho', 'Thao tác'].map(c => (
+                                                <TableCell key={c} sx={{ fontWeight: 700, fontSize: 11 }}>{c}</TableCell>
+                                            ))}
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {availableProducts.slice(0, 50).map(p => {
+                                            const av = invMap.get(p.id)?.availableQuantity || 0;
+                                            return (
+                                                <TableRow key={p.id} hover>
+                                                    <TableCell sx={{ py: 1 }}>
+                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                            {p.imageUrl && (
+                                                                <Box component="img" src={p.imageUrl} alt={p.name}
+                                                                    sx={{ width: 32, height: 42, objectFit: 'contain', borderRadius: 0.5, border: '1px solid #e0e0e0' }} />
+                                                            )}
+                                                            <Typography variant="body2" fontWeight={600} fontSize={13}>{p.name}</Typography>
+                                                        </Box>
+                                                    </TableCell>
+                                                    <TableCell sx={{ py: 1 }}>
+                                                        <Typography variant="caption" fontFamily="monospace" color="#888">{p.isbnBarcode || p.sku}</Typography>
+                                                    </TableCell>
+                                                    <TableCell sx={{ py: 1 }}>
+                                                        <Typography variant="body2" fontWeight={700} color="#2e7d32">{av}</Typography>
+                                                    </TableCell>
+                                                    <TableCell sx={{ py: 1 }}>
+                                                        <Button size="small" variant="outlined" onClick={() => addProduct(p)}>Thêm</Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
+                                    </TableBody>
+                                </Table>
+                            )}
+                        </Paper>
                     </>
                 )}
 
@@ -743,7 +768,7 @@ const TransfersPage: React.FC = () => {
                 onReceive={handleReceive}
                 loading={actionLoading}
             />
-            <CreateTransferDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={refresh} warehouses={warehouses} />
+            <CreateTransferDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={refresh} warehouses={warehouses} products={productsData} />
 
             <Snackbar open={!!snack} autoHideDuration={3000} onClose={() => setSnack(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
                 {snack ? <Alert severity={snack.sev} onClose={() => setSnack(null)} sx={{ borderRadius: 2 }}>{snack.msg}</Alert> : <div />}

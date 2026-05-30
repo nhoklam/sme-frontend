@@ -335,7 +335,8 @@ const LowStockTab: React.FC<Props> = ({ warehouses }) => {
                 )
             );
 
-            const lowStockItems: LowStockItem[] = [];
+            const productAggMap = new Map<string, LowStockItem & { warehouses: string[] }>();
+            
             accessibleWarehouseIds.forEach((wId, i) => {
                 const w = warehouses.find(wh => wh.id === wId);
                 if (!w) return;
@@ -345,24 +346,36 @@ const LowStockTab: React.FC<Props> = ({ warehouses }) => {
                 products.forEach(p => {
                     const inv = invMap.get(p.id);
                     const qty = inv ? Number(inv.availableQuantity) : 0;
-                    const minQty = inv ? Number(inv.minQuantity) : 0; // Defaults to 0
+                    const minQty = inv ? Number(inv.minQuantity) : 0;
 
                     if (qty <= minQty) {
-                        lowStockItems.push({
-                            inventoryId: inv ? inv.id : '',
-                            productId: p.id,
-                            productName: p.name,
-                            productSku: p.sku,
-                            warehouseId: w.id,
-                            warehouseName: w.name,
-                            quantity: qty,
-                            minQuantity: minQty,
-                            reservedQuantity: inv ? Number(inv.reservedQuantity || 0) : 0
-                        });
+                        if (productAggMap.has(p.id)) {
+                            const existing = productAggMap.get(p.id)!;
+                            existing.quantity += qty;
+                            existing.minQuantity += minQty;
+                            existing.reservedQuantity += inv ? Number(inv.reservedQuantity || 0) : 0;
+                            if (!existing.warehouses.includes(w.name)) {
+                                existing.warehouses.push(w.name);
+                                existing.warehouseName = existing.warehouses.join(', ');
+                            }
+                        } else {
+                            productAggMap.set(p.id, {
+                                inventoryId: p.id, // Use productId as unique key for table
+                                productId: p.id,
+                                productName: p.name,
+                                productSku: p.sku,
+                                warehouseId: w.id,
+                                warehouseName: w.name,
+                                quantity: qty,
+                                minQuantity: minQty,
+                                reservedQuantity: inv ? Number(inv.reservedQuantity || 0) : 0,
+                                warehouses: [w.name]
+                            });
+                        }
                     }
                 });
             });
-            setItems(lowStockItems);
+            setItems(Array.from(productAggMap.values()));
         } catch {
             setItems([]);
         } finally { setLoading(false); }

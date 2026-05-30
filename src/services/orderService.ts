@@ -16,12 +16,18 @@ const orderService = {
         page?: number;
         size?: number;
         warehouseId?: string;
+        fromDate?: string;
+        toDate?: string;
+        provinceCode?: string;
     }): Promise<PageResponse<OrderResponse>> => {
         const query = new URLSearchParams();
         if (params.keyword?.trim()) query.set('keyword', params.keyword.trim());
         if (params.status) query.set('status', params.status);
         if (params.paymentStatus) query.set('paymentStatus', params.paymentStatus);
         if (params.warehouseId) query.set('warehouseId', params.warehouseId);
+        if (params.provinceCode) query.set('provinceCode', params.provinceCode);
+        if (params.fromDate) query.set('fromDate', params.fromDate);
+        if (params.toDate) query.set('toDate', params.toDate);
         query.set('page', String(params.page ?? 0));
         query.set('size', String(params.size ?? 20));
 
@@ -38,6 +44,9 @@ const orderService = {
         paymentStatus?: string;
         warehouseId?: string;
         source?: string;
+        fromDate?: string;
+        toDate?: string;
+        provinceCode?: string;
     }): Promise<{
         totalCount: number;
         pendingCount: number;
@@ -49,7 +58,10 @@ const orderService = {
         if (params.status) query.set('status', params.status);
         if (params.paymentStatus) query.set('paymentStatus', params.paymentStatus);
         if (params.warehouseId) query.set('warehouseId', params.warehouseId);
+        if (params.provinceCode) query.set('provinceCode', params.provinceCode);
         if (params.source) query.set('source', params.source);
+        if (params.fromDate) query.set('fromDate', params.fromDate);
+        if (params.toDate) query.set('toDate', params.toDate);
 
         const res = await axiosInstance.get<ApiResponse<{
             totalCount: number;

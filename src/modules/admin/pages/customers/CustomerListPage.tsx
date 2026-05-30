@@ -14,6 +14,7 @@ import {
 } from '@mui/icons-material';
 import customerService from '../../../../services/customerService';
 import { Customer, CustomerTier } from '../../../../types';
+import CustomerDialog from './CustomerDialog';
 
 const TIER_MAP: Record<CustomerTier, { label: string; color: string; bg: string }> = {
     STANDARD: { label: 'Tiêu chuẩn', color: '#374151', bg: '#f3f4f6' },
@@ -165,6 +166,11 @@ const CustomerListPage: React.FC = () => {
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
     const [topOpen, setTopOpen] = useState(false);
+    
+    // Customer Dialog state
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+
     const PAGE_SIZE = 20;
 
     const loadCustomers = useCallback(async () => {
@@ -236,6 +242,7 @@ const CustomerListPage: React.FC = () => {
                         Đang xem Top Chi tiêu
                     </Button>
                     <Button variant="contained" startIcon={<Add />}
+                        onClick={() => { setSelectedCustomer(null); setDialogOpen(true); }}
                         sx={{ bgcolor: '#2563eb', textTransform: 'none', fontWeight: 700, '&:hover': { bgcolor: '#1d4ed8' } }}>
                         + Thêm khách hàng
                     </Button>
@@ -390,6 +397,16 @@ const CustomerListPage: React.FC = () => {
 
             {/* Top Spenders Dialog */}
             <TopSpendersDialog open={topOpen} onClose={() => setTopOpen(false)} />
+
+            {/* Add / Edit Dialog */}
+            <CustomerDialog 
+                open={dialogOpen} 
+                onClose={() => setDialogOpen(false)} 
+                initialData={selectedCustomer}
+                onSuccess={() => {
+                    loadCustomers();
+                }}
+            />
         </Box>
     );
 };

@@ -16,6 +16,7 @@ import {
 import JsBarcode from 'jsbarcode';
 import BarcodePrintDialog, { BarcodePrintItem } from '../../../../components/common/BarcodePrintDialog';
 import ProductFormDialog from './ProductFormDialog';
+import ProductImportDialog from './ProductImportDialog';
 import authService from '../../../../services/authService';
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -80,6 +81,7 @@ const ProductListPage = () => {
 
     // ── Dialog state ──
     const [formOpen, setFormOpen] = useState(false);
+    const [importOpen, setImportOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | undefined>(undefined);
 
     // ── Popover Stock states ──
@@ -321,6 +323,11 @@ const ProductListPage = () => {
                         onClick={handleExport}
                         sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2, borderColor: '#e0e0e0', color: '#555', height: 36 }}>
                         Xuất file
+                    </Button>
+                    <Button variant="outlined" startIcon={<Add />}
+                        onClick={() => setImportOpen(true)}
+                        sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2, borderColor: '#10b981', color: '#10b981', height: 36, '&:hover': { bgcolor: '#ecfdf5', borderColor: '#059669' } }}>
+                        Import Excel
                     </Button>
                     <Button variant="contained" startIcon={<Add />}
                         onClick={() => { setEditingId(undefined); setFormOpen(true); }}
@@ -606,6 +613,13 @@ const ProductListPage = () => {
                 productId={editingId}
                 onClose={() => setFormOpen(false)}
                 onSuccess={loadProducts}
+            />
+            <ProductImportDialog
+                open={importOpen}
+                onClose={() => setImportOpen(false)}
+                onSuccess={loadProducts}
+                categories={categories}
+                suppliers={suppliers}
             />
 
             {/* Popover chi tiết tồn kho ở từng chi nhánh/kho */}

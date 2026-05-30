@@ -89,7 +89,7 @@ const OrderRow = React.memo(({
             </TableCell>
             <TableCell sx={{ py: 1.5 }}>
                 <Typography variant="body2" fontWeight={600} fontSize={12} color="#1a1a2e">
-                    {order.createdByName || '—'}
+                    {order.createdByName || (order as any).cashierName || '—'}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">Nhân viên</Typography>
             </TableCell>
@@ -700,6 +700,9 @@ const OrderListPage: React.FC = () => {
     const [provinceFilter, setProvinceFilter] = useState('');
     const [warehouseFilter, setWarehouseFilter] = useState('');
     const [showAdvanced, setShowAdvanced] = useState(false);
+    const [dateRange, setDateRange] = useState('last_30_days');
+    const [customStartDate, setCustomStartDate] = useState('');
+    const [customEndDate, setCustomEndDate] = useState('');
 
     const [orders, setOrders] = useState<any[]>([]);
     const [source, setSource] = useState<'ALL' | 'ONLINE' | 'OFFLINE'>('ALL');
@@ -717,7 +720,7 @@ const OrderListPage: React.FC = () => {
     const [createOpen, setCreateOpen] = useState(false);
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
 
-    const PAGE_SIZE = 20;
+    const PAGE_SIZE = 10;
 
     useEffect(() => {
         warehouseService.getAll().then(setWarehouses).catch(() => { });
@@ -777,9 +780,54 @@ const OrderListPage: React.FC = () => {
             let tPages = 0;
             let tElements = 0;
 
+            let fromDate: string | undefined = undefined;
+            let toDate: string | undefined = undefined;
+
+            const now = new Date();
+            if (dateRange !== 'all') {
+                const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                if (dateRange === 'today') {
+                    fromDate = today.toISOString();
+                    toDate = new Date(today.getTime() + 86400000 - 1).toISOString();
+                } else if (dateRange === 'yesterday') {
+                    const yesterday = new Date(today.getTime() - 86400000);
+                    fromDate = yesterday.toISOString();
+                    toDate = new Date(yesterday.getTime() + 86400000 - 1).toISOString();
+                } else if (dateRange === 'this_week') {
+                    const firstDayOfWeek = new Date(today.getTime());
+                    firstDayOfWeek.setDate(today.getDate() - today.getDay() + (today.getDay() === 0 ? -6 : 1));
+                    fromDate = firstDayOfWeek.toISOString();
+                    toDate = new Date(today.getTime() + 86400000 - 1).toISOString();
+                } else if (dateRange === 'last_week') {
+                    const firstDayOfLastWeek = new Date(today.getTime());
+                    firstDayOfLastWeek.setDate(today.getDate() - today.getDay() + (today.getDay() === 0 ? -6 : 1) - 7);
+                    fromDate = firstDayOfLastWeek.toISOString();
+                    toDate = new Date(firstDayOfLastWeek.getTime() + 7 * 86400000 - 1).toISOString();
+                } else if (dateRange === 'this_month') {
+                    fromDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+                    toDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
+                } else if (dateRange === 'last_month') {
+                    fromDate = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+                    toDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999).toISOString();
+                } else if (dateRange === 'this_year') {
+                    fromDate = new Date(now.getFullYear(), 0, 1).toISOString();
+                    toDate = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999).toISOString();
+                } else if (dateRange === 'last_year') {
+                    fromDate = new Date(now.getFullYear() - 1, 0, 1).toISOString();
+                    toDate = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59, 999).toISOString();
+                } else if (dateRange === 'last_30_days') {
+                    fromDate = new Date(today.getTime() - 29 * 86400000).toISOString();
+                    toDate = new Date(today.getTime() + 86400000 - 1).toISOString();
+                } else if (dateRange === 'custom') {
+                    if (customStartDate) fromDate = new Date(customStartDate + 'T00:00:00').toISOString();
+                    if (customEndDate) toDate = new Date(customEndDate + 'T23:59:59.999').toISOString();
+                }
+            }
+
             const params: any = {
                 keyword: search.trim() || undefined,
-                page, size: PAGE_SIZE,
+                page: 0, size: 9999, 
+                fromDate, toDate
             };
 
             const [onlineRes, offlineRes, statsRes] = await Promise.all([
@@ -789,6 +837,7 @@ const OrderListPage: React.FC = () => {
                         ...params,
                         status: statusFilter || undefined,
                         paymentStatus: paymentStatusFilter || undefined,
+                        provinceCode: provinceFilter || undefined,
                         warehouseId: warehouseFilter || undefined,
                     })
                     : Promise.resolve(null),
@@ -804,11 +853,16 @@ const OrderListPage: React.FC = () => {
                             else if (statusFilter === 'CANCELLED') typeParam = '&type=VOIDED';
                             else shouldFetchOffline = false;
                         }
+                        if (paymentStatusFilter === 'UNPAID') shouldFetchOffline = false;
+                        if (provinceFilter) shouldFetchOffline = false;
+
                         if (!shouldFetchOffline) return Promise.resolve(null);
 
                         const kwParam = search ? `&keyword=${encodeURIComponent(search)}` : '';
                         const whParam = warehouseFilter ? `&warehouseId=${warehouseFilter}` : '';
-                        return axiosInstance.get(`/pos/invoices?page=${page}&size=${PAGE_SIZE}${kwParam}${typeParam}${whParam}`)
+                        const fromParam = fromDate ? `&from=${encodeURIComponent(fromDate)}` : '';
+                        const toParam = toDate ? `&to=${encodeURIComponent(toDate)}` : '';
+                        return axiosInstance.get(`/pos/invoices?page=0&size=9999${kwParam}${typeParam}${whParam}${fromParam}${toParam}`)
                             .then(res => res.data?.data);
                     })()
                     : Promise.resolve(null),
@@ -818,8 +872,11 @@ const OrderListPage: React.FC = () => {
                     keyword: search.trim() || undefined,
                     status: statusFilter || undefined,
                     paymentStatus: paymentStatusFilter || undefined,
+                    provinceCode: provinceFilter || undefined,
                     warehouseId: warehouseFilter || undefined,
-                    source: source
+                    source: source,
+                    fromDate,
+                    toDate
                 })
             ]);
 
@@ -865,9 +922,12 @@ const OrderListPage: React.FC = () => {
             }
 
             if (paymentMethodFilter) finalOrders = finalOrders.filter(o => o.paymentMethod?.includes(paymentMethodFilter));
-            if (provinceFilter) finalOrders = finalOrders.filter(o => o.provinceCode === provinceFilter);
 
-            setOrders(finalOrders);
+            tElements = finalOrders.length;
+            tPages = Math.ceil(tElements / PAGE_SIZE);
+            const paginatedOrders = finalOrders.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+            setOrders(paginatedOrders);
             setTotalPages(tPages);
             setTotalElements(tElements);
             if (statsRes) {
@@ -878,9 +938,9 @@ const OrderListPage: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [page, search, statusFilter, paymentStatusFilter, paymentMethodFilter, provinceFilter, warehouseFilter, source]);
+    }, [page, search, statusFilter, paymentStatusFilter, paymentMethodFilter, provinceFilter, warehouseFilter, source, dateRange, customStartDate, customEndDate]);
 
-    useEffect(() => { setPage(0); }, [search, statusFilter, paymentStatusFilter, paymentMethodFilter, provinceFilter, warehouseFilter, source]);
+    useEffect(() => { setPage(0); }, [search, statusFilter, paymentStatusFilter, paymentMethodFilter, provinceFilter, warehouseFilter, source, dateRange, customStartDate, customEndDate]);
     useEffect(() => { loadOrders(); }, [loadOrders]);
 
     const handleAction = React.useCallback(async (action: string, order: OrderResponse) => {
@@ -1042,6 +1102,28 @@ const OrderListPage: React.FC = () => {
                         sx={{ flex: 1, minWidth: 220 }}
                         InputProps={{ startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 17, color: '#bbb' }} /></InputAdornment> }}
                     />
+                    <FormControl size="small" sx={{ minWidth: 160 }}>
+                        <Select value={dateRange} onChange={(e: SelectChangeEvent<string>) => setDateRange(e.target.value)}
+                            displayEmpty sx={{ fontSize: 13, bgcolor: '#fff', borderRadius: 1.5 }}>
+                            <MenuItem value="all" sx={{ fontSize: 13 }}>Tất cả thời gian</MenuItem>
+                            <MenuItem value="today" sx={{ fontSize: 13 }}>Hôm nay</MenuItem>
+                            <MenuItem value="yesterday" sx={{ fontSize: 13 }}>Hôm qua</MenuItem>
+                            <MenuItem value="this_week" sx={{ fontSize: 13 }}>Tuần này</MenuItem>
+                            <MenuItem value="last_week" sx={{ fontSize: 13 }}>Tuần trước</MenuItem>
+                            <MenuItem value="this_month" sx={{ fontSize: 13 }}>Tháng này</MenuItem>
+                            <MenuItem value="last_month" sx={{ fontSize: 13 }}>Tháng trước</MenuItem>
+                            <MenuItem value="this_year" sx={{ fontSize: 13 }}>Năm nay</MenuItem>
+                            <MenuItem value="last_year" sx={{ fontSize: 13 }}>Năm trước</MenuItem>
+                            <MenuItem value="last_30_days" sx={{ fontSize: 13 }}>30 ngày qua</MenuItem>
+                            <MenuItem value="custom" sx={{ fontSize: 13 }}>Tùy chỉnh...</MenuItem>
+                        </Select>
+                    </FormControl>
+                    {dateRange === 'custom' && (
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                            <TextField type="date" size="small" value={customStartDate} onChange={e => setCustomStartDate(e.target.value)} sx={{ width: 130 }} InputProps={{ sx: { fontSize: 13, borderRadius: 1.5 } }} />
+                            <TextField type="date" size="small" value={customEndDate} onChange={e => setCustomEndDate(e.target.value)} sx={{ width: 130 }} InputProps={{ sx: { fontSize: 13, borderRadius: 1.5 } }} />
+                        </Box>
+                    )}
                     <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                         {STATUS_OPTIONS.map(opt => (
                             <Button key={opt.value} size="small" onClick={() => setStatusFilter(opt.value)}
@@ -1096,7 +1178,9 @@ const OrderListPage: React.FC = () => {
                                 onChange={(e: SelectChangeEvent<string>) => setProvinceFilter(e.target.value)}
                                 displayEmpty sx={{ fontSize: 13 }}>
                                 <MenuItem value="">Tất cả khu vực</MenuItem>
-                                {PROVINCES.map(p => <MenuItem key={p.code} value={p.code} sx={{ fontSize: 13 }}>{p.name}</MenuItem>)}
+                                {Object.entries(globalProvincesCache).length > 0 
+                                    ? Object.entries(globalProvincesCache).map(([code, name]) => <MenuItem key={code} value={code} sx={{ fontSize: 13 }}>{name}</MenuItem>) 
+                                    : PROVINCES.map(p => <MenuItem key={p.code} value={p.code} sx={{ fontSize: 13 }}>{p.name}</MenuItem>)}
                             </Select>
                         </FormControl>
                         {activeFilterCount > 0 && (
@@ -1116,7 +1200,7 @@ const OrderListPage: React.FC = () => {
                         {statusFilter && <Chip size="small" label={STATUS_OPTIONS.find(o => o.value === statusFilter)?.label} onDelete={() => setStatusFilter('')} sx={{ bgcolor: '#fff3e0', color: '#e65100', fontWeight: 600 }} />}
                         {paymentStatusFilter && <Chip size="small" label={PAYMENT_OPTIONS.find(o => o.value === paymentStatusFilter)?.label} onDelete={() => setPaymentStatusFilter('')} sx={{ bgcolor: '#e8f5e9', color: '#2e7d32', fontWeight: 600 }} />}
                         {paymentMethodFilter && <Chip size="small" label={paymentMethodFilter} onDelete={() => setPaymentMethodFilter('')} sx={{ bgcolor: '#f3e5f5', color: '#6a1b9a', fontWeight: 600 }} />}
-                        {provinceFilter && <Chip size="small" label={PROVINCES.find(p => p.code === provinceFilter)?.name} onDelete={() => setProvinceFilter('')} sx={{ bgcolor: '#e1f5fe', color: '#0277bd', fontWeight: 600 }} />}
+                        {provinceFilter && <Chip size="small" label={getProvinceName(provinceFilter)} onDelete={() => setProvinceFilter('')} sx={{ bgcolor: '#e1f5fe', color: '#0277bd', fontWeight: 600 }} />}
                     </Box>
                 )}
             </Paper>

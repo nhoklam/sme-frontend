@@ -28,11 +28,11 @@ const LoginPage = () => {
                 <Box sx={{ textAlign: 'center', mb: 4 }}>
                     <Box sx={{
                         width: 56, height: 56, borderRadius: 2,
-                        bgcolor: '#1976d2', display: 'flex',
+                        display: 'flex',
                         alignItems: 'center', justifyContent: 'center',
                         mx: 'auto', mb: 2,
                     }}>
-                        <Typography fontSize={28}>🛒</Typography>
+                        <img src="/LogoBookLy.svg" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                     </Box>
                     <Typography variant="h5" fontWeight={700} color="#1a1a2e" mb={0.5}>
                         SME ERP & POS

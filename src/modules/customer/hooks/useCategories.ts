@@ -34,6 +34,26 @@ const CATEGORY_COLORS: Record<string, string> = {
     'Ngoại Ngữ': '#f9fbe7',
 };
 
+const getCategoryIcon = (name: string): string => {
+    const lowerName = name.toLowerCase();
+    if (lowerName.includes('tư duy') || lowerName.includes('kỹ năng') || lowerName.includes('kĩ năng')) return '💡';
+    if (lowerName.includes('văn hóa') || lowerName.includes('nghệ thuật') || lowerName.includes('văn học')) return '📚';
+    if (lowerName.includes('kinh tế') || lowerName.includes('tài chính') || lowerName.includes('kinh doanh')) return '💰';
+    if (lowerName.includes('lịch sử') || lowerName.includes('chính trị')) return '🏛️';
+    if (lowerName.includes('khoa học') || lowerName.includes('giáo dục')) return '🔬';
+    if (lowerName.includes('gia đình') || lowerName.includes('mẹ và bé')) return '🏠';
+    if (lowerName.includes('thiếu nhi') || lowerName.includes('mầm non')) return '🧸';
+    if (lowerName.includes('tâm lý')) return '🧠';
+    if (lowerName.includes('ngoại ngữ') || lowerName.includes('tiếng')) return '🌍';
+    if (lowerName.includes('công nghệ') || lowerName.includes('it')) return '💻';
+    if (lowerName.includes('y học') || lowerName.includes('sức khỏe')) return '⚕️';
+    if (lowerName.includes('tôn giáo') || lowerName.includes('tâm linh')) return '🕉️';
+    if (lowerName.includes('tiểu thuyết') || lowerName.includes('truyện')) return '📖';
+    if (lowerName.includes('tham khảo')) return '📓';
+    
+    return CATEGORY_ICONS[name] ?? '📔'; // Icon mặc định
+};
+
 export interface DisplayCategory {
     id: string;
     parentId?: string | null;
@@ -62,7 +82,7 @@ export const useCategories = () => {
             id: cat.id,
             parentId: cat.parentId,
             name: cat.name,
-            icon: CATEGORY_ICONS[cat.name] ?? '📖',
+            icon: getCategoryIcon(cat.name),
             color: CATEGORY_COLORS[cat.name] ?? '#f5f5f5',
             slug: cat.slug ?? cat.name.toLowerCase().replace(/\s+/g, '-'),
             children: [],

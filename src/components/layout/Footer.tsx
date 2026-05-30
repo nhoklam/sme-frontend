@@ -102,13 +102,13 @@ const Footer = () => {
                             <Box sx={{ display: 'flex', gap: 1.2, alignItems: 'center' }}>
                                 <Phone sx={{ color: '#f5a623', fontSize: 18 }} />
                                 <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>
-                                    1800 6655 (Miễn phí)
+                                     0367287044 (Miễn phí)
                                 </Typography>
                             </Box>
                             <Box sx={{ display: 'flex', gap: 1.2, alignItems: 'center' }}>
                                 <Email sx={{ color: '#f5a623', fontSize: 18 }} />
                                 <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>
-                                    support@bookly.vn
+                                    nguyenhuuquang150805@gmail.com
                                 </Typography>
                             </Box>
                         </Box>

@@ -144,6 +144,7 @@ const INITIAL_FORM = {
     name: '', isbnBarcode: '', sku: '', categoryId: '', supplierId: '',
     description: '', retailPrice: '' as string | number, wholesalePrice: '' as string | number,
     imageUrls: [] as string[], unit: 'Cuốn', weight: '' as string | number, isActive: true,
+    author: '', publisher: '', publishYear: '' as string | number, numberOfPages: '' as string | number,
 };
 
 const ProductFormDialog: React.FC<Props> = ({ open, onClose, onSuccess, productId }) => {
@@ -195,6 +196,8 @@ const ProductFormDialog: React.FC<Props> = ({ open, onClose, onSuccess, productI
                 description: p.description ?? '', retailPrice: p.retailPrice ?? '', wholesalePrice: p.wholesalePrice ?? '',
                 imageUrls: p.imageUrls?.length ? p.imageUrls : (p.imageUrl ? [p.imageUrl] : []),
                 unit: p.unit ?? 'Cuốn', weight: p.weight ?? '', isActive: p.isActive ?? true,
+                author: p.author ?? '', publisher: p.publisher ?? '', 
+                publishYear: p.publishYear ?? '', numberOfPages: p.numberOfPages ?? '',
             });
         } catch { setErrorMsg('Không thể tải dữ liệu sản phẩm'); }
         finally { setLoading(false); }
@@ -232,12 +235,15 @@ const ProductFormDialog: React.FC<Props> = ({ open, onClose, onSuccess, productI
             const retailPrice = Number(form.retailPrice);
             const wholesalePrice = form.wholesalePrice !== '' ? Number(form.wholesalePrice) : undefined;
             const weight = form.weight !== '' ? Number(form.weight) : undefined;
+            const publishYear = form.publishYear !== '' ? Number(form.publishYear) : undefined;
+            const numberOfPages = form.numberOfPages !== '' ? Number(form.numberOfPages) : undefined;
             if (productId) {
                 const payload: UpdateProductRequest = {
                     name: form.name.trim(), categoryId: form.categoryId, supplierId: form.supplierId || null, hasSupplierId: true,
                     isbnBarcode: form.isbnBarcode.trim(), sku: form.sku?.trim() || undefined,
                     description: form.description?.trim() || undefined,
                     retailPrice, wholesalePrice, imageUrls: form.imageUrls, unit: form.unit, weight, isActive: form.isActive,
+                    author: form.author?.trim() || undefined, publisher: form.publisher?.trim() || undefined, publishYear, numberOfPages
                 };
                 await productService.update(productId, payload);
                 toast.success('Cập nhật thành công');
@@ -246,6 +252,7 @@ const ProductFormDialog: React.FC<Props> = ({ open, onClose, onSuccess, productI
                     name: form.name.trim(), categoryId: form.categoryId, supplierId: form.supplierId || undefined,
                     isbnBarcode: form.isbnBarcode.trim(), sku: form.sku?.trim() || undefined, description: form.description?.trim() || undefined,
                     retailPrice, wholesalePrice, imageUrls: form.imageUrls, unit: form.unit, weight,
+                    author: form.author?.trim() || undefined, publisher: form.publisher?.trim() || undefined, publishYear, numberOfPages
                 };
                 await productService.create(payload);
                 toast.success('Thêm sản phẩm thành công');
@@ -379,6 +386,33 @@ const ProductFormDialog: React.FC<Props> = ({ open, onClose, onSuccess, productI
                                                         {UNIT_OPTIONS.map(u => <MenuItem key={u} value={u} sx={{ fontSize: 13 }}>{u}</MenuItem>)}
                                                     </Select>
                                                 </FormControl>
+                                            </Grid>
+                                        </Grid>
+                                    </Box>
+
+                                    {/* PHẦN MỚI: THÔNG TIN XUẤT BẢN */}
+                                    <Box sx={{ p: 2.5, bgcolor: '#fff', borderRadius: 3, border: '1px solid #e2e8f0' }}>
+                                        <SectionHeader icon={Inventory} title="Thông tin sách & Khối lượng" />
+                                        <Grid container spacing={2}>
+                                            <Grid size={{ xs: 12, sm: 6 }}>
+                                                <FieldLabel label="Tác giả" />
+                                                <TextField fullWidth size="small" placeholder="Tên tác giả..." value={form.author} onChange={set('author')} sx={inputStyles} />
+                                            </Grid>
+                                            <Grid size={{ xs: 12, sm: 6 }}>
+                                                <FieldLabel label="Nhà xuất bản" />
+                                                <TextField fullWidth size="small" placeholder="VD: NXB Trẻ..." value={form.publisher} onChange={set('publisher')} sx={inputStyles} />
+                                            </Grid>
+                                            <Grid size={{ xs: 12, sm: 4 }}>
+                                                <FieldLabel label="Năm xuất bản" />
+                                                <TextField fullWidth size="small" type="number" placeholder="VD: 2023" value={form.publishYear} onChange={set('publishYear')} sx={inputStyles} />
+                                            </Grid>
+                                            <Grid size={{ xs: 12, sm: 4 }}>
+                                                <FieldLabel label="Số trang" />
+                                                <TextField fullWidth size="small" type="number" placeholder="VD: 350" value={form.numberOfPages} onChange={set('numberOfPages')} sx={inputStyles} />
+                                            </Grid>
+                                            <Grid size={{ xs: 12, sm: 4 }}>
+                                                <FieldLabel label="Trọng lượng (g)" />
+                                                <TextField fullWidth size="small" type="number" placeholder="VD: 200" value={form.weight} onChange={set('weight')} sx={inputStyles} />
                                             </Grid>
                                         </Grid>
                                     </Box>

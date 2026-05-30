@@ -7,6 +7,7 @@ export type WsEventType =
     | 'SHIFT_PENDING_APPROVAL'
     | 'TRANSFER_ARRIVED'
     | 'IMPORT_SUCCESS'
+    | 'ORDER_STATUS_UPDATED'
     | 'OUT_OF_STOCK';
 
 export interface WsPayload {
@@ -103,33 +104,45 @@ export function useWebSocket({ warehouseId, onMessage, enabled = true }: UseWebS
         const userData = userStr ? JSON.parse(userStr) : null;
         const isAdmin = userData?.role === 'ROLE_ADMIN';
 
-        // Nếu không phải Admin và cũng không có warehouseId thì mới bỏ qua
-        if (!isAdmin && !warehouseId) {
-            console.log('[WebSocket] No warehouseId and not Admin — skipping WebSocket connection');
+        const customerAuthStr = localStorage.getItem('customer_auth');
+        const customerData = customerAuthStr ? JSON.parse(customerAuthStr) : null;
+        const customerId = customerData?.user?.id; // Lấy ID của customer
+        const isCustomer = !!customerId;
+
+        // Nếu không phải Admin, không có warehouseId, và cũng không phải Customer thì bỏ qua
+        if (!isAdmin && !warehouseId && !isCustomer) {
+            console.log('[WebSocket] No warehouseId, not Admin, not Customer — skipping WebSocket connection');
             return;
         }
 
         // Xác định các topic cần subscribe
-        const topics = isAdmin
-            ? [
+        let topics: string[] = [];
+        if (isAdmin) {
+            topics = [
                 '/topic/admin/low-stock',
                 '/topic/admin/new-order',
                 '/topic/admin/shift-alert',
                 '/topic/admin/transfer'
-            ]
-            : [
+            ];
+        } else if (warehouseId) {
+            topics = [
                 `/topic/warehouse/${warehouseId}/low-stock`,
                 `/topic/warehouse/${warehouseId}/new-order`,
                 `/topic/warehouse/${warehouseId}/shift-alert`,
                 `/topic/warehouse/${warehouseId}/transfer`,
                 `/topic/warehouse/${warehouseId}/inventory`,
             ];
+        }
+
+        if (isCustomer) {
+            topics.push(`/topic/user/${customerId}/orders`);
+        }
 
         // Reset retry counter khi thông tin thay đổi
         retryCountRef.current = 0;
         isDeactivatingRef.current = false;
 
-        const accessToken = localStorage.getItem('access_token') || userData?.accessToken;
+        const accessToken = localStorage.getItem('access_token') || userData?.accessToken || customerData?.accessToken;
 
         const client = new Client({
             brokerURL: getWsUrl(),
@@ -151,10 +164,8 @@ export function useWebSocket({ warehouseId, onMessage, enabled = true }: UseWebS
                         try {
                             const payload = JSON.parse(msg.body) as WsPayload;
 
-                            // Phát âm thanh khi có đơn hàng mới
-                            if (payload.type === 'NEW_ORDER' && notificationAudio) {
-                                notificationAudio.play().catch(e => console.warn('Autoplay prevented:', e));
-                            }
+                            // Không tự động phát âm thanh ở đây nữa để tránh lỗi policy của trình duyệt
+                            // Thay vào đó, để component tự xử lý phát âm thanh.
 
                             onMessageRef.current(payload);
                         } catch {

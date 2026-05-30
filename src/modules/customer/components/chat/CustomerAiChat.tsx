@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Box, IconButton, Paper, Typography, TextField, CircularProgress, Fab, Fade } from '@mui/material';
-import { Chat as ChatIcon, Close, Send, SmartToy, Person } from '@mui/icons-material';
+import { Box, IconButton, Paper, Typography, TextField, CircularProgress, Fab, Fade, Avatar, Chip, Badge } from '@mui/material';
+import { Chat as ChatIcon, Close, Send, SmartToy, Person, SupportAgent } from '@mui/icons-material';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
 
@@ -15,11 +15,20 @@ const CustomerAiChat = () => {
     const [messages, setMessages] = useState<Message[]>([{
         id: 'welcome',
         role: 'assistant',
-        content: 'Xin chào! Tôi là trợ lý AI của nhà sách. Tôi có thể giúp bạn tìm kiếm sách hoặc tư vấn mua hàng hôm nay không?'
+        content: '👋 Chào mừng bạn đến với nhà sách! Mình là Trợ lý AI, có thể giúp bạn tìm sách, tra cứu đơn hàng hoặc tư vấn chương trình khuyến mãi.\n\nBạn cần mình hỗ trợ gì hôm nay?'
     }]);
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [showGreeting, setShowGreeting] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        // Show greeting bubble after 3 seconds
+        const timer = setTimeout(() => {
+            if (!isOpen) setShowGreeting(true);
+        }, 3000);
+        return () => clearTimeout(timer);
+    }, [isOpen]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -29,10 +38,10 @@ const CustomerAiChat = () => {
         scrollToBottom();
     }, [messages, isOpen]);
 
-    const handleSend = async () => {
-        if (!inputValue.trim()) return;
+    const handleSend = async (text: string = inputValue.trim()) => {
+        if (!text) return;
 
-        const userMsg: Message = { id: Date.now().toString(), role: 'user', content: inputValue.trim() };
+        const userMsg: Message = { id: Date.now().toString(), role: 'user', content: text };
         setMessages(prev => [...prev, userMsg]);
         setInputValue('');
         setIsLoading(true);
@@ -48,6 +57,8 @@ const CustomerAiChat = () => {
                     role: 'assistant',
                     content: res.data.data.reply
                 }]);
+                const audio = new Audio('/assets/ting.mp3');
+                audio.play().catch(e => console.log('Audio error:', e));
             } else {
                 throw new Error(res.data.message);
             }
@@ -69,23 +80,59 @@ const CustomerAiChat = () => {
         }
     };
 
+    const SUGGESTIONS = ['Gợi ý sách mới', 'Có khuyến mãi gì?', 'Chính sách đổi trả'];
+
     return (
         <>
             <Fade in={!isOpen}>
-                <Fab 
-                    color="primary" 
-                    aria-label="chat" 
-                    onClick={() => setIsOpen(true)}
-                    sx={{
-                        position: 'fixed',
-                        bottom: 24,
-                        right: 24,
-                        zIndex: 1000,
-                        boxShadow: '0 8px 24px rgba(0,0,0,0.15)'
-                    }}
-                >
-                    <ChatIcon />
-                </Fab>
+                <Box sx={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1000, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
+                    <Fade in={showGreeting}>
+                        <Paper 
+                            elevation={4} 
+                            onClick={() => { setShowGreeting(false); setIsOpen(true); }}
+                            sx={{ 
+                                p: 1.5, 
+                                borderRadius: '16px 16px 4px 16px', 
+                                bgcolor: 'white', 
+                                border: '1px solid #f0f0f0',
+                                cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', gap: 1.5,
+                                transition: 'transform 0.2s',
+                                '&:hover': { transform: 'scale(1.02)', bgcolor: '#f8fafc' }
+                            }}
+                        >
+                            <Typography variant="body2" fontWeight={600} color="text.primary">
+                                👋 Xin chào! Mình có thể tư vấn sách cho bạn không?
+                            </Typography>
+                            <IconButton size="small" 
+                                onClick={(e) => { e.stopPropagation(); setShowGreeting(false); }} 
+                                sx={{ p: 0.5, bgcolor: '#f1f5f9', '&:hover': { bgcolor: '#e2e8f0' } }}
+                            >
+                                <Close sx={{ fontSize: 14 }} />
+                            </IconButton>
+                        </Paper>
+                    </Fade>
+                    
+                    <Badge 
+                        overlap="circular"
+                        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+                        variant="dot"
+                        color="error"
+                        invisible={!showGreeting}
+                    >
+                        <Fab 
+                            onClick={() => { setIsOpen(true); setShowGreeting(false); }}
+                            sx={{
+                                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                                color: 'white',
+                                boxShadow: '0 8px 24px rgba(37,99,235,0.3)',
+                                '&:hover': { background: 'linear-gradient(135deg, #1d4ed8 0%, #1e3a8a 100%)' }
+                            }}
+                        >
+                            <SupportAgent fontSize="large" />
+                        </Fab>
+                    </Badge>
+                </Box>
             </Fade>
 
             <Fade in={isOpen}>
@@ -106,18 +153,26 @@ const CustomerAiChat = () => {
                 >
                     {/* Header */}
                     <Box sx={{ 
-                        bgcolor: 'primary.main', 
+                        background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                         color: 'white', 
-                        p: 2, 
+                        p: 2, pb: 2.5,
                         display: 'flex', 
                         alignItems: 'center',
-                        justifyContent: 'space-between'
+                        justifyContent: 'space-between',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
                     }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <SmartToy />
-                            <Typography variant="subtitle1" fontWeight="bold">Trợ lý Nhà sách</Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                            <Badge overlap="circular" anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} variant="dot" sx={{ '& .MuiBadge-badge': { bgcolor: '#10b981', boxShadow: '0 0 0 2px #1d4ed8' } }}>
+                                <Avatar sx={{ bgcolor: 'white', color: '#1d4ed8', width: 40, height: 40 }}>
+                                    <SupportAgent />
+                                </Avatar>
+                            </Badge>
+                            <Box>
+                                <Typography variant="subtitle1" fontWeight="bold" lineHeight={1.2}>Trợ lý Tư vấn</Typography>
+                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)' }}>Nhà sách trực tuyến</Typography>
+                            </Box>
                         </Box>
-                        <IconButton size="small" onClick={() => setIsOpen(false)} sx={{ color: 'white' }}>
+                        <IconButton size="small" onClick={() => setIsOpen(false)} sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.1)', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}>
                             <Close fontSize="small" />
                         </IconButton>
                     </Box>
@@ -135,36 +190,49 @@ const CustomerAiChat = () => {
                         {messages.map((msg) => (
                             <Box key={msg.id} sx={{ 
                                 display: 'flex', 
-                                gap: 1,
+                                gap: 1.5,
                                 flexDirection: msg.role === 'user' ? 'row-reverse' : 'row'
                             }}>
-                                <Box sx={{ 
-                                    width: 32, 
-                                    height: 32, 
-                                    borderRadius: '50%', 
-                                    bgcolor: msg.role === 'user' ? 'primary.light' : 'secondary.main',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: 'white',
-                                    flexShrink: 0
+                                <Avatar sx={{ 
+                                    width: 32, height: 32, 
+                                    bgcolor: msg.role === 'user' ? '#e2e8f0' : '#10b981',
+                                    color: msg.role === 'user' ? '#64748b' : 'white',
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
                                 }}>
-                                    {msg.role === 'user' ? <Person fontSize="small" /> : <SmartToy fontSize="small" />}
-                                </Box>
-                                <Paper elevation={1} sx={{ 
+                                    {msg.role === 'user' ? <Person fontSize="small" /> : <SupportAgent fontSize="small" />}
+                                </Avatar>
+                                <Paper elevation={0} sx={{ 
                                     p: 1.5, 
                                     maxWidth: '75%',
-                                    bgcolor: msg.role === 'user' ? 'primary.main' : 'white',
-                                    color: msg.role === 'user' ? 'white' : 'text.primary',
+                                    bgcolor: msg.role === 'user' ? '#2563eb' : 'white',
+                                    color: msg.role === 'user' ? 'white' : '#334155',
+                                    border: msg.role === 'user' ? 'none' : '1px solid #e2e8f0',
                                     borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                                    '& p': { m: 0 },
-                                    '& ul, & ol': { m: 0, pl: 2 },
-                                    '& li': { mb: 0.5 }
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                                    '& p': { m: 0, fontSize: '0.9rem', lineHeight: 1.5 },
+                                    '& ul, & ol': { m: 0, pl: 2.5, mt: 0.5 },
+                                    '& li': { mb: 0.5, fontSize: '0.9rem' },
+                                    '& strong': { color: msg.role === 'user' ? '#fff' : '#0f172a' }
                                 }}>
                                     <ReactMarkdown>{msg.content}</ReactMarkdown>
                                 </Paper>
                             </Box>
                         ))}
+                        {messages.length === 1 && !isLoading && (
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, pl: 5, mt: -1 }}>
+                                {SUGGESTIONS.map((sug, i) => (
+                                    <Chip 
+                                        key={i} label={sug} size="small" 
+                                        onClick={() => handleSend(sug)}
+                                        sx={{ 
+                                            bgcolor: 'white', border: '1px solid #cbd5e1', color: '#475569',
+                                            fontWeight: 600, fontSize: 12, cursor: 'pointer',
+                                            '&:hover': { bgcolor: '#f1f5f9', borderColor: '#94a3b8' }
+                                        }} 
+                                    />
+                                ))}
+                            </Box>
+                        )}
                         {isLoading && (
                             <Box sx={{ display: 'flex', gap: 1 }}>
                                 <Box sx={{ 
@@ -195,12 +263,17 @@ const CustomerAiChat = () => {
                             InputProps={{
                                 endAdornment: (
                                     <IconButton 
-                                        color="primary" 
-                                        onClick={handleSend}
+                                        onClick={() => handleSend()}
                                         disabled={!inputValue.trim() || isLoading}
                                         size="small"
+                                        sx={{ 
+                                            bgcolor: inputValue.trim() ? '#2563eb' : '#e2e8f0', 
+                                            color: inputValue.trim() ? 'white' : '#94a3b8',
+                                            mr: 0.5,
+                                            '&:hover': { bgcolor: inputValue.trim() ? '#1d4ed8' : '#e2e8f0' }
+                                        }}
                                     >
-                                        <Send fontSize="small" />
+                                        <Send fontSize="small" sx={{ ml: 0.5 }} />
                                     </IconButton>
                                 )
                             }}
