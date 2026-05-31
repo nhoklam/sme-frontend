@@ -156,8 +156,9 @@ export default function AIChatWidget() {
                 <Paper
                     elevation={24}
                     sx={{
-                        position: 'absolute', bottom: 0, right: 0,
-                        width: 400, height: 600, borderRadius: 4,
+                        position: 'fixed', top: '50%', right: 30,
+                        transform: 'translateY(-50%)',
+                        width: 400, height: '85vh', maxHeight: 750, borderRadius: 4,
                         display: isOpen ? 'flex' : 'none', flexDirection: 'column',
                         overflow: 'hidden', 
                         border: '1px solid rgba(255,255,255,0.1)',

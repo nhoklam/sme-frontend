@@ -15,6 +15,7 @@ import {
 import customerService from '../../../../services/customerService';
 import { Customer, CustomerTier } from '../../../../types';
 import CustomerDialog from './CustomerDialog';
+import CustomerDetailDialog from './CustomerDetailDialog';
 
 const TIER_MAP: Record<CustomerTier, { label: string; color: string; bg: string }> = {
     STANDARD: { label: 'Tiêu chuẩn', color: '#374151', bg: '#f3f4f6' },
@@ -171,6 +172,10 @@ const CustomerListPage: React.FC = () => {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
+    // Customer Detail Dialog state
+    const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+    const [detailCustomerId, setDetailCustomerId] = useState<string | null>(null);
+
     const PAGE_SIZE = 20;
 
     const loadCustomers = useCallback(async () => {
@@ -244,7 +249,7 @@ const CustomerListPage: React.FC = () => {
                     <Button variant="contained" startIcon={<Add />}
                         onClick={() => { setSelectedCustomer(null); setDialogOpen(true); }}
                         sx={{ bgcolor: '#2563eb', textTransform: 'none', fontWeight: 700, '&:hover': { bgcolor: '#1d4ed8' } }}>
-                        + Thêm khách hàng
+                        Thêm khách hàng
                     </Button>
                 </Box>
             </Box>
@@ -357,7 +362,10 @@ const CustomerListPage: React.FC = () => {
                                                 <Box sx={{ display: 'flex', gap: 0.5 }}>
                                                     <Tooltip title="Xem lịch sử mua hàng">
                                                         <IconButton size="small"
-                                                            onClick={() => navigate(`/admin/customers/${customer.id}`)}
+                                                            onClick={() => {
+                                                                setDetailCustomerId(customer.id);
+                                                                setDetailDialogOpen(true);
+                                                            }}
                                                             sx={{ '&:hover': { color: '#1976d2', bgcolor: '#e3f2fd' } }}>
                                                             <Visibility sx={{ fontSize: 16, color: '#2563eb' }} />
                                                         </IconButton>
@@ -406,6 +414,14 @@ const CustomerListPage: React.FC = () => {
                 onSuccess={() => {
                     loadCustomers();
                 }}
+            />
+
+            {/* Customer Detail Dialog */}
+            <CustomerDetailDialog 
+                open={detailDialogOpen}
+                customerId={detailCustomerId}
+                onClose={() => setDetailDialogOpen(false)}
+                onCustomerUpdated={loadCustomers}
             />
         </Box>
     );

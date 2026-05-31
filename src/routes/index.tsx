@@ -43,7 +43,6 @@ const FinancePage = lazy(() => import('../modules/admin/pages/finance/FinancePag
 const WarehousePage = lazy(() => import('../modules/admin/pages/warehouses/WarehousePage'));
 const CodReconciliationPage = lazy(() => import('../modules/admin/pages/orders/CodReconciliationPage'));
 const EmployeeReportPage = lazy(() => import('../modules/admin/pages/reports/EmployeeReportPage'));
-const CustomerDetailPage = lazy(() => import('../modules/admin/pages/customers/CustomerDetailPage'));
 const PromotionPage = lazy(() => import('../modules/admin/pages/promotions/PromotionPage'));
 const CustomerAnalysisReportPage = lazy(() => import('../modules/admin/pages/reports/CustomerAnalysisReportPage'));
 const ShiftListPage = lazy(() => import('../modules/admin/pages/shifts/ShiftListPage'));
@@ -234,7 +233,6 @@ const AppRoutes: React.FC = () => (
 
 
             <Route path="customers" element={<AdminGuard>{withSuspense(CustomerListPage)}</AdminGuard>} />
-            <Route path="customers/:id" element={<AdminGuard>{withSuspense(CustomerDetailPage)}</AdminGuard>} />
 
             <Route path="suppliers" element={<AdminGuard>{withSuspense(SupplierPage)}</AdminGuard>} />
 

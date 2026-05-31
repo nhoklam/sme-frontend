@@ -587,10 +587,12 @@ const EmployeePOSPage: React.FC = () => {
                 alignItems: 'center', justifyContent: 'space-between', zIndex: 1000, flexShrink: 0
             }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Button variant="outlined" onClick={() => navigate('/admin/dashboard')} startIcon={<ArrowBack />}
-                        sx={{ textTransform: 'none', color: '#595959', borderColor: '#d9d9d9', borderRadius: 1.5, height: 36, px: 2 }}>
-                        Quay về Dashboard
-                    </Button>
+                    {isAdmin && (
+                        <Button variant="outlined" onClick={() => navigate('/admin/dashboard')} startIcon={<ArrowBack />}
+                            sx={{ textTransform: 'none', color: '#595959', borderColor: '#d9d9d9', borderRadius: 1.5, height: 36, px: 2 }}>
+                            Quay về Dashboard
+                        </Button>
+                    )}
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Storefront sx={{ color: '#1890ff', fontSize: 22 }} />
                         <Typography fontWeight={700} fontSize={15} color="#262626">CRM Bán hàng</Typography>
@@ -635,7 +637,7 @@ const EmployeePOSPage: React.FC = () => {
                     {/* SEARCH BAR & TABS */}
                     <Box sx={{ bgcolor: '#fff', borderRadius: 2, p: 1.5, display: 'flex', alignItems: 'center', gap: 2, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', flexShrink: 0 }}>
                         <Box sx={{ flex: 1 }}>
-                            <POSProductSearchBar onAdd={addToCart} disabled={!shift} />
+                            <POSProductSearchBar onAdd={addToCart} disabled={!shift} warehouseId={currentUser?.warehouseId} />
                         </Box>
 
                         {/* TABS CONTAINER */}

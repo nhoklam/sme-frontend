@@ -22,6 +22,7 @@ const CustomerDialog: React.FC<CustomerDialogProps> = ({ open, onClose, onSucces
         fullName: '',
         email: '',
         address: '',
+        provinceCode: '',
         gender: '',
         dateOfBirth: '',
         notes: '',
@@ -36,6 +37,7 @@ const CustomerDialog: React.FC<CustomerDialogProps> = ({ open, onClose, onSucces
                     fullName: initialData.fullName || '',
                     email: initialData.email || '',
                     address: initialData.address || '',
+                    provinceCode: initialData.provinceCode || '',
                     gender: initialData.gender || '',
                     dateOfBirth: initialData.dateOfBirth ? new Date(initialData.dateOfBirth).toISOString().split('T')[0] : '',
                     notes: initialData.notes || '',
@@ -47,6 +49,7 @@ const CustomerDialog: React.FC<CustomerDialogProps> = ({ open, onClose, onSucces
                     fullName: '',
                     email: '',
                     address: '',
+                    provinceCode: '',
                     gender: '',
                     dateOfBirth: '',
                     notes: '',
@@ -147,10 +150,17 @@ const CustomerDialog: React.FC<CustomerDialogProps> = ({ open, onClose, onSucces
                                 />
                             )}
                         </Grid>
-                        <Grid size={{ xs: 12 }}>
+                        <Grid size={{ xs: 12, sm: 6 }}>
                             <TextField
                                 fullWidth label="Địa chỉ" size="small"
                                 value={formData.address} onChange={handleChange('address')}
+                            />
+                        </Grid>
+                        <Grid size={{ xs: 12, sm: 6 }}>
+                            <TextField
+                                fullWidth label="Tỉnh / Thành phố" size="small"
+                                value={formData.provinceCode} onChange={handleChange('provinceCode')}
+                                placeholder="VD: 01 (Hà Nội)"
                             />
                         </Grid>
                         <Grid size={{ xs: 12 }}>

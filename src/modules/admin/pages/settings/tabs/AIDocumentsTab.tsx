@@ -184,13 +184,7 @@ export default function AIDocumentsTab() {
                 </TableContainer>
             </Paper>
 
-            <Alert severity="info" icon={<Info />} sx={{ borderRadius: 2 }}>
-                <Typography variant="body2">
-                    <strong>Ghi chú:</strong> Hệ thống sử dụng mô hình RAG (Retrieval-Augmented Generation) để cung cấp ngữ cảnh cho AI. 
-                    Khi bạn tải lên tài liệu, hệ thống sẽ chia nhỏ văn bản và chuyển đổi thành Vector. 
-                    AI Co-pilot sẽ tự động tìm kiếm trong các tài liệu này để trả lời câu hỏi của nhân viên.
-                </Typography>
-            </Alert>
+     
 
             {/* Dialog Test Semantic Search */}
             <Dialog open={showTest} onClose={() => setShowTest(false)} maxWidth="md" fullWidth>

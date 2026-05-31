@@ -141,6 +141,7 @@ export interface Customer {
   acquisitionChannel?: string;
   email?: string;
   address?: string;
+  provinceCode?: string;
   dateOfBirth?: string;
   gender?: string;
   loyaltyPoints: number;

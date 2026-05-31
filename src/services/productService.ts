@@ -17,12 +17,14 @@ const productService = {
         sortBy?: string;
         page?: number;
         size?: number;
+        warehouseId?: string;
     }): Promise<PageResponse<ProductResponse>> => {
         const query = new URLSearchParams();
         if (params.keyword?.trim()) query.set('keyword', params.keyword.trim());
         if (params.categoryId) query.set('categoryId', params.categoryId);
         if (params.isActive !== undefined) query.set('isActive', String(params.isActive));
         if (params.sortBy) query.set('sortBy', params.sortBy);
+        if (params.warehouseId) query.set('warehouseId', params.warehouseId);
         query.set('page', String(params.page ?? 0));
         query.set('size', String(params.size ?? 20));
 

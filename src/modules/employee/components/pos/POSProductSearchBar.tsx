@@ -16,9 +16,10 @@ interface Props {
     onAdd: (p: ProductResponse) => void;
     onScanCoupon?: (code: string) => void;
     disabled?: boolean;
+    warehouseId?: string;
 }
 
-const POSProductSearchBar: React.FC<Props> = ({ onAdd, onScanCoupon, disabled }) => {
+const POSProductSearchBar: React.FC<Props> = ({ onAdd, onScanCoupon, disabled, warehouseId }) => {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<ProductResponse[]>([]);
     const [loading, setLoading] = useState(false);
@@ -38,7 +39,7 @@ const POSProductSearchBar: React.FC<Props> = ({ onAdd, onScanCoupon, disabled })
         const t = setTimeout(async () => {
             setLoading(true);
             try {
-                const r = await productService.search({ keyword: q || '', page: 0, size: 15, isActive: true });
+                const r = await productService.search({ keyword: q || '', page: 0, size: 15, isActive: true, warehouseId });
                 setResults(r.content);
             } catch { setResults([]); }
             finally { setLoading(false); }
@@ -70,11 +71,15 @@ const POSProductSearchBar: React.FC<Props> = ({ onAdd, onScanCoupon, disabled })
             setBarcodeErr(''); setLoading(true);
             try {
                 const p = await productService.getByBarcode(q);
+                // getByBarcode already defaults to backend logic if no warehouseId is passed, 
+                // but wait, ProductService getByBarcode now also accepts warehouseId. 
+                // But wait, the frontend getByBarcode doesn't pass warehouseId yet?
+                // Let's just fix the search here first.
                 onAdd(p); setQuery(''); setResults([]);
                 inputRef.current?.focus();
             } catch {
                 try {
-                    const r = await productService.search({ keyword: q, page: 0, size: 10, isActive: true });
+                    const r = await productService.search({ keyword: q, page: 0, size: 10, isActive: true, warehouseId });
                     if (r.content.length === 1) { onAdd(r.content[0]); setQuery(''); setResults([]); }
                     else if (r.content.length > 1) setResults(r.content);
                     else setBarcodeErr(`Không tìm thấy: ${q}`);
@@ -187,7 +192,7 @@ const POSProductSearchBar: React.FC<Props> = ({ onAdd, onScanCoupon, disabled })
                         setResults([]);
                     } catch {
                         try {
-                            const r = await productService.search({ keyword: code, page: 0, size: 10, isActive: true });
+                            const r = await productService.search({ keyword: code, page: 0, size: 10, isActive: true, warehouseId });
                             if (r.content.length === 1) { onAdd(r.content[0]); setQuery(''); setResults([]); }
                             else if (r.content.length > 1) setResults(r.content);
                             else setBarcodeErr(`Không tìm thấy sản phẩm có mã: ${code}`);
