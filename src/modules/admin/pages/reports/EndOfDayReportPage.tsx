@@ -4,7 +4,8 @@ import {
     Box, Typography, Grid, Card, CardContent, Button,
     Select, MenuItem, FormControl, Skeleton, Paper,
     CircularProgress, Alert, Table, TableBody, TableCell,
-    TableContainer, TableHead, TableRow, SelectChangeEvent
+    TableContainer, TableHead, TableRow, SelectChangeEvent,
+    TablePagination
 } from '@mui/material';
 import {
     Refresh
@@ -112,6 +113,10 @@ const EndOfDayReportPage: React.FC = () => {
     const [error, setError] = useState('');
 
     const [invoices, setInvoices] = useState<InvoiceResponse[]>([]);
+    
+    // Pagination states
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
 
     useEffect(() => {
         warehouseService.getAll().then(setWarehouses).catch(() => { });
@@ -141,7 +146,17 @@ const EndOfDayReportPage: React.FC = () => {
 
     const handleQuickFilterChange = (e: SelectChangeEvent) => {
         setQuickFilter(e.target.value);
+        setPage(0);
         fetchData(e.target.value);
+    };
+
+    const handleChangePage = (event: unknown, newPage: number) => {
+        setPage(newPage);
+    };
+
+    const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(0);
     };
 
     // Calculate metrics
@@ -390,7 +405,7 @@ const EndOfDayReportPage: React.FC = () => {
                                     ) : invoices.length === 0 ? (
                                         <TableRow><TableCell colSpan={7} align="center" sx={{ py: 3, color: '#888' }}>Không có giao dịch nào</TableCell></TableRow>
                                     ) : (
-                                        invoices.map(inv => {
+                                        invoices.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map(inv => {
                                             // Tính giá vốn từ items (macPrice * quantity)
                                             const invCogs = inv.items?.reduce((s, item) => s + ((item.macPrice ?? 0) * Math.abs(item.quantity)), 0) || 0;
                                             const invProfit = inv.type === 'SALE' ? inv.finalAmount - invCogs : 0;
@@ -426,6 +441,17 @@ const EndOfDayReportPage: React.FC = () => {
                                 </TableBody>
                             </Table>
                         </TableContainer>
+                        <TablePagination
+                            rowsPerPageOptions={[5, 10, 25, 50]}
+                            component="div"
+                            count={invoices.length}
+                            rowsPerPage={rowsPerPage}
+                            page={page}
+                            onPageChange={handleChangePage}
+                            onRowsPerPageChange={handleChangeRowsPerPage}
+                            labelRowsPerPage="Số dòng:"
+                            labelDisplayedRows={({ from, to, count }) => `${from}–${to} trên ${count !== -1 ? count : `hơn ${to}`}`}
+                        />
 
                     </Paper>
                 </Grid>

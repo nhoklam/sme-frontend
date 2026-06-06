@@ -9,16 +9,30 @@ import { Add, Edit, Close, Block, CheckCircle, Phone, Person } from '@mui/icons-
 import warehouseService from '../../../../../services/warehouseService';
 import userService from '../../../../../services/userService';
 import type { Warehouse, UserResponse } from '../../../../../types';
+import { districtCentroids } from '../../../../../data/districtCentroids';
 import toast from 'react-hot-toast';
 
+const LocationPickerMap = React.lazy(() => import('../../../../../components/ui/LocationPickerMap'));
+
+const HCM_DISTRICTS = [
+  { code: '760', name: 'Quận 1' }, { code: '761', name: 'Quận 12' }, { code: '764', name: 'Quận Gò Vấp' },
+  { code: '765', name: 'Quận Bình Thạnh' }, { code: '766', name: 'Quận Tân Bình' }, { code: '767', name: 'Quận Tân Phú' },
+  { code: '768', name: 'Quận Phú Nhuận' }, { code: '769', name: 'TP Thủ Đức' }, { code: '770', name: 'Quận 3' },
+  { code: '771', name: 'Quận 10' }, { code: '772', name: 'Quận 11' }, { code: '773', name: 'Quận 4' },
+  { code: '774', name: 'Quận 5' }, { code: '775', name: 'Quận 6' }, { code: '776', name: 'Quận 8' },
+  { code: '777', name: 'Quận Bình Tân' }, { code: '778', name: 'Quận 7' }, { code: '783', name: 'Huyện Củ Chi' },
+  { code: '784', name: 'Huyện Hóc Môn' }, { code: '785', name: 'Huyện Bình Chánh' }, { code: '786', name: 'Huyện Nhà Bè' },
+  { code: '787', name: 'Huyện Cần Giờ' }
+];
+
 export default function WarehousesTab() {
-    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);  
     const [managers, setManagers] = useState<UserResponse[]>([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editing, setEditing] = useState<Warehouse | null>(null);
     const [saving, setSaving] = useState(false);
-    const [form, setForm] = useState({ name: '', code: '', warehouseType: 'BRANCH' as 'MAIN' | 'BRANCH' | 'DROPSHIP', address: '', phone: '', managerId: '' });
+    const [form, setForm] = useState({ name: '', code: '', provinceCode: '', latitude: '' as string | number, longitude: '' as string | number, warehouseType: 'BRANCH' as 'MAIN' | 'BRANCH' | 'DROPSHIP', address: '', phone: '', managerId: '' });
 
     const loadData = async () => {
         setLoading(true);
@@ -51,6 +65,9 @@ export default function WarehousesTab() {
             setForm({
                 name: w.name,
                 code: w.code ?? '',
+                provinceCode: w.provinceCode ?? '',
+                latitude: (w as any).latitude ?? '',
+                longitude: (w as any).longitude ?? '',
                 warehouseType: w.warehouseType ?? 'BRANCH',
                 address: w.address ?? '',
                 phone: w.phone ?? '',
@@ -61,6 +78,9 @@ export default function WarehousesTab() {
             setForm({
                 name: '',
                 code: '',
+                provinceCode: '',
+                latitude: '',
+                longitude: '',
                 warehouseType: 'BRANCH',
                 address: '',
                 phone: '',
@@ -99,6 +119,44 @@ export default function WarehousesTab() {
             toast.success(w.isActive ? 'Đã ngừng hoạt động' : 'Đã khôi phục');
             loadData();
         } catch { toast.error('Lỗi cập nhật trạng thái'); }
+    };
+
+    const handleSearchAddress = async () => {
+        if (!form.address) {
+            toast.error('Vui lòng nhập địa chỉ để tìm kiếm');
+            return;
+        }
+
+        // Cải thiện từ khóa tìm kiếm: thêm "TP.HCM" hoặc tên Quận để OSM dễ tìm hơn
+        const districtName = HCM_DISTRICTS.find(d => d.code === form.provinceCode)?.name || '';
+        const query1 = `${form.address}, ${districtName}, Hồ Chí Minh, Việt Nam`;
+        
+        // Tạo câu query 2 (fallback): Lọc bỏ số nhà, chỉ giữ chữ cái để tìm tên đường (đối phó với nhược điểm của OSM)
+        const streetOnly = form.address.replace(/^[\d\w/]+\s+/, '').trim();
+        const query2 = `${streetOnly}, ${districtName}, Hồ Chí Minh, Việt Nam`;
+
+        try {
+            // Thử tìm lần 1 với đầy đủ số nhà
+            let res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query1)}&format=json&limit=1`);
+            let data = await res.json();
+            
+            // Nếu không ra, thử tìm lần 2 chỉ với tên đường
+            if (!data || data.length === 0) {
+                res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query2)}&format=json&limit=1`);
+                data = await res.json();
+            }
+
+            if (data && data.length > 0) {
+                const lat = parseFloat(data[0].lat);
+                const lng = parseFloat(data[0].lon);
+                setForm(p => ({ ...p, latitude: lat, longitude: lng }));
+                toast.success('Đã tìm thấy vị trí trên bản đồ');
+            } else {
+                toast.error('Không tìm thấy địa chỉ, vui lòng kéo ghim thủ công!');
+            }
+        } catch (e) {
+            toast.error('Lỗi khi gọi dịch vụ bản đồ');
+        }
     };
 
     return (
@@ -161,7 +219,12 @@ export default function WarehousesTab() {
                                             <Typography fontSize={12} fontWeight={500} color="#475569" sx={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                 {w.address || <span style={{ color: '#cbd5e1', fontStyle: 'italic' }}>Chưa cập nhật</span>}
                                             </Typography>
-                                            {w.phone && <Typography fontSize={11} color="#94a3b8" fontFamily="monospace" mt={0.25}>{w.phone}</Typography>}
+                                            {w.provinceCode && (
+                                                <Typography fontSize={11} color="#64748b" fontWeight={700} mt={0.25}>
+                                                    Khu vực: {HCM_DISTRICTS.find(p => p.code === w.provinceCode)?.name || w.provinceCode}
+                                                </Typography>
+                                            )}
+                                            {w.phone && <Typography fontSize={11} color="#94a3b8" fontFamily="monospace" mt={0.25}>ĐT: {w.phone}</Typography>}
                                         </TableCell>
                                         <TableCell align="center">
                                             {(w as any).managerId ? (
@@ -220,6 +283,30 @@ export default function WarehousesTab() {
                             </FormControl>
                         </Grid>
                         <Grid size={{ xs: 12, sm: 6 }}>
+                            <Typography variant="caption" fontWeight={700} color="#1d4ed8" mb={0.5} display="block">Quận/Huyện TP.HCM *</Typography>
+                            <FormControl fullWidth size="small">
+                                <Select value={form.provinceCode} onChange={e => {
+                                    const code = e.target.value as string;
+                                    const centroid = districtCentroids[code];
+                                    setForm(p => ({ 
+                                        ...p, 
+                                        provinceCode: code,
+                                        latitude: centroid ? centroid.lat : p.latitude,
+                                        longitude: centroid ? centroid.lng : p.longitude
+                                    }));
+                                }} displayEmpty>
+                                    <MenuItem value="">-- Chọn Quận/Huyện --</MenuItem>
+                                    {HCM_DISTRICTS.map(p => <MenuItem key={p.code} value={p.code}>{p.name}</MenuItem>)}
+                                </Select>
+                            </FormControl>
+                            {/* Centroid for Routing: Tọa độ tâm quận tự động điền dùng cho tính khoảng cách Smart Routing */}
+                            {form.provinceCode && form.latitude && form.longitude && (
+                                <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
+                                    📍 Tọa độ Routing: {form.latitude}, {form.longitude}
+                                </Typography>
+                            )}
+                        </Grid>
+                        <Grid size={{ xs: 12, sm: 6 }}>
                             <Typography variant="caption" fontWeight={700} color="#64748b" mb={0.5} display="block">Số điện thoại</Typography>
                             <TextField fullWidth size="small" value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} />
                         </Grid>
@@ -233,14 +320,37 @@ export default function WarehousesTab() {
                             </FormControl>
                         </Grid>
                         <Grid size={{ xs: 12, sm: 6 }}>
-                            <Typography variant="caption" fontWeight={700} color="#64748b" mb={0.5} display="block">Địa chỉ</Typography>
-                            <TextField fullWidth size="small" value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} placeholder="Số nhà, tên đường, quận/huyện..." />
+                            <Typography variant="caption" fontWeight={700} color="#64748b" mb={0.5} display="block">Địa chỉ chi tiết</Typography>
+                            <TextField fullWidth size="small" value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} placeholder="Số nhà, tên đường..." />
+                        </Grid>
+                        <Grid size={{ xs: 12, sm: 3 }}>
+                            <Typography variant="caption" fontWeight={700} color="#64748b" mb={0.5} display="block">Vĩ độ (Latitude)</Typography>
+                            <TextField fullWidth size="small" value={form.latitude} onChange={e => setForm(p => ({ ...p, latitude: e.target.value }))} placeholder="10.7769" />
+                        </Grid>
+                        <Grid size={{ xs: 12, sm: 3 }}>
+                            <Typography variant="caption" fontWeight={700} color="#64748b" mb={0.5} display="block">Kinh độ (Longitude)</Typography>
+                            <TextField fullWidth size="small" value={form.longitude} onChange={e => setForm(p => ({ ...p, longitude: e.target.value }))} placeholder="106.7009" />
+                        </Grid>
+                        
+                        <Grid size={{ xs: 12 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1, mt: 1 }}>
+                                <Button variant="outlined" size="small" onClick={handleSearchAddress} sx={{ textTransform: 'none', fontWeight: 600 }}>
+                                    📍 Tìm tọa độ từ địa chỉ đã nhập
+                                </Button>
+                            </Box>
+                            <React.Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}><CircularProgress /></Box>}>
+                                <LocationPickerMap 
+                                    lat={form.latitude ? parseFloat(form.latitude.toString()) : 10.7769}
+                                    lng={form.longitude ? parseFloat(form.longitude.toString()) : 106.7009}
+                                    onLocationChange={(lat: number, lng: number) => setForm(p => ({ ...p, latitude: lat, longitude: lng }))} 
+                                />
+                            </React.Suspense>
                         </Grid>
                     </Grid>
                 </DialogContent>
                 <DialogActions sx={{ px: 3, py: 2 }}>
                     <Button onClick={() => { setShowModal(false); setEditing(null); }} sx={{ textTransform: 'none', fontWeight: 700 }}>Hủy bỏ</Button>
-                    <Button variant="contained" onClick={handleSave} disabled={saving || !form.name}
+                    <Button variant="contained" onClick={handleSave} disabled={saving || !form.name || !form.provinceCode}
                         sx={{ textTransform: 'none', fontWeight: 700, bgcolor: '#1d4ed8', px: 4, '&:hover': { bgcolor: '#1e40af' } }}>
                         {saving ? <CircularProgress size={20} sx={{ color: 'white' }} /> : (editing ? 'Lưu thay đổi' : 'Mở chi nhánh')}
                     </Button>

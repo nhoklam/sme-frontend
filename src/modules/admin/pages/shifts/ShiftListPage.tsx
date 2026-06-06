@@ -44,6 +44,7 @@ export default function ShiftListPage() {
 
     const currentUser = authService.getCurrentUser()?.user;
     const isAdmin = currentUser?.role === 'ROLE_ADMIN';
+    const canApprove = isAdmin || currentUser?.role === 'ROLE_MANAGER';
 
     const [openModal, setOpenModal] = useState(false);
     const [actionType, setActionType] = useState<'OPEN' | 'CLOSE'>('OPEN');
@@ -310,7 +311,7 @@ export default function ShiftListPage() {
                                                         Đóng ca
                                                     </Button>
                                                 )}
-                                                {s.status === 'CLOSED' && isAdmin && (
+                                                {s.status === 'CLOSED' && canApprove && (
                                                     <Button
                                                         size="small" variant="contained" color="primary" disableElevation
                                                         startIcon={<CheckCircleOutline sx={{ fontSize: 14 }} />}

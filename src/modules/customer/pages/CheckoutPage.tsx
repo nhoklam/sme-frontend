@@ -20,6 +20,7 @@ import { fmt } from '../../../utils/constants';
 import orderService from '../../../services/orderService';
 import { customerApi } from '../../../services/customerApi';
 import { CustomerAddress } from '../../../types';
+import { useShippingCoordinates } from '../../../hooks/useShippingCoordinates';
 
 const FREE_SHIP = 150000;
 
@@ -89,6 +90,22 @@ const CheckoutPage: React.FC = () => {
     // Address Selection State
     const [addressModalOpen, setAddressModalOpen] = useState(false);
 
+    const [form, setForm] = useState<CheckoutFormData>({
+        shippingName: '',
+        shippingPhone: '',
+        specificAddress: '',
+        provinceCity: '',
+        district: '',
+        ward: '',
+        paymentMethod: 'COD',
+        note: '',
+    });
+
+    // Derived state for district code
+    const selectedDistrict = form.district ? districts.find(d => d.name === form.district) : undefined;
+    const districtCode = selectedDistrict ? String(selectedDistrict.code) : undefined;
+    const coordinates = useShippingCoordinates(districtCode);
+
     const { data: addressData } = useQuery({
         queryKey: ['customerAddresses'],
         queryFn: () => customerApi.getAddresses(),
@@ -110,16 +127,7 @@ const CheckoutPage: React.FC = () => {
         setAddressModalOpen(false);
     };
 
-    const [form, setForm] = useState<CheckoutFormData>({
-        shippingName: '',
-        shippingPhone: '',
-        specificAddress: '',
-        provinceCity: '',
-        district: '',
-        ward: '',
-        paymentMethod: 'COD',
-        note: '',
-    });
+
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     useEffect(() => {
@@ -259,6 +267,9 @@ const CheckoutPage: React.FC = () => {
                 })),
                 couponCodes: appliedPromotions.map((p: any) => p.code),
                 discountAmount: discountAmount,
+                // NV-1: Tọa độ tự động tra cứu từ tên Quận/Huyện. Gửi đi optional, Backend có fallback.
+                shippingLatitude: coordinates?.lat,
+                shippingLongitude: coordinates?.lng,
             };
 
             const result = await createOrder.mutateAsync(orderData as any);

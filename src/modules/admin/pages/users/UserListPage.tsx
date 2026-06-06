@@ -6,7 +6,8 @@ import {
     TableCell, TableContainer, TableHead, TableRow,
     TextField, InputAdornment, Chip, IconButton, Menu,
     MenuItem, Divider, Select, FormControl, Snackbar, Alert,
-    Avatar, Tooltip, Skeleton,
+    Avatar, Tooltip, Skeleton, Dialog, DialogTitle,
+    DialogContent, DialogActions
 } from '@mui/material';
 import {
     Search, Add, MoreVert, LockOpen, Lock as LockIcon,
@@ -16,6 +17,7 @@ import userService from '../../../../services/userService';
 import { UserResponse, UserRole } from '../../../../types';
 import UserCreateModal from './UserCreateModal';
 import { useAuth } from '../../../../store/hooks/useAuth';
+import { authApi } from '../../../../services/authApi';
 
 const ROLE_MAP: Record<UserRole, { label: string; color: string; bg: string }> = {
     ROLE_ADMIN: { label: 'Admin', color: '#7b1fa2', bg: '#f3e5f5' },
@@ -73,6 +75,10 @@ const UserListPage: React.FC = () => {
     const [roleFilter, setRoleFilter] = useState('all');
     const [snack, setSnack] = useState('');
     const [openCreate, setOpenCreate] = useState(false);
+    const [openUnlock, setOpenUnlock] = useState(false);
+    const [unlockEmail, setUnlockEmail] = useState('');
+    const [unlockLoading, setUnlockLoading] = useState(false);
+    const [unlockError, setUnlockError] = useState('');
     const [editingUser, setEditingUser] = useState<UserResponse | null>(null);
 
     const handleEditClick = (user: UserResponse) => {
@@ -121,6 +127,26 @@ const UserListPage: React.FC = () => {
         }
     };
 
+    const handleUnlockUser = async () => {
+        if (!unlockEmail.trim()) {
+            setUnlockError('Vui lòng nhập email');
+            return;
+        }
+        setUnlockLoading(true);
+        setUnlockError('');
+        try {
+            await authApi.unlockUser(unlockEmail.trim());
+            setSnack(`Đã mở khóa tài khoản cho email: ${unlockEmail}`);
+            setOpenUnlock(false);
+            setUnlockEmail('');
+            loadUsers(); // Refresh list to see if they show up as active (if they were listed)
+        } catch (e: any) {
+            setUnlockError(e.response?.data?.message || 'Mở khóa thất bại');
+        } finally {
+            setUnlockLoading(false);
+        }
+    };
+
     const filtered = users.filter(u => {
         const matchSearch = !search ||
             u.fullName.toLowerCase().includes(search.toLowerCase()) ||
@@ -164,6 +190,13 @@ const UserListPage: React.FC = () => {
                             <Refresh sx={{ fontSize: 18 }} />
                         </IconButton>
                     </Tooltip>
+                    {!isManager && (
+                        <Button variant="outlined" startIcon={<LockOpen />}
+                            onClick={() => { setUnlockEmail(''); setUnlockError(''); setOpenUnlock(true); }}
+                            sx={{ textTransform: 'none', fontWeight: 700 }}>
+                            Mở khóa tài khoản
+                        </Button>
+                    )}
                     <Button variant="contained" startIcon={<Add />}
                         onClick={() => { setEditingUser(null); setOpenCreate(true); }}
                         sx={{ bgcolor: '#2563eb', textTransform: 'none', fontWeight: 700, '&:hover': { bgcolor: '#1d4ed8' } }}>
@@ -318,6 +351,33 @@ const UserListPage: React.FC = () => {
                 onSaved={loadUsers}
                 userToEdit={editingUser}
             />
+
+            <Dialog open={openUnlock} onClose={() => setOpenUnlock(false)} maxWidth="xs" fullWidth>
+                <DialogTitle sx={{ fontWeight: 800 }}>Mở khóa tài khoản</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Nhập email của tài khoản bị khóa do đăng nhập sai quá số lần quy định.
+                    </Typography>
+                    {unlockError && <Alert severity="error" sx={{ mb: 2 }}>{unlockError}</Alert>}
+                    <TextField
+                        autoFocus
+                        fullWidth
+                        label="Email tài khoản"
+                        type="email"
+                        value={unlockEmail}
+                        onChange={e => setUnlockEmail(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleUnlockUser()}
+                    />
+                </DialogContent>
+                <DialogActions sx={{ px: 3, pb: 2 }}>
+                    <Button onClick={() => setOpenUnlock(false)} color="inherit" sx={{ textTransform: 'none' }}>
+                        Hủy
+                    </Button>
+                    <Button onClick={handleUnlockUser} variant="contained" disabled={unlockLoading} sx={{ textTransform: 'none' }}>
+                        {unlockLoading ? 'Đang mở khóa...' : 'Xác nhận mở khóa'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
             <Snackbar
                 open={!!snack} autoHideDuration={2500} onClose={() => setSnack('')}

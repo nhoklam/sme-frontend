@@ -337,7 +337,9 @@ const CustomerAuthPopup: React.FC<CustomerAuthPopupProps> = ({ open, onClose, on
                                 color: '#f5a623'
                             }
                         }}
-                        onClick={() => alert('Tính năng đăng nhập Google đang được phát triển')}
+                        onClick={() => {
+                            window.location.href = `${process.env.REACT_APP_API_URL || 'http://localhost:8080/api'}/oauth2/authorize/google?redirect_uri=${window.location.origin}/oauth2/redirect`;
+                        }}
                     >
                         Tiếp tục với Google
                     </Button>

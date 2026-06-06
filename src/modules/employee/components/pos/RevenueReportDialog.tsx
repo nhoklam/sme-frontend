@@ -16,8 +16,9 @@ import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
     ResponsiveContainer, BarChart, Bar, Cell,
 } from 'recharts';
-import reportService from '../../../../services/reportService';
 import axiosInstance from '../../../../services/axiosConfig';
+import userService from '../../../../services/userService';
+import reportService from '../../../../services/reportService';
 import { RevenueDataPoint, ReportPeriod } from '../../../../types';
 
 const fmt = (n?: number) =>
@@ -88,6 +89,16 @@ const RevenueReportDialog: React.FC<Props> = ({ open, onClose, warehouseId, onPr
     const [loadingInvoices, setLoadingInvoices] = useState(false);
     const [page, setPage] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
+    const [cashierId, setCashierId] = useState('');
+    const [users, setUsers] = useState<any[]>([]);
+
+    useEffect(() => {
+        if (open) {
+            userService.getAll(warehouseId ? { warehouseId } : {})
+                .then(res => setUsers(res.filter(u => u.role === 'ROLE_CASHIER' || u.role === 'ROLE_MANAGER')))
+                .catch(() => {});
+        }
+    }, [open, warehouseId]);
 
     // Tính date range mặc định
     const getDefaultRange = (p: string) => {
@@ -142,6 +153,7 @@ const RevenueReportDialog: React.FC<Props> = ({ open, onClose, warehouseId, onPr
                 period: (useCustomDate || period !== 'month' && period !== 'year') ? 'day' : period as ReportPeriod,
                 ...(warehouseId ? { warehouseId } : {}),
                 paymentMethod: paymentMethod || undefined,
+                cashierId: cashierId || undefined,
             });
             setRevenueData(data);
 
@@ -153,6 +165,7 @@ const RevenueReportDialog: React.FC<Props> = ({ open, onClose, warehouseId, onPr
                     to,
                     warehouseId,
                     paymentMethod: paymentMethod || undefined,
+                    cashierId: cashierId || undefined,
                     page,
                     size: 10
                 });
@@ -166,7 +179,7 @@ const RevenueReportDialog: React.FC<Props> = ({ open, onClose, warehouseId, onPr
 
         } catch { setRevenueData([]); }
         finally { setLoading(false); }
-    }, [period, dateFrom, dateTo, useCustomDate, warehouseId, paymentMethod, page]);
+    }, [period, dateFrom, dateTo, useCustomDate, warehouseId, paymentMethod, cashierId, page]);
 
     const loadTopProducts = useCallback(async () => {
         setLoadingProducts(true);
@@ -203,7 +216,7 @@ const RevenueReportDialog: React.FC<Props> = ({ open, onClose, warehouseId, onPr
             if (tab === 'overview') loadRevenue();
             if (tab === 'products') loadTopProducts();
         }
-    }, [open, tab, period, useCustomDate, dateFrom, dateTo]);
+    }, [open, tab, loadRevenue, loadTopProducts]);
 
     useEffect(() => {
         if (!open) {
@@ -329,24 +342,7 @@ const RevenueReportDialog: React.FC<Props> = ({ open, onClose, warehouseId, onPr
                                         </Button>
                                     ))}
                                 </Box>
-                                <Divider sx={{ mb: 1.5 }} />
-                                <Typography fontSize={11} fontWeight={600} color="#94a3b8" mb={1}>Phương thức thanh toán</Typography>
-                                <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-                                    <Select
-                                        value={paymentMethod}
-                                        onChange={e => {
-                                            setPaymentMethodState(e.target.value);
-                                            setPage(0);
-                                        }}
-                                        displayEmpty
-                                        sx={{ fontSize: 12, borderRadius: 1.5 }}
-                                    >
-                                        {PAYMENT_METHODS.map(m => (
-                                            <MenuItem key={m.value} value={m.value} sx={{ fontSize: 12 }}>{m.label}</MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
-                                <Divider sx={{ mb: 1.5 }} />
+
                                 <Typography fontSize={11} fontWeight={600} color="#94a3b8" mb={1}>Hoặc chọn ngày cụ thể</Typography>
                                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                                     <TextField size="small" type="date" label="Từ" value={dateFrom}
@@ -358,7 +354,7 @@ const RevenueReportDialog: React.FC<Props> = ({ open, onClose, warehouseId, onPr
                                         InputLabelProps={{ shrink: true }}
                                         sx={{ flex: 1, '& .MuiOutlinedInput-root': { fontSize: 12 } }} />
                                 </Box>
-                                {(useCustomDate || paymentMethod !== '') && (
+                                {(useCustomDate) && (
                                     <Button size="small" variant="contained" fullWidth onClick={() => { setPage(0); loadRevenue(); setFilterAnchor(null); }}
                                         sx={{ mt: 1.5, textTransform: 'none', fontSize: 12, bgcolor: '#2563eb', fontWeight: 700, borderRadius: 1.5, '&:hover': { bgcolor: '#1d4ed8' } }}>
                                         Áp dụng
@@ -409,9 +405,46 @@ const RevenueReportDialog: React.FC<Props> = ({ open, onClose, warehouseId, onPr
                         {/* Detail table (Invoice List) */}
                         {!loading && (
                             <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-                                <Box sx={{ px: 2.5, py: 1.25, bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between' }}>
-                                    <Typography variant="caption" fontWeight={700} color="#64748b" letterSpacing={0.3} fontSize={10.5}>DANH SÁCH HÓA ĐƠN</Typography>
-                                    {loadingInvoices && <CircularProgress size={14} />}
+                                <Box sx={{ px: 2.5, py: 1.5, bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <Typography variant="caption" fontWeight={700} color="#64748b" letterSpacing={0.3} fontSize={10.5}>DANH SÁCH HÓA ĐƠN</Typography>
+                                        {loadingInvoices && <CircularProgress size={14} />}
+                                    </Box>
+                                    
+                                    <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                                        <FormControl size="small" sx={{ minWidth: 160 }}>
+                                            <Select
+                                                value={paymentMethod}
+                                                onChange={e => {
+                                                    setPaymentMethodState(e.target.value);
+                                                    setPage(0);
+                                                }}
+                                                displayEmpty
+                                                sx={{ fontSize: 11.5, borderRadius: 1.5, bgcolor: '#fff', '& .MuiSelect-select': { py: 0.75 } }}
+                                            >
+                                                {PAYMENT_METHODS.map(m => (
+                                                    <MenuItem key={m.value} value={m.value} sx={{ fontSize: 11.5 }}>{m.label}</MenuItem>
+                                                ))}
+                                            </Select>
+                                        </FormControl>
+
+                                        <FormControl size="small" sx={{ minWidth: 160 }}>
+                                            <Select
+                                                value={cashierId}
+                                                onChange={e => {
+                                                    setCashierId(e.target.value);
+                                                    setPage(0);
+                                                }}
+                                                displayEmpty
+                                                sx={{ fontSize: 11.5, borderRadius: 1.5, bgcolor: '#fff', '& .MuiSelect-select': { py: 0.75 } }}
+                                            >
+                                                <MenuItem value="" sx={{ fontSize: 11.5 }}>Tất cả nhân viên</MenuItem>
+                                                {users.map(u => (
+                                                    <MenuItem key={u.id} value={u.id} sx={{ fontSize: 11.5 }}>{u.fullName} ({u.username})</MenuItem>
+                                                ))}
+                                            </Select>
+                                        </FormControl>
+                                    </Box>
                                 </Box>
                                 <Box sx={{ maxHeight: 300, overflowY: 'auto', '&::-webkit-scrollbar': { width: 4 }, '&::-webkit-scrollbar-thumb': { bgcolor: '#e2e8f0' } }}>
                                     <Table size="small" stickyHeader>

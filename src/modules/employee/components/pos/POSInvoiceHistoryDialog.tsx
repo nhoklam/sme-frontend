@@ -67,7 +67,8 @@ const POSInvoiceHistoryDialog: React.FC<Props> = ({ open, onClose, shiftId, onRe
     const [selected, setSelected] = useState<InvoiceResponse | null>(null);
     const [keyword, setKeyword] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
-    const [showAllItems, setShowAllItems] = useState(false);
+    const [itemsPage, setItemsPage] = useState(0);
+    const ITEMS_PER_PAGE = 10;
 
     // New filters
     const [paymentFilter, setPaymentFilter] = useState('');
@@ -128,7 +129,7 @@ const POSInvoiceHistoryDialog: React.FC<Props> = ({ open, onClose, shiftId, onRe
             setPaymentFilter(''); setTypeFilter(''); setDateFrom(''); setDateTo('');
         }
     }, [open]);
-    useEffect(() => { setShowAllItems(false); }, [selected]);
+    useEffect(() => { setItemsPage(0); }, [selected]);
 
     const handleSelect = async (inv: InvoiceResponse) => {
         try {
@@ -355,11 +356,18 @@ const POSInvoiceHistoryDialog: React.FC<Props> = ({ open, onClose, shiftId, onRe
                                     </Box>
                                 ))}
                     </Box>
-                    {totalPages > 1 && (
-                        <Box sx={{ p: 1, borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'center' }}>
-                            <Pagination size="small" count={totalPages} page={page + 1} onChange={(_, p) => setPage(p - 1)} />
-                        </Box>
-                    )}
+                    <Box sx={{ p: 1.5, borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: '#fff' }}>
+                        <Typography variant="body2" color="text.secondary">
+                            Trang {page + 1} / {totalPages || 1}
+                        </Typography>
+                        <Pagination 
+                            size="small" 
+                            count={totalPages || 1} 
+                            page={page + 1} 
+                            onChange={(_, p) => setPage(p - 1)} 
+                            color="primary"
+                        />
+                    </Box>
                 </Box>
 
                 {/* Right panel - Chi tiết */}
@@ -456,7 +464,7 @@ const POSInvoiceHistoryDialog: React.FC<Props> = ({ open, onClose, shiftId, onRe
                                     </Box>
                                 ) : (
                                     <>
-                                        {(showAllItems ? selected.items : selected.items.slice(0, 20)).map((item, i) => (
+                                        {selected.items.slice(itemsPage * ITEMS_PER_PAGE, (itemsPage + 1) * ITEMS_PER_PAGE).map((item, i) => (
                                             <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', px: 2, py: 1.25, borderBottom: i < (selected.items?.length || 0) - 1 ? '1px solid #f8fafc' : 'none', bgcolor: '#fff' }}>
                                                 <Box>
                                                     <Typography variant="body2" fontWeight={600} fontSize={12.5} color="#334155">{item.productName}</Typography>
@@ -465,9 +473,14 @@ const POSInvoiceHistoryDialog: React.FC<Props> = ({ open, onClose, shiftId, onRe
                                                 <Typography variant="body2" fontWeight={700} color="#475569">{fmt(item.subtotal)}</Typography>
                                             </Box>
                                         ))}
-                                        {!showAllItems && selected.items.length > 20 && (
-                                            <Box onClick={() => setShowAllItems(true)} sx={{ py: 1, textAlign: 'center', cursor: 'pointer', bgcolor: '#f8fafc', color: '#64748b', fontSize: 12, fontWeight: 600, '&:hover': { bgcolor: '#f1f5f9' } }}>
-                                                Xem thêm {selected.items.length - 20} sản phẩm...
+                                        {Math.ceil(selected.items.length / ITEMS_PER_PAGE) > 1 && (
+                                            <Box sx={{ p: 1.5, display: 'flex', justifyContent: 'center', borderTop: '1px solid #f8fafc', bgcolor: '#fff' }}>
+                                                <Pagination 
+                                                    size="small" 
+                                                    count={Math.ceil(selected.items.length / ITEMS_PER_PAGE)} 
+                                                    page={itemsPage + 1} 
+                                                    onChange={(_, p) => setItemsPage(p - 1)} 
+                                                />
                                             </Box>
                                         )}
                                     </>

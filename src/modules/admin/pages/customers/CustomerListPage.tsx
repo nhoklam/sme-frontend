@@ -16,6 +16,8 @@ import customerService from '../../../../services/customerService';
 import { Customer, CustomerTier } from '../../../../types';
 import CustomerDialog from './CustomerDialog';
 import CustomerDetailDialog from './CustomerDetailDialog';
+import { useDebounce } from '../../../../hooks/useDebounce';
+import { useCustomers, useTopSpenders } from '../../../../hooks/useCustomers';
 
 const TIER_MAP: Record<CustomerTier, { label: string; color: string; bg: string }> = {
     STANDARD: { label: 'Tiêu chuẩn', color: '#374151', bg: '#f3f4f6' },
@@ -36,18 +38,8 @@ const fmtCurrency = (n?: number) =>
 
 // ── Top Chi Tiêu Dialog ────────────────────────────────────
 const TopSpendersDialog: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
-    const [topCustomers, setTopCustomers] = useState<Customer[]>([]);
-    const [loading, setLoading] = useState(false);
-
-    useEffect(() => {
-        if (open) {
-            setLoading(true);
-            customerService.getTopSpenders(0, 10)
-                .then(data => setTopCustomers(data.content ?? []))
-                .catch(() => setTopCustomers([]))
-                .finally(() => setLoading(false));
-        }
-    }, [open]);
+    const { data: pageData, isLoading: loading } = useTopSpenders(0, 10);
+    const topCustomers = pageData?.content || [];
 
     const maxSpent = topCustomers[0]?.totalSpent || 1;
 
@@ -158,14 +150,10 @@ const TopSpendersDialog: React.FC<{ open: boolean; onClose: () => void }> = ({ o
 // ── Main Page ──────────────────────────────────────────────
 const CustomerListPage: React.FC = () => {
     const navigate = useNavigate();
-    const [customers, setCustomers] = useState<Customer[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
     const [search, setSearch] = useState('');
+    const debouncedSearch = useDebounce(search, 300);
     const [tierFilter, setTierFilter] = useState('');
     const [page, setPage] = useState(0);
-    const [totalPages, setTotalPages] = useState(0);
-    const [totalElements, setTotalElements] = useState(0);
     const [topOpen, setTopOpen] = useState(false);
     
     // Customer Dialog state
@@ -178,33 +166,18 @@ const CustomerListPage: React.FC = () => {
 
     const PAGE_SIZE = 20;
 
-    const loadCustomers = useCallback(async () => {
-        setLoading(true);
-        setError('');
-        try {
-            const data = await customerService.search({
-                keyword: search.trim() || undefined,
-                tier: tierFilter || undefined,
-                page,
-                size: PAGE_SIZE,
-            });
-            setCustomers(data.content ?? []);
-            setTotalPages(data.totalPages ?? 0);
-            setTotalElements(data.totalElements ?? 0);
-        } catch (e: any) {
-            setError(e.response?.data?.message || 'Không thể tải danh sách khách hàng');
-        } finally {
-            setLoading(false);
-        }
-    }, [search, tierFilter, page]);
+    const { data, isLoading: loading, error, refetch: loadCustomers } = useCustomers({
+        keyword: debouncedSearch.trim() || undefined,
+        tier: tierFilter || undefined,
+        page,
+        size: PAGE_SIZE,
+    });
 
-    useEffect(() => {
-        const t = setTimeout(() => setPage(0), 400);
-        return () => clearTimeout(t);
-    }, [search]);
+    const customers = data?.content || [];
+    const totalPages = data?.totalPages || 0;
+    const totalElements = data?.totalElements || 0;
 
-    useEffect(() => { setPage(0); }, [tierFilter]);
-    useEffect(() => { loadCustomers(); }, [search, tierFilter, page]);
+    useEffect(() => { setPage(0); }, [debouncedSearch, tierFilter]);
 
     const stats = [
         { label: 'Tổng khách hàng', value: totalElements, color: '#1a1a2e' },
@@ -230,7 +203,7 @@ const CustomerListPage: React.FC = () => {
                 </Box>
                 <Box sx={{ display: 'flex', gap: 1 }}>
                     <Tooltip title="Làm mới">
-                        <IconButton onClick={loadCustomers} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+                        <IconButton onClick={() => loadCustomers()} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
                             <Refresh sx={{ fontSize: 18 }} />
                         </IconButton>
                     </Tooltip>
@@ -267,7 +240,7 @@ const CustomerListPage: React.FC = () => {
                 ))}
             </Box>
 
-            {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
+            {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{(error as any).message || 'Lỗi tải danh sách khách hàng'}</Alert>}
 
             {/* Filters */}
             <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #f0f0f0', mb: 2 }}>

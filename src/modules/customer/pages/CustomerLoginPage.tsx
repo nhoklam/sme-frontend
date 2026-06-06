@@ -355,7 +355,11 @@ const CustomerLoginPage: React.FC = () => {
                                             color: '#f5a623'
                                         }
                                     }}
-                                    onClick={() => alert('Tính năng đăng nhập Google đang được phát triển')}
+                                    onClick={() => {
+                                        // Lưu redirect_uri vào localStorage để backend biết đường quay về (nếu cần xử lý thêm)
+                                        // Hoặc backend đã cấu hình sẵn oauth2 success handler để redirect về FE
+                                        window.location.href = `${process.env.REACT_APP_API_URL || 'http://localhost:8080/api'}/oauth2/authorize/google?redirect_uri=${window.location.origin}/oauth2/redirect`;
+                                    }}
                                 >
                                     Tiếp tục với Google
                                 </Button>

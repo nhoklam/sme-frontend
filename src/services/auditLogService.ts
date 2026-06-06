@@ -5,6 +5,7 @@ export interface AuditLog {
     id?: number;
     entityName: string;
     entityId: string;
+    targetName?: string;
     action: string;       // CREATE | UPDATE | DELETE
     changes?: string;
     performedBy: string;

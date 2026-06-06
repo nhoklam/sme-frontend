@@ -4,10 +4,10 @@ import {
     Box, Typography, Button, Paper, Grid, Chip,
     IconButton, Alert, Skeleton, Table,
     TableBody, TableCell, TableHead, TableRow, TableContainer,
-    Avatar, Card, CardContent
+    Avatar, Card, CardContent, TablePagination, TextField, InputAdornment
 } from '@mui/material';
 import {
-    ArrowBack,
+    ArrowBack, Search,
     CheckCircleOutline, ErrorOutline, History,
     Print, Description, Person, StorefrontOutlined,
     Payments, ReceiptLong, TrendingUp
@@ -58,18 +58,21 @@ const ShiftDetailPage = () => {
     const [shift, setShift] = useState<PosShift | null>(null);
     const [invoices, setInvoices] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [invoicesLoading, setInvoicesLoading] = useState(false);
     const [error, setError] = useState('');
+    
+    // Pagination & Search
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [keyword, setKeyword] = useState('');
+    const [totalElements, setTotalElements] = useState(0);
 
-    const loadData = useCallback(async () => {
+    const loadShift = useCallback(async () => {
         if (!id) return;
         setLoading(true);
         try {
-            const [sData, iData] = await Promise.all([
-                shiftService.getById(id),
-                shiftService.getInvoicesByShift(id)
-            ]);
+            const sData = await shiftService.getById(id);
             setShift(sData);
-            setInvoices(iData.content || []);
         } catch (e: any) {
             setError(e.response?.data?.message || 'Không thể tải thông tin ca làm việc');
         } finally {
@@ -77,16 +80,37 @@ const ShiftDetailPage = () => {
         }
     }, [id]);
 
+    const loadInvoices = useCallback(async () => {
+        if (!id) return;
+        setInvoicesLoading(true);
+        try {
+            const iData = await shiftService.getInvoicesByShift(id, page, rowsPerPage, keyword);
+            setInvoices(iData.content || []);
+            setTotalElements(iData.totalElements || 0);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setInvoicesLoading(false);
+        }
+    }, [id, page, rowsPerPage, keyword]);
+
     useEffect(() => {
-        loadData();
-    }, [loadData]);
+        loadShift();
+    }, [loadShift]);
+
+    useEffect(() => {
+        const t = setTimeout(() => {
+            loadInvoices();
+        }, 300);
+        return () => clearTimeout(t);
+    }, [loadInvoices]);
 
     const handleApprove = async () => {
         if (!id) return;
         try {
             await shiftService.approveShift(id);
             toast.success('Đã duyệt ca làm việc');
-            loadData();
+            loadShift();
         } catch (e: any) {
             toast.error(e.response?.data?.message || 'Duyệt ca thất bại');
         }
@@ -130,7 +154,7 @@ const ShiftDetailPage = () => {
                     </Box>
                 </Box>
                 <Box sx={{ display: 'flex', gap: 1.5 }}>
-                    <Button startIcon={<Print />} variant="outlined" sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 2 }}>
+                    <Button onClick={() => window.print()} startIcon={<Print />} variant="outlined" sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 2 }}>
                         In báo cáo ca
                     </Button>
                     {shift.status === 'CLOSED' && (
@@ -234,14 +258,24 @@ const ShiftDetailPage = () => {
                 <Grid size={{ xs: 12, md: 8 }}>
                     <Paper elevation={0} sx={{ borderRadius: 4, border: '1px solid #f0f0f0', overflow: 'hidden' }}>
                         <Box sx={{ p: 2.5, borderBottom: '1px solid #f5f5f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Typography variant="subtitle2" fontWeight={800} color="#1a1a2e">DANH SÁCH HÓA ĐƠN ({invoices.length})</Typography>
-                            <Button size="small" variant="text" sx={{ textTransform: 'none', fontWeight: 700 }}>Xem tất cả</Button>
+                            <Typography variant="subtitle2" fontWeight={800} color="#1a1a2e">DANH SÁCH HÓA ĐƠN</Typography>
+                            <TextField
+                                size="small"
+                                placeholder="Tìm kiếm hóa đơn..."
+                                value={keyword}
+                                onChange={(e) => { setKeyword(e.target.value); setPage(0); }}
+                                InputProps={{
+                                    startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment>,
+                                }}
+                                sx={{ width: 250, '& input': { py: 1, fontSize: 13 } }}
+                            />
                         </Box>
                         <TableContainer sx={{ maxHeight: 600 }}>
                             <Table stickyHeader size="small">
                                 <TableHead>
                                     <TableRow sx={{ '& th': { bgcolor: '#fafafa', fontSize: 11, fontWeight: 800, color: '#888', py: 1.5 } }}>
                                         <TableCell>MÃ HĐ</TableCell>
+                                        <TableCell>KHÁCH HÀNG</TableCell>
                                         <TableCell>THỜI GIAN</TableCell>
                                         <TableCell>LOẠI</TableCell>
                                         <TableCell align="right">TỔNG TIỀN</TableCell>
@@ -262,6 +296,10 @@ const ShiftDetailPage = () => {
                                                     <Typography variant="body2" fontWeight={700} color="#1976d2">{inv.code}</Typography>
                                                 </TableCell>
                                                 <TableCell>
+                                                    <Typography variant="body2" fontWeight={600} fontSize={13}>{inv.customerName || 'Khách lẻ'}</Typography>
+                                                    <Typography variant="caption" color="text.secondary">{inv.customerPhone || '—'}</Typography>
+                                                </TableCell>
+                                                <TableCell>
                                                     <Typography variant="body2" fontSize={12}>{new Date(inv.createdAt).toLocaleTimeString('vi-VN')}</Typography>
                                                 </TableCell>
                                                 <TableCell>
@@ -275,7 +313,7 @@ const ShiftDetailPage = () => {
                                                     <Typography variant="body2" fontWeight={700}>{fmt(inv.finalAmount)}</Typography>
                                                 </TableCell>
                                                 <TableCell align="center">
-                                                    <IconButton size="small" onClick={() => navigate(`/admin/orders/pos/${inv.id}`)}><Description sx={{ fontSize: 18 }} /></IconButton>
+                                                    <IconButton size="small" onClick={() => navigate(`/admin/orders/${inv.code}`)}><Description sx={{ fontSize: 18 }} /></IconButton>
                                                 </TableCell>
                                             </TableRow>
                                         ))
@@ -283,6 +321,19 @@ const ShiftDetailPage = () => {
                                 </TableBody>
                             </Table>
                         </TableContainer>
+                        <TablePagination
+                            component="div"
+                            count={totalElements}
+                            page={page}
+                            onPageChange={(e, newPage) => setPage(newPage)}
+                            rowsPerPage={rowsPerPage}
+                            onRowsPerPageChange={(e) => {
+                                setRowsPerPage(parseInt(e.target.value, 10));
+                                setPage(0);
+                            }}
+                            labelRowsPerPage="Số dòng:"
+                            labelDisplayedRows={({ from, to, count }) => `${from}–${to} của ${count !== -1 ? count : `hơn ${to}`}`}
+                        />
                     </Paper>
                 </Grid>
             </Grid>

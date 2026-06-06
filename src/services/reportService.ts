@@ -30,6 +30,7 @@ const reportService = {
         });
         if (params.warehouseId) query.set('warehouseId', params.warehouseId);
         if (params.paymentMethod) query.set('paymentMethod', params.paymentMethod);
+        if (params.cashierId) query.set('cashierId', params.cashierId);
 
         const res = await axiosInstance.get<ApiResponse<RevenueDataPoint[]>>(
             `/reports/revenue?${query}`
@@ -63,7 +64,7 @@ const reportService = {
     },
 
     // ── Lấy danh sách hóa đơn cho báo cáo ──────────────────────────
-    getInvoices: async (params: { from: string; to: string; warehouseId?: string; paymentMethod?: string; page?: number; size?: number }): Promise<{ content: any[], totalPages: number, totalElements: number }> => {
+    getInvoices: async (params: { from: string; to: string; warehouseId?: string; paymentMethod?: string; cashierId?: string; page?: number; size?: number }): Promise<{ content: any[], totalPages: number, totalElements: number }> => {
         const query = new URLSearchParams({
             from: params.from,
             to: params.to,
@@ -72,6 +73,7 @@ const reportService = {
         });
         if (params.warehouseId) query.set('warehouseId', params.warehouseId);
         if (params.paymentMethod) query.set('paymentMethod', params.paymentMethod);
+        if (params.cashierId) query.set('cashierId', params.cashierId);
 
         const res = await axiosInstance.get<ApiResponse<{ content: any[], totalPages: number, totalElements: number }>>(
             `/pos/invoices?${query}`

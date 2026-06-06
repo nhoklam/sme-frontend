@@ -37,8 +37,13 @@ const shiftService = {
         return res.data.data;
     },
 
-    getInvoicesByShift: async (shiftId: string, page = 0, size = 50) => {
-        const res = await axiosInstance.get<ApiResponse<PageResponse<any>>>(`/pos/invoices?shiftId=${shiftId}&page=${page}&size=${size}`);
+    getInvoicesByShift: async (shiftId: string, page = 0, size = 10, keyword = '') => {
+        const query = new URLSearchParams();
+        query.set('shiftId', shiftId);
+        query.set('page', String(page));
+        query.set('size', String(size));
+        if (keyword) query.set('keyword', keyword);
+        const res = await axiosInstance.get<ApiResponse<PageResponse<any>>>(`/pos/invoices?${query}`);
         return res.data.data;
     },
 

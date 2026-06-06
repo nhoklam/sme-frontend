@@ -12,6 +12,7 @@ import authService from '../services/authService';
 // ─────────────────────────────────────────────────────────────
 // LAZY LOADING COMPONENTS
 // ─────────────────────────────────────────────────────────────
+const OAuth2RedirectHandler = lazy(() => import('../pages/auth/OAuth2RedirectHandler'));
 
 // Admin Pages
 const DashboardPage = lazy(() => import('../modules/admin/pages/DashboardPage'));
@@ -182,6 +183,7 @@ const AppRoutes: React.FC = () => (
             <Route path="order-success" element={withSuspense(OrderSuccessPage)} />
             <Route path="order-tracking" element={withSuspense(OrderTrackingPage)} />
             <Route path="payment/return" element={withSuspense(PaymentReturnPage)} />
+            <Route path="oauth2/redirect" element={withSuspense(OAuth2RedirectHandler)} />
 
         </Route>
 

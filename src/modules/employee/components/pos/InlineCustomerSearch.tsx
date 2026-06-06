@@ -96,6 +96,7 @@ const InlineCustomerSearch: React.FC<Props> = ({ customer, onSelect, inputRef: e
             <TextField
                 fullWidth size="small"
                 inputRef={inputRef}
+                autoComplete="off"
                 placeholder="Tìm tên hoặc số điện thoại..."
                 value={query}
                 onChange={e => { setQuery(e.target.value); setShowDrop(true); }}

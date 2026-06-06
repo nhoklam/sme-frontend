@@ -1,0 +1,427 @@
+﻿
+         /\      Grafana   /ΓÇ╛ΓÇ╛/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ΓÇ╛ΓÇ╛\ 
+  /          \   |   (  |  (ΓÇ╛)  |
+ / __________ \  |_|\_\  \_____/ 
+
+
+     execution: local
+        script: load-tests/nv2-pessimistic-lock-test.js
+        output: -
+
+     scenarios: (100.00%) 3 scenarios, 35 max VUs, 1m35s max duration (incl. graceful stop):
+              * pos_concurrency: 20 looping VUs for 30s (exec: posCheckout, gracefulStop: 30s)
+              * pos_vs_admin_adjust: 5 looping VUs for 30s (exec: adminAdjust, startTime: 35s, gracefulStop: 30s)
+              * pos_vs_admin_pos: 10 looping VUs for 30s (exec: posCheckout, startTime: 35s, gracefulStop: 30s)
+
+
+running (0m01.0s), 20/35 VUs, 0 complete and 0 interrupted iterations
+pos_concurrency       [   3% ] 20 VUs   01.0s/30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  34.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  34.0s
+
+running (0m02.0s), 20/35 VUs, 0 complete and 0 interrupted iterations
+pos_concurrency       [   7% ] 20 VUs   02.0s/30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  33.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  33.0s
+
+running (0m03.0s), 20/35 VUs, 0 complete and 0 interrupted iterations
+pos_concurrency       [  10% ] 20 VUs   03.0s/30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  32.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  32.0s
+
+running (0m04.0s), 20/35 VUs, 1 complete and 0 interrupted iterations
+pos_concurrency       [  13% ] 20 VUs   04.0s/30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  31.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  31.0s
+
+running (0m05.0s), 20/35 VUs, 1 complete and 0 interrupted iterations
+pos_concurrency       [  17% ] 20 VUs   05.0s/30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  30.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  30.0s
+
+running (0m06.0s), 20/35 VUs, 2 complete and 0 interrupted iterations
+pos_concurrency       [  20% ] 20 VUs   06.0s/30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  29.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  29.0s
+
+running (0m07.0s), 20/35 VUs, 2 complete and 0 interrupted iterations
+pos_concurrency       [  23% ] 20 VUs   07.0s/30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  28.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  28.0s
+
+running (0m08.0s), 20/35 VUs, 3 complete and 0 interrupted iterations
+pos_concurrency       [  27% ] 20 VUs   08.0s/30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  27.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  27.0s
+
+running (0m09.0s), 20/35 VUs, 4 complete and 0 interrupted iterations
+pos_concurrency       [  30% ] 20 VUs   09.0s/30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  26.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  26.0s
+
+running (0m10.0s), 20/35 VUs, 5 complete and 0 interrupted iterations
+pos_concurrency       [  33% ] 20 VUs   10.0s/30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  25.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  25.0s
+
+running (0m11.0s), 20/35 VUs, 5 complete and 0 interrupted iterations
+pos_concurrency       [  37% ] 20 VUs   11.0s/30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  24.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  24.0s
+
+running (0m12.0s), 20/35 VUs, 5 complete and 0 interrupted iterations
+pos_concurrency       [  40% ] 20 VUs   12.0s/30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  23.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  23.0s
+
+running (0m13.0s), 20/35 VUs, 6 complete and 0 interrupted iterations
+pos_concurrency       [  43% ] 20 VUs   13.0s/30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  22.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  22.0s
+
+running (0m14.0s), 20/35 VUs, 7 complete and 0 interrupted iterations
+pos_concurrency       [  47% ] 20 VUs   14.0s/30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  21.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  21.0s
+
+running (0m15.0s), 20/35 VUs, 7 complete and 0 interrupted iterations
+pos_concurrency       [  50% ] 20 VUs   15.0s/30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  20.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  20.0s
+
+running (0m16.0s), 20/35 VUs, 8 complete and 0 interrupted iterations
+pos_concurrency       [  53% ] 20 VUs   16.0s/30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  19.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  19.0s
+
+running (0m17.0s), 20/35 VUs, 9 complete and 0 interrupted iterations
+pos_concurrency       [  57% ] 20 VUs   17.0s/30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  18.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  18.0s
+
+running (0m18.0s), 20/35 VUs, 10 complete and 0 interrupted iterations
+pos_concurrency       [  60% ] 20 VUs   18.0s/30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  17.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  17.0s
+
+running (0m19.0s), 20/35 VUs, 10 complete and 0 interrupted iterations
+pos_concurrency       [  63% ] 20 VUs   19.0s/30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  16.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  16.0s
+
+running (0m20.0s), 20/35 VUs, 11 complete and 0 interrupted iterations
+pos_concurrency       [  67% ] 20 VUs   20.0s/30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  15.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  15.0s
+
+running (0m21.0s), 20/35 VUs, 11 complete and 0 interrupted iterations
+pos_concurrency       [  70% ] 20 VUs   21.0s/30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  14.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  14.0s
+
+running (0m22.0s), 20/35 VUs, 12 complete and 0 interrupted iterations
+pos_concurrency       [  73% ] 20 VUs   22.0s/30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  13.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  13.0s
+
+running (0m23.0s), 20/35 VUs, 13 complete and 0 interrupted iterations
+pos_concurrency       [  77% ] 20 VUs   23.0s/30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  12.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  12.0s
+
+running (0m24.0s), 20/35 VUs, 13 complete and 0 interrupted iterations
+pos_concurrency       [  80% ] 20 VUs   24.0s/30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  11.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  11.0s
+
+running (0m25.0s), 20/35 VUs, 14 complete and 0 interrupted iterations
+pos_concurrency       [  83% ] 20 VUs   25.0s/30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  10.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  10.0s
+
+running (0m26.0s), 20/35 VUs, 15 complete and 0 interrupted iterations
+pos_concurrency       [  87% ] 20 VUs   26.0s/30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  09.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  09.0s
+
+running (0m27.0s), 20/35 VUs, 15 complete and 0 interrupted iterations
+pos_concurrency       [  90% ] 20 VUs   27.0s/30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  08.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  08.0s
+
+running (0m28.0s), 20/35 VUs, 16 complete and 0 interrupted iterations
+pos_concurrency       [  93% ] 20 VUs   28.0s/30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  07.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  07.0s
+
+running (0m29.0s), 20/35 VUs, 16 complete and 0 interrupted iterations
+pos_concurrency       [  97% ] 20 VUs   29.0s/30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  06.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  06.0s
+
+running (0m30.0s), 20/35 VUs, 16 complete and 0 interrupted iterations
+pos_concurrency       [ 100% ] 20 VUs   30.0s/30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  05.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  05.0s
+
+running (0m31.0s), 19/35 VUs, 17 complete and 0 interrupted iterations
+pos_concurrency     Γåô [ 100% ] 20 VUs   30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  04.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  04.0s
+
+running (0m32.0s), 18/35 VUs, 18 complete and 0 interrupted iterations
+pos_concurrency     Γåô [ 100% ] 20 VUs   30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  03.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  03.0s
+
+running (0m33.0s), 17/35 VUs, 19 complete and 0 interrupted iterations
+pos_concurrency     Γåô [ 100% ] 20 VUs   30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  02.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  02.0s
+
+running (0m34.0s), 17/35 VUs, 19 complete and 0 interrupted iterations
+pos_concurrency     Γåô [ 100% ] 20 VUs   30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  01.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  01.0s
+
+running (0m35.0s), 16/35 VUs, 20 complete and 0 interrupted iterations
+pos_concurrency     Γåô [ 100% ] 20 VUs   30s
+pos_vs_admin_adjust ΓÇó [   0% ] waiting  00.0s
+pos_vs_admin_pos    ΓÇó [   0% ] waiting  00.0s
+
+running (0m36.0s), 30/35 VUs, 21 complete and 0 interrupted iterations
+pos_concurrency     Γåô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust   [   3% ] 5 VUs   01.0s/30s
+pos_vs_admin_pos      [   3% ] 10 VUs  01.0s/30s
+
+running (0m37.0s), 30/35 VUs, 21 complete and 0 interrupted iterations
+pos_concurrency     Γåô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust   [   7% ] 5 VUs   02.0s/30s
+pos_vs_admin_pos      [   7% ] 10 VUs  02.0s/30s
+
+running (0m38.0s), 29/35 VUs, 22 complete and 0 interrupted iterations
+pos_concurrency     Γåô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust   [  10% ] 5 VUs   03.0s/30s
+pos_vs_admin_pos      [  10% ] 10 VUs  03.0s/30s
+
+running (0m39.0s), 28/35 VUs, 23 complete and 0 interrupted iterations
+pos_concurrency     Γåô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust   [  13% ] 5 VUs   04.0s/30s
+pos_vs_admin_pos      [  13% ] 10 VUs  04.0s/30s
+
+running (0m40.0s), 27/35 VUs, 24 complete and 0 interrupted iterations
+pos_concurrency     Γåô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust   [  17% ] 5 VUs   05.0s/30s
+pos_vs_admin_pos      [  17% ] 10 VUs  05.0s/30s
+
+running (0m41.0s), 27/35 VUs, 24 complete and 0 interrupted iterations
+pos_concurrency     Γåô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust   [  20% ] 5 VUs   06.0s/30s
+pos_vs_admin_pos      [  20% ] 10 VUs  06.0s/30s
+
+running (0m42.0s), 27/35 VUs, 24 complete and 0 interrupted iterations
+pos_concurrency     Γåô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust   [  23% ] 5 VUs   07.0s/30s
+pos_vs_admin_pos      [  23% ] 10 VUs  07.0s/30s
+
+running (0m43.0s), 26/35 VUs, 25 complete and 0 interrupted iterations
+pos_concurrency     Γåô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust   [  27% ] 5 VUs   08.0s/30s
+pos_vs_admin_pos      [  27% ] 10 VUs  08.0s/30s
+
+running (0m44.0s), 26/35 VUs, 25 complete and 0 interrupted iterations
+pos_concurrency     Γåô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust   [  30% ] 5 VUs   09.0s/30s
+pos_vs_admin_pos      [  30% ] 10 VUs  09.0s/30s
+
+running (0m45.0s), 25/35 VUs, 26 complete and 0 interrupted iterations
+pos_concurrency     Γåô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust   [  33% ] 5 VUs   10.0s/30s
+pos_vs_admin_pos      [  33% ] 10 VUs  10.0s/30s
+
+running (0m46.0s), 24/35 VUs, 27 complete and 0 interrupted iterations
+pos_concurrency     Γåô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust   [  37% ] 5 VUs   11.0s/30s
+pos_vs_admin_pos      [  37% ] 10 VUs  11.0s/30s
+
+running (0m47.0s), 24/35 VUs, 27 complete and 0 interrupted iterations
+pos_concurrency     Γåô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust   [  40% ] 5 VUs   12.0s/30s
+pos_vs_admin_pos      [  40% ] 10 VUs  12.0s/30s
+
+running (0m48.0s), 23/35 VUs, 28 complete and 0 interrupted iterations
+pos_concurrency     Γåô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust   [  43% ] 5 VUs   13.0s/30s
+pos_vs_admin_pos      [  43% ] 10 VUs  13.0s/30s
+
+running (0m49.0s), 23/35 VUs, 28 complete and 0 interrupted iterations
+pos_concurrency     Γåô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust   [  47% ] 5 VUs   14.0s/30s
+pos_vs_admin_pos      [  47% ] 10 VUs  14.0s/30s
+
+running (0m50.0s), 21/35 VUs, 30 complete and 0 interrupted iterations
+pos_concurrency     Γåô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust   [  50% ] 5 VUs   15.0s/30s
+pos_vs_admin_pos      [  50% ] 10 VUs  15.0s/30s
+
+running (0m51.0s), 21/35 VUs, 30 complete and 0 interrupted iterations
+pos_concurrency     Γåô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust   [  53% ] 5 VUs   16.0s/30s
+pos_vs_admin_pos      [  53% ] 10 VUs  16.0s/30s
+
+running (0m52.0s), 20/35 VUs, 31 complete and 0 interrupted iterations
+pos_concurrency     Γåô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust   [  57% ] 5 VUs   17.0s/30s
+pos_vs_admin_pos      [  57% ] 10 VUs  17.0s/30s
+
+running (0m53.0s), 20/35 VUs, 31 complete and 0 interrupted iterations
+pos_concurrency     Γåô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust   [  60% ] 5 VUs   18.0s/30s
+pos_vs_admin_pos      [  60% ] 10 VUs  18.0s/30s
+
+running (0m54.0s), 19/35 VUs, 32 complete and 0 interrupted iterations
+pos_concurrency     Γåô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust   [  63% ] 5 VUs   19.0s/30s
+pos_vs_admin_pos      [  63% ] 10 VUs  19.0s/30s
+
+running (0m55.0s), 19/35 VUs, 32 complete and 0 interrupted iterations
+pos_concurrency     Γåô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust   [  67% ] 5 VUs   20.0s/30s
+pos_vs_admin_pos      [  67% ] 10 VUs  20.0s/30s
+
+running (0m56.0s), 18/35 VUs, 33 complete and 0 interrupted iterations
+pos_concurrency     Γåô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust   [  70% ] 5 VUs   21.0s/30s
+pos_vs_admin_pos      [  70% ] 10 VUs  21.0s/30s
+
+running (0m57.0s), 17/35 VUs, 34 complete and 0 interrupted iterations
+pos_concurrency     Γåô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust   [  73% ] 5 VUs   22.0s/30s
+pos_vs_admin_pos      [  73% ] 10 VUs  22.0s/30s
+
+running (0m58.0s), 17/35 VUs, 34 complete and 0 interrupted iterations
+pos_concurrency     Γåô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust   [  77% ] 5 VUs   23.0s/30s
+pos_vs_admin_pos      [  77% ] 10 VUs  23.0s/30s
+
+running (0m59.0s), 17/35 VUs, 35 complete and 0 interrupted iterations
+pos_concurrency     Γåô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust   [  80% ] 5 VUs   24.0s/30s
+pos_vs_admin_pos      [  80% ] 10 VUs  24.0s/30s
+
+running (1m00.0s), 17/35 VUs, 35 complete and 0 interrupted iterations
+pos_concurrency     Γåô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust   [  83% ] 5 VUs   25.0s/30s
+pos_vs_admin_pos      [  83% ] 10 VUs  25.0s/30s
+
+running (1m01.0s), 15/35 VUs, 36 complete and 2 interrupted iterations
+pos_concurrency     Γ£ô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust   [  87% ] 5 VUs   26.0s/30s
+pos_vs_admin_pos      [  87% ] 10 VUs  26.0s/30s
+
+running (1m02.0s), 15/35 VUs, 36 complete and 2 interrupted iterations
+pos_concurrency     Γ£ô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust   [  90% ] 5 VUs   27.0s/30s
+pos_vs_admin_pos      [  90% ] 10 VUs  27.0s/30s
+
+running (1m03.0s), 15/35 VUs, 38 complete and 2 interrupted iterations
+pos_concurrency     Γ£ô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust   [  93% ] 5 VUs   28.0s/30s
+pos_vs_admin_pos      [  93% ] 10 VUs  28.0s/30s
+
+running (1m04.0s), 15/35 VUs, 38 complete and 2 interrupted iterations
+pos_concurrency     Γ£ô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust   [  97% ] 5 VUs   29.0s/30s
+pos_vs_admin_pos      [  97% ] 10 VUs  29.0s/30s
+
+running (1m05.0s), 15/35 VUs, 38 complete and 2 interrupted iterations
+pos_concurrency     Γ£ô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust   [ 100% ] 5 VUs   30.0s/30s
+pos_vs_admin_pos      [ 100% ] 10 VUs  30.0s/30s
+
+running (1m06.0s), 14/35 VUs, 39 complete and 2 interrupted iterations
+pos_concurrency     Γ£ô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust Γåô [ 100% ] 5 VUs   30s
+pos_vs_admin_pos    Γåô [ 100% ] 10 VUs  30s
+
+running (1m07.0s), 13/35 VUs, 40 complete and 2 interrupted iterations
+pos_concurrency     Γ£ô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust Γåô [ 100% ] 5 VUs   30s
+pos_vs_admin_pos    Γåô [ 100% ] 10 VUs  30s
+
+running (1m08.0s), 12/35 VUs, 41 complete and 2 interrupted iterations
+pos_concurrency     Γ£ô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust Γåô [ 100% ] 5 VUs   30s
+pos_vs_admin_pos    Γåô [ 100% ] 10 VUs  30s
+
+running (1m09.0s), 11/35 VUs, 42 complete and 2 interrupted iterations
+pos_concurrency     Γ£ô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust Γåô [ 100% ] 5 VUs   30s
+pos_vs_admin_pos    Γåô [ 100% ] 10 VUs  30s
+
+running (1m10.0s), 11/35 VUs, 42 complete and 2 interrupted iterations
+pos_concurrency     Γ£ô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust Γåô [ 100% ] 5 VUs   30s
+pos_vs_admin_pos    Γåô [ 100% ] 10 VUs  30s
+
+running (1m11.0s), 09/35 VUs, 44 complete and 2 interrupted iterations
+pos_concurrency     Γ£ô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust Γåô [ 100% ] 5 VUs   30s
+pos_vs_admin_pos    Γåô [ 100% ] 10 VUs  30s
+
+running (1m12.0s), 08/35 VUs, 45 complete and 2 interrupted iterations
+pos_concurrency     Γ£ô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust Γåô [ 100% ] 5 VUs   30s
+pos_vs_admin_pos    Γåô [ 100% ] 10 VUs  30s
+
+running (1m13.0s), 07/35 VUs, 46 complete and 2 interrupted iterations
+pos_concurrency     Γ£ô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust Γåô [ 100% ] 5 VUs   30s
+pos_vs_admin_pos    Γåô [ 100% ] 10 VUs  30s
+
+running (1m14.0s), 06/35 VUs, 47 complete and 2 interrupted iterations
+pos_concurrency     Γ£ô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust Γåô [ 100% ] 5 VUs   30s
+pos_vs_admin_pos    Γåô [ 100% ] 10 VUs  30s
+
+running (1m15.0s), 05/35 VUs, 48 complete and 2 interrupted iterations
+pos_concurrency     Γ£ô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust Γåô [ 100% ] 5 VUs   30s
+pos_vs_admin_pos    Γåô [ 100% ] 10 VUs  30s
+
+running (1m16.0s), 04/35 VUs, 49 complete and 2 interrupted iterations
+pos_concurrency     Γ£ô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust Γåô [ 100% ] 5 VUs   30s
+pos_vs_admin_pos    Γåô [ 100% ] 10 VUs  30s
+
+running (1m17.0s), 04/35 VUs, 49 complete and 2 interrupted iterations
+pos_concurrency     Γ£ô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust Γåô [ 100% ] 5 VUs   30s
+pos_vs_admin_pos    Γåô [ 100% ] 10 VUs  30s
+
+running (1m18.0s), 03/35 VUs, 50 complete and 2 interrupted iterations
+pos_concurrency     Γ£ô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust Γåô [ 100% ] 5 VUs   30s
+pos_vs_admin_pos    Γåô [ 100% ] 10 VUs  30s
+
+running (1m19.0s), 03/35 VUs, 50 complete and 2 interrupted iterations
+pos_concurrency     Γ£ô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust Γåô [ 100% ] 5 VUs   30s
+pos_vs_admin_pos    Γåô [ 100% ] 10 VUs  30s
+
+running (1m20.0s), 02/35 VUs, 51 complete and 2 interrupted iterations
+pos_concurrency     Γ£ô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust Γåô [ 100% ] 5 VUs   30s
+pos_vs_admin_pos    Γåô [ 100% ] 10 VUs  30s
+
+running (1m21.0s), 01/35 VUs, 52 complete and 2 interrupted iterations
+pos_concurrency     Γ£ô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust Γ£ô [ 100% ] 5 VUs   30s
+pos_vs_admin_pos    Γåô [ 100% ] 10 VUs  30s
+
+running (1m21.2s), 00/35 VUs, 53 complete and 2 interrupted iterations
+pos_concurrency     Γ£ô [ 100% ] 20 VUs  30s
+pos_vs_admin_adjust Γ£ô [ 100% ] 5 VUs   30s
+pos_vs_admin_pos    Γ£ô [ 100% ] 10 VUs  30s

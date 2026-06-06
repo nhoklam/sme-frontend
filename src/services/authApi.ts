@@ -13,5 +13,20 @@ export const authApi = {
   },
   refreshToken: async (refreshToken: string) => {
     return axiosInstance.post<any, ApiResponse<{ accessToken: string; refreshToken: string }>>('/auth/refresh', { refreshToken });
+  },
+  logout: async () => {
+    return axiosInstance.post<any, ApiResponse<void>>('/auth/logout');
+  },
+  forgotPassword: async (email: string) => {
+    return axiosInstance.post<any, ApiResponse<void>>('/auth/forgot-password', { email });
+  },
+  resetPassword: async (data: { email: string; otp: string; newPassword: string }) => {
+    return axiosInstance.post<any, ApiResponse<void>>('/auth/reset-password', data);
+  },
+  exchangeOAuth2Token: async (code: string) => {
+    return axiosInstance.post<any, ApiResponse<{ accessToken: string; refreshToken: string; user: AuthUser }>>('/auth/oauth2/token', { code });
+  },
+  unlockUser: async (email: string) => {
+    return axiosInstance.post<any, ApiResponse<void>>('/auth/unlock-user', { email });
   }
 };

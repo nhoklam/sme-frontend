@@ -2,10 +2,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import customerAuthService, { CUSTOMER_STORAGE_KEY } from '../../../services/customerAuthService';
 
-/**
- * Hook lấy thông tin user đang đăng nhập.
- * Nếu chưa đăng nhập → trả null, không gọi API.
- */
 export const useCurrentUser = () => {
     const rawStored = localStorage.getItem(CUSTOMER_STORAGE_KEY);
 

@@ -12,7 +12,7 @@ export const checkAuth = createAsyncThunk(
             if (!token) return null;
 
             // Gọi API lấy thông tin user
-            const response = await axios.get(`${API_URL}/auth/profile`, {
+            const response = await axios.get(`${API_URL}/auth/me`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             return response.data;

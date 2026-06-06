@@ -5,6 +5,7 @@ import {
     TableRow, TextField, InputAdornment, Chip, IconButton, Select, MenuItem,
     FormControl, Tooltip, Skeleton, Alert, Button, Grid, Card, CardContent,
     Snackbar, Typography, Pagination, Dialog, DialogTitle, DialogContent, DialogActions,
+    TablePagination,
 } from '@mui/material';
 import {
     Search, Edit, History, Refresh, FilterList,
@@ -43,8 +44,6 @@ const STOCK_STATUS_OPTIONS: { value: StockStatusFilter; label: string }[] = [
     { value: 'out_of_stock', label: 'Hết hàng' },
 ];
 
-const PAGE_SIZE = 30;
-
 // ── thumbnail component ───────────────────────────────────────
 const ProductThumb: React.FC<{ url?: string; name: string }> = ({ url, name }) => {
     const [err, setErr] = useState(false);
@@ -76,6 +75,9 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
     const [selectedCategory, setSelectedCategory] = useState('');
     const [stockStatus, setStockStatus] = useState<StockStatusFilter>('all');
     const [page, setPage] = useState(0);
+    const [pageSize, setPageSize] = useState(10);
+    const [stockPage, setStockPage] = useState(0);
+    const [importPage, setImportPage] = useState(0);
 
     // ── Modal state ───────────────────────────────────────────
     const [adjustTarget, setAdjustTarget] = useState<InventoryWithMeta | null>(null);
@@ -190,8 +192,8 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
         });
     }, [inventories, selectedCategory, stockStatus]);
 
-    const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-    const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+    const totalPages = Math.ceil(filtered.length / pageSize);
+    const paged = filtered.slice(page * pageSize, (page + 1) * pageSize);
 
     // ── Stats ─────────────────────────────────────────────────
     const stats = {
@@ -295,17 +297,17 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
                         code,
                         time: new Date(tx.createdAt).toLocaleString('vi-VN'),
                         items: [],
-                        warehouseName: warehouses.find(w => w.id === tx.warehouseId)?.name || 'N/A'
+                        warehouseName: warehouses.find(w => w.id === (tx as any).warehouseId)?.name || 'N/A'
                     };
                     receipts.push(groups[code]);
                 }
 
                 const htMatch = tx.note?.match(/HT (\d+)/);
                 const ttMatch = tx.note?.match(/TT (\d+)/);
-                const p = productMap.get(tx.productId);
+                const p = productMap.get((tx as any).productId);
 
                 groups[code].items.push({
-                    productId: tx.productId,
+                    productId: (tx as any).productId,
                     productName: p?.name || 'Sản phẩm đã xóa',
                     sku: p?.sku || 'N/A',
                     isbnBarcode: p?.isbnBarcode || 'N/A',
@@ -537,15 +539,21 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
                 </TableContainer>
 
                 {/* Footer: count + pagination */}
-                <Box sx={{ px: 2.5, py: 1.25, borderTop: '1px solid #f0f0f0', bgcolor: '#fafafa', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="caption" color="text.secondary">
-                        Hiển thị <strong>{paged.length}</strong> / <strong>{filtered.length}</strong> mặt hàng
-                        {activeCount > 0 && ' (đang lọc)'}
-                    </Typography>
-                    {totalPages > 1 && (
-                        <Pagination count={totalPages} page={page + 1} onChange={(_, v) => setPage(v - 1)} size="small" />
-                    )}
-                </Box>
+                <TablePagination
+                    component="div"
+                    count={filtered.length}
+                    page={page}
+                    onPageChange={(_, newPage) => setPage(newPage)}
+                    rowsPerPage={pageSize}
+                    onRowsPerPageChange={(e) => {
+                        setPageSize(parseInt(e.target.value, 10));
+                        setPage(0);
+                    }}
+                    labelRowsPerPage="Số dòng/trang:"
+                    labelDisplayedRows={({ from, to, count }) => `${from}–${to} trên ${count !== -1 ? count : `hơn ${to}`}`}
+                    rowsPerPageOptions={[5, 10, 25, 50, 100]}
+                    sx={{ borderTop: '1px solid #f0f0f0', bgcolor: '#fafafa' }}
+                />
             </Paper>
 
             {/* Lịch sử phiếu kiểm kho */}
@@ -574,7 +582,7 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
                                         <Typography variant="body2" color="#9ca3af">Chưa có lịch sử kiểm kho nào</Typography>
                                     </TableCell>
                                 </TableRow>
-                            ) : stockCountHistory.map((h, i) => (
+                            ) : stockCountHistory.slice(stockPage * 5, (stockPage + 1) * 5).map((h, i) => (
                                 <TableRow key={i} sx={{ '&:hover': { bgcolor: '#f8fafc' } }}>
                                     <TableCell>
                                         <Typography variant="body2" fontWeight={700} color="#2563eb">{h.code}</Typography>
@@ -613,6 +621,11 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
                         </TableBody>
                     </Table>
                 </TableContainer>
+                {Math.ceil(stockCountHistory.length / 5) > 1 && (
+                    <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+                        <Pagination count={Math.ceil(stockCountHistory.length / 5)} page={stockPage + 1} onChange={(_, v) => setStockPage(v - 1)} size="small" />
+                    </Box>
+                )}
             </Paper>
 
             {/* Lịch sử phiếu nhập kho */}
@@ -637,7 +650,7 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
                                 <TableRow><TableCell colSpan={5} align="center" sx={{ py: 3 }}><Skeleton variant="text" width="80%" /></TableCell></TableRow>
                             ) : importHistory.length === 0 ? (
                                 <TableRow><TableCell colSpan={5} align="center" sx={{ py: 3 }}><Typography variant="body2" color="#9ca3af">Chưa có lịch sử nhập hàng</Typography></TableCell></TableRow>
-                            ) : importHistory.map((h, i) => (
+                            ) : importHistory.slice(importPage * 5, (importPage + 1) * 5).map((h, i) => (
                                 <TableRow key={i} sx={{ '&:hover': { bgcolor: '#f0fdf4' } }}>
                                     <TableCell><Typography variant="body2" fontWeight={700} color="#059669">{h.code}</Typography></TableCell>
                                     <TableCell><Typography variant="body2">{new Date(h.createdAt).toLocaleString('vi-VN')}</Typography></TableCell>
@@ -657,6 +670,11 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
                         </TableBody>
                     </Table>
                 </TableContainer>
+                {Math.ceil(importHistory.length / 5) > 1 && (
+                    <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+                        <Pagination count={Math.ceil(importHistory.length / 5)} page={importPage + 1} onChange={(_, v) => setImportPage(v - 1)} size="small" />
+                    </Box>
+                )}
             </Paper>
 
             {/* Modals */}

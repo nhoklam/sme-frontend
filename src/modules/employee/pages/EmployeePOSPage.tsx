@@ -10,7 +10,7 @@ import {
     Storefront, Dashboard as DashboardIcon,
     Logout as LogoutIcon, Logout,
     Add, Close, LocalOffer, Delete, Print, ReceiptLong,
-    Pause, ShoppingBasket, PersonAdd, Undo, ArrowBack, Person, MonetizationOn, Percent
+    Pause, ShoppingBasket, PersonAdd, Undo, ArrowBack, Person, MonetizationOn, Percent, Lock
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 
@@ -20,6 +20,7 @@ import { useWebSocket, WsPayload } from '../../../store/hooks/useWebSocket';
 import { ProductResponse, Customer } from '../../../types';
 
 import OpenShiftDialog from '../components/pos/OpenShiftDialog';
+import CloseShiftDialog from '../components/pos/CloseShiftDialog';
 import POSProductSearchBar from '../components/pos/POSProductSearchBar';
 import InlineCustomerSearch from '../components/pos/InlineCustomerSearch';
 import QuickCreateCustomerDialog from '../components/pos/QuickCreateCustomerDialog';
@@ -160,6 +161,11 @@ const EmployeePOSPage: React.FC = () => {
     const [qrDialogOpen, setQrDialogOpen] = useState(false);
     const [qrPaymentData, setQrPaymentData] = useState<{ checkoutUrl: string; qrCode?: string; orderCode: string; amount: number; gateway: string } | null>(null);
 
+    const [closeShiftOpen, setCloseShiftOpen] = useState(false);
+    const [closeShiftLoading, setCloseShiftLoading] = useState(false);
+
+    const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+
     usePosPaymentWebSocket(qrPaymentData?.orderCode || '', (invoice) => {
         setSnack({ msg: '✅ Khách hàng đã thanh toán thành công!', sev: 'success' });
         setQrDialogOpen(false);
@@ -212,7 +218,10 @@ const EmployeePOSPage: React.FC = () => {
         try {
             const res = await axiosInstance.get(`/inventory/warehouse/${currentUser.warehouseId}/search?keyword=${barcode}&page=0&size=5`);
             const items = res.data?.data?.content || [];
-            const match = items.find((p: any) => p.isbnBarcode === barcode || p.sku === barcode);
+            const match = items.find((p: any) => 
+                (p.isbnBarcode && p.isbnBarcode.toLowerCase() === barcode.toLowerCase()) || 
+                (p.sku && p.sku.toLowerCase() === barcode.toLowerCase())
+            );
 
             if (match) {
                 const pRes = await axiosInstance.get(`/products/${match.productId}`);
@@ -539,16 +548,17 @@ const EmployeePOSPage: React.FC = () => {
         } finally { setOpenShiftLoading(false); }
     };
 
-    const handleCloseShift = async () => {
-        const reported = window.prompt('Nhập số tiền thực đếm trong két (₫):');
-        if (reported === null) return;
-        const reason = window.prompt('Lý do chênh lệch (nếu có):') ?? '';
+    const handleCloseShift = async (reported: number, reason: string) => {
+        setCloseShiftLoading(true);
         try {
-            await axiosInstance.post('/pos/shifts/close', { reportedCash: Number(reported), discrepancyReason: reason || undefined });
+            await axiosInstance.post('/pos/shifts/close', { reportedCash: reported, discrepancyReason: reason || undefined });
             setShift(null);
+            setCloseShiftOpen(false);
             setSnack({ msg: '✅ Đóng ca thành công!', sev: 'success' });
         } catch (e: any) {
             setSnack({ msg: e.response?.data?.message || 'Đóng ca thất bại', sev: 'error' });
+        } finally {
+            setCloseShiftLoading(false);
         }
     };
 
@@ -577,9 +587,39 @@ const EmployeePOSPage: React.FC = () => {
         );
     }
 
+    const handleLogout = () => {
+        localStorage.removeItem(LS_ORDERS);
+        localStorage.removeItem(LS_ACTIVE);
+        localStorage.removeItem(LS_COUNTER);
+        localStorage.removeItem(LS_HELD);
+        authService.logout();
+        navigate('/admin/login');
+    };
+
     return (
         <Box sx={{ height: '100vh', bgcolor: '#f5f7fb', display: 'flex', flexDirection: 'column', fontFamily: 'system-ui, sans-serif' }}>
             <OpenShiftDialog open={!shift} onOpen={handleOpenShift} loading={openShiftLoading} />
+            <CloseShiftDialog 
+                open={closeShiftOpen} 
+                loading={closeShiftLoading} 
+                onClose={() => setCloseShiftOpen(false)} 
+                onConfirm={handleCloseShift} 
+            />
+            
+            <Dialog open={logoutConfirmOpen} onClose={() => setLogoutConfirmOpen(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+                <MuiDialogTitle fontWeight={700}>Xác nhận đăng xuất</MuiDialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        Bạn có chắc chắn muốn đăng xuất? Thao tác này sẽ <strong>xóa toàn bộ giỏ hàng và các đơn hàng đang giữ</strong> trên máy này.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions sx={{ px: 3, pb: 2 }}>
+                    <Button onClick={() => setLogoutConfirmOpen(false)} sx={{ color: '#595959', textTransform: 'none' }}>Hủy bỏ</Button>
+                    <Button variant="contained" color="error" onClick={handleLogout} sx={{ textTransform: 'none', borderRadius: 1.5 }}>
+                        Đăng xuất & Xóa dữ liệu
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
             {/* HEADER */}
             <Box sx={{
@@ -622,9 +662,15 @@ const EmployeePOSPage: React.FC = () => {
                         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
                         transformOrigin={{ vertical: 'top', horizontal: 'right' }}
                     >
-                        <MenuItem onClick={() => { authService.logout(); navigate('/admin/login'); }}>
+                        {shift && (
+                            <MenuItem onClick={() => { setUserMenuAnchor(null); setCloseShiftOpen(true); }}>
+                                <Lock fontSize="small" sx={{ mr: 1, color: '#faad14' }} />
+                                <Typography color="#d48806" variant="body2" fontWeight={600}>Đóng ca làm việc</Typography>
+                            </MenuItem>
+                        )}
+                        <MenuItem onClick={() => { setUserMenuAnchor(null); setLogoutConfirmOpen(true); }}>
                             <Logout fontSize="small" sx={{ mr: 1, color: '#ff4d4f' }} />
-                            <Typography color="error" variant="body2">Đăng xuất</Typography>
+                            <Typography color="error" variant="body2" fontWeight={600}>Đăng xuất</Typography>
                         </MenuItem>
                     </Menu>
                 </Box>

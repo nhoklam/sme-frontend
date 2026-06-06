@@ -8,6 +8,8 @@ import productService from '../../../../services/productService';
 import { ProductResponse } from '../../../../types';
 import BarcodeScannerDialog from './BarcodeScannerDialog';
 import { IconButton } from '@mui/material';
+import { useDebounce } from '../../../../hooks/useDebounce';
+import { List } from 'react-window';
 
 const fmt = (n?: number) =>
     new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(n ?? 0);
@@ -26,6 +28,7 @@ const POSProductSearchBar: React.FC<Props> = ({ onAdd, onScanCoupon, disabled, w
     const [barcodeErr, setBarcodeErr] = useState('');
     const [isFocused, setIsFocused] = useState(false);
     const [scannerOpen, setScannerOpen] = useState(false);
+    const debouncedQuery = useDebounce(query, 300);
     const inputRef = useRef<HTMLInputElement>(null);
     const dropRef = useRef<HTMLDivElement>(null);
 
@@ -33,19 +36,19 @@ const POSProductSearchBar: React.FC<Props> = ({ onAdd, onScanCoupon, disabled, w
     const isCouponCode = (q: string) => q.trim().toUpperCase().startsWith('KM') || /^[A-Z0-9]{6,12}$/.test(q.trim().toUpperCase());
 
     useEffect(() => {
-        const q = query.trim();
-        if (!q && !isFocused) { setResults([]); setBarcodeErr(''); return; }
+        const q = debouncedQuery.trim();
+        if (!q && !isFocused) { setResults([]); setBarcodeErr(''); setLoading(false); return; }
+        if (!q) { setResults([]); setLoading(false); return; }
 
-        const t = setTimeout(async () => {
-            setLoading(true);
-            try {
-                const r = await productService.search({ keyword: q || '', page: 0, size: 15, isActive: true, warehouseId });
-                setResults(r.content);
-            } catch { setResults([]); }
-            finally { setLoading(false); }
-        }, 220);
-        return () => clearTimeout(t);
-    }, [query, isFocused]);
+        let active = true;
+        setLoading(true);
+        productService.search({ keyword: q || '', page: 0, size: 100, isActive: true, warehouseId })
+            .then(r => { if(active) setResults(r.content); })
+            .catch(() => { if(active) setResults([]); })
+            .finally(() => { if(active) setLoading(false); });
+
+        return () => { active = false; };
+    }, [debouncedQuery, isFocused, warehouseId]);
 
     useEffect(() => {
         const h = (e: MouseEvent) => {
@@ -136,7 +139,7 @@ const POSProductSearchBar: React.FC<Props> = ({ onAdd, onScanCoupon, disabled, w
             {(results.length > 0 || barcodeErr) && (
                 <Paper elevation={8} sx={{
                     position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 9999,
-                    bgcolor: '#fff', borderRadius: 1.5, mt: 0.5, maxHeight: 380, overflowY: 'auto',
+                    bgcolor: '#fff', borderRadius: 1.5, mt: 0.5, overflow: 'hidden',
                     boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
                 }}>
                     {barcodeErr && (
@@ -150,29 +153,40 @@ const POSProductSearchBar: React.FC<Props> = ({ onAdd, onScanCoupon, disabled, w
                                 <Typography variant="caption" color="#64748b" fontWeight={700}>{results.length} kết quả</Typography>
                                 <Button size="small" onClick={() => { setQuery(''); setResults([]); }} sx={{ py: 0, minWidth: 0, fontSize: 11, color: '#94a3b8' }}>✕</Button>
                             </Box>
-                            {results.map((p, i) => (
-                                <Box key={p.id} onClick={() => handleSelect(p)} sx={{
-                                    px: 2, py: 0.875, cursor: 'pointer',
-                                    display: 'flex', alignItems: 'center', gap: 1.5,
-                                    bgcolor: i % 2 === 0 ? '#fff' : '#fafafa',
-                                    borderBottom: '1px solid #f1f5f9',
-                                    '&:hover': { bgcolor: '#eff6ff' },
-                                }}>
-                                    {p.imageUrl
-                                        ? <Box component="img" src={p.imageUrl} alt={p.name} sx={{ width: 30, height: 40, objectFit: 'contain', borderRadius: 0.5, flexShrink: 0 }} />
-                                        : <Box sx={{ width: 30, height: 40, bgcolor: '#f1f5f9', borderRadius: 0.5, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>📦</Box>}
-                                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                                        <Typography variant="body2" fontWeight={600} fontSize={12} noWrap color="#1e293b">{p.name}</Typography>
-                                        <Typography variant="caption" color="#94a3b8" fontSize={10}>{p.sku || p.isbnBarcode || 'Không có SKU'}</Typography>
-                                    </Box>
-                                    <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
-                                        <Typography variant="body2" fontWeight={700} fontSize={12} color="#1d4ed8">{fmt(p.retailPrice)}</Typography>
-                                        <Typography variant="caption" color={!p.availableQuantity ? '#ef4444' : '#22c55e'} fontSize={10}>
-                                            {!p.availableQuantity ? 'Hết hàng' : `Còn ${p.availableQuantity}`}
-                                        </Typography>
-                                    </Box>
-                                </Box>
-                            ))}
+                            <List
+                                style={{ height: Math.min(380, results.length * 60), width: '100%' }}
+                                rowCount={results.length}
+                                rowHeight={60}
+                                rowProps={{}}
+                                rowComponent={({ index, style }) => {
+                                    const p = results[index];
+                                    return (
+                                        <div style={style} key={p.id}>
+                                            <Box onClick={() => handleSelect(p)} sx={{
+                                                px: 2, cursor: 'pointer', height: '100%',
+                                                display: 'flex', alignItems: 'center', gap: 1.5,
+                                                bgcolor: index % 2 === 0 ? '#fff' : '#fafafa',
+                                                borderBottom: '1px solid #f1f5f9',
+                                                '&:hover': { bgcolor: '#eff6ff' },
+                                            }}>
+                                                {p.imageUrl
+                                                    ? <Box component="img" src={p.imageUrl} alt={p.name} sx={{ width: 30, height: 40, objectFit: 'contain', borderRadius: 0.5, flexShrink: 0 }} />
+                                                    : <Box sx={{ width: 30, height: 40, bgcolor: '#f1f5f9', borderRadius: 0.5, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>📦</Box>}
+                                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                                    <Typography variant="body2" fontWeight={600} fontSize={12} noWrap color="#1e293b">{p.name}</Typography>
+                                                    <Typography variant="caption" color="#94a3b8" fontSize={10}>{p.sku || p.isbnBarcode || 'Không có SKU'}</Typography>
+                                                </Box>
+                                                <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
+                                                    <Typography variant="body2" fontWeight={700} fontSize={12} color="#1d4ed8">{fmt(p.retailPrice)}</Typography>
+                                                    <Typography variant="caption" color={!p.availableQuantity ? '#ef4444' : '#22c55e'} fontSize={10}>
+                                                        {!p.availableQuantity ? 'Hết hàng' : `Còn ${p.availableQuantity}`}
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+                                        </div>
+                                    );
+                                }}
+                            />
                         </>
                     )}
                 </Paper>

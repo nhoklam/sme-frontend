@@ -23,6 +23,7 @@ export default function AuditLogsTab() {
             const logs: AuditLog[] = (Array.isArray(data) ? data : []).map((item: any) => ({
                 entityName: item.entityName || '',
                 entityId: item.entityId || '',
+                targetName: item.targetName || '',
                 action: item.actionType || item.action || '',
                 performedBy: item.changedBy || item.performedBy || 'SYSTEM',
                 performedAt: item.changedAt || item.performedAt || '',
@@ -40,7 +41,7 @@ export default function AuditLogsTab() {
         if (actionFilter && log.action !== actionFilter) return false;
         if (keyword) {
             const kw = keyword.toLowerCase();
-            return log.performedBy.toLowerCase().includes(kw) || log.entityName.toLowerCase().includes(kw) || log.entityId.toLowerCase().includes(kw);
+            return log.performedBy.toLowerCase().includes(kw) || log.entityName.toLowerCase().includes(kw) || log.entityId.toLowerCase().includes(kw) || (log.targetName && log.targetName.toLowerCase().includes(kw));
         }
         return true;
     });
@@ -90,7 +91,7 @@ export default function AuditLogsTab() {
                                 <TableCell sx={{ fontWeight: 700, color: '#64748b', fontSize: 11 }}>NGƯỜI THỰC HIỆN</TableCell>
                                 <TableCell sx={{ fontWeight: 700, color: '#64748b', fontSize: 11 }}>HÀNH ĐỘNG</TableCell>
                                 <TableCell sx={{ fontWeight: 700, color: '#64748b', fontSize: 11 }}>BẢNG DỮ LIỆU</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: '#64748b', fontSize: 11 }} align="center">ID TARGET</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: '#64748b', fontSize: 11 }} align="center">ĐỐI TƯỢNG (TARGET)</TableCell>
                                 <TableCell sx={{ fontWeight: 700, color: '#64748b', fontSize: 11 }} align="right">PHIÊN BẢN</TableCell>
                             </TableRow>
                         </TableHead>
@@ -124,7 +125,12 @@ export default function AuditLogsTab() {
                                             <Typography fontSize={12} fontWeight={600} color="#475569">{log.entityName}</Typography>
                                         </TableCell>
                                         <TableCell align="center">
-                                            <Typography fontSize={10} fontFamily="monospace" fontWeight={700} color="#64748b"
+                                            {log.targetName && log.targetName !== 'N/A' && log.targetName !== 'Unknown' && (
+                                                <Typography fontSize={12} fontWeight={700} color="#1e293b" mb={0.5}>
+                                                    {log.targetName}
+                                                </Typography>
+                                            )}
+                                            <Typography fontSize={10} fontFamily="monospace" fontWeight={600} color="#64748b"
                                                 sx={{ bgcolor: '#f1f5f9', px: 1, py: 0.25, borderRadius: 0.75, display: 'inline-block' }}>
                                                 {log.entityId?.toString().slice(0, 8)}...
                                             </Typography>

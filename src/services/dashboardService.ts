@@ -97,7 +97,7 @@ const dashboardService = {
 
     getTopData: async (warehouseId?: string) => {
         const now = new Date();
-        const from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+        const from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
         const to = now.toISOString();
 
         const [products, customers] = await Promise.all([

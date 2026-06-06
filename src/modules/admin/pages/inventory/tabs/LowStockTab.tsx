@@ -4,7 +4,7 @@ import {
     TableRow, TextField, InputAdornment, Chip, Select, MenuItem, FormControl,
     Skeleton, Alert, Button, Typography, LinearProgress,
     Dialog, DialogTitle, DialogContent, DialogActions,
-    IconButton, Divider, CircularProgress, Snackbar,
+    IconButton, Divider, CircularProgress, Snackbar, TablePagination,
 } from '@mui/material';
 import { Search, Refresh, FileDownloadOutlined, Add, Close, ShoppingCart } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
@@ -301,6 +301,9 @@ const LowStockTab: React.FC<Props> = ({ warehouses }) => {
     const [selectedWarehouse, setSelectedWarehouse] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('');
 
+    const [page, setPage] = useState(0);
+    const [pageSize, setPageSize] = useState(10);
+
     // ── NEW: Quick Import state ──
     const [importDialogOpen, setImportDialogOpen] = useState(false);
     const [importPrefilledItems, setImportPrefilledItems] = useState<LowStockItem[]>([]);
@@ -434,8 +437,10 @@ const LowStockTab: React.FC<Props> = ({ warehouses }) => {
         setImportDialogOpen(true);
     };
 
-    const clearFilters = () => { setSearch(''); setSelectedWarehouse(''); setSelectedCategory(''); };
+    const clearFilters = () => { setSearch(''); setSelectedWarehouse(''); setSelectedCategory(''); setPage(0); };
     const activeCount = [search, selectedWarehouse, selectedCategory].filter(Boolean).length;
+
+    const paged = filtered.slice(page * pageSize, page * pageSize + pageSize);
 
     return (
         <Box>
@@ -469,7 +474,7 @@ const LowStockTab: React.FC<Props> = ({ warehouses }) => {
                     size="small"
                     placeholder="Tìm theo tên, SKU..."
                     value={search}
-                    onChange={e => setSearch(e.target.value)}
+                    onChange={e => { setSearch(e.target.value); setPage(0); }}
                     sx={{ flex: 1, minWidth: 200 }}
                     InputProps={{
                         startAdornment: (
@@ -481,7 +486,7 @@ const LowStockTab: React.FC<Props> = ({ warehouses }) => {
                 />
                 {isAdmin && (
                     <FormControl size="small" sx={{ minWidth: 180 }}>
-                        <Select value={selectedWarehouse} onChange={e => setSelectedWarehouse(e.target.value)} displayEmpty>
+                        <Select value={selectedWarehouse} onChange={e => { setSelectedWarehouse(e.target.value); setPage(0); }} displayEmpty>
                             <MenuItem value="">Tất cả kho</MenuItem>
                             {warehouses.filter(w => w.isActive).map(w => (
                                 <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>
@@ -490,7 +495,7 @@ const LowStockTab: React.FC<Props> = ({ warehouses }) => {
                     </FormControl>
                 )}
                 <FormControl size="small" sx={{ minWidth: 180 }}>
-                    <Select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)} displayEmpty>
+                    <Select value={selectedCategory} onChange={e => { setSelectedCategory(e.target.value); setPage(0); }} displayEmpty>
                         <MenuItem value="">Tất cả danh mục</MenuItem>
                         {categories.filter(c => c.isActive).map(c => (
                             <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
@@ -533,8 +538,8 @@ const LowStockTab: React.FC<Props> = ({ warehouses }) => {
                                         {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(j => <TableCell key={j}><Skeleton height={20} /></TableCell>)}
                                     </TableRow>
                                 ))
-                            ) : filtered.length > 0 ? (
-                                filtered.map((item, idx) => {
+                            ) : paged.length > 0 ? (
+                                paged.map((item, idx) => {
                                     const pct = item.minQuantity > 0
                                         ? Math.min((item.quantity / item.minQuantity) * 100, 100) : 0;
                                     const p = productMap.get(item.productId);
@@ -630,6 +635,21 @@ const LowStockTab: React.FC<Props> = ({ warehouses }) => {
                         </TableBody>
                     </Table>
                 </TableContainer>
+                <TablePagination
+                    component="div"
+                    count={filtered.length}
+                    page={page}
+                    onPageChange={(_, newPage) => setPage(newPage)}
+                    rowsPerPage={pageSize}
+                    onRowsPerPageChange={(e) => {
+                        setPageSize(parseInt(e.target.value, 10));
+                        setPage(0);
+                    }}
+                    labelRowsPerPage="Số dòng/trang:"
+                    labelDisplayedRows={({ from, to, count }) => `${from}–${to} trên ${count !== -1 ? count : `hơn ${to}`}`}
+                    rowsPerPageOptions={[5, 10, 25, 50, 100]}
+                    sx={{ borderTop: '1px solid #f0f0f0', bgcolor: '#fafafa' }}
+                />
             </Paper>
 
             {/* Quick Import Dialog */}

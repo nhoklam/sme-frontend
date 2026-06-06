@@ -531,6 +531,8 @@ export interface CreateOrderRequest {
   couponCode?: string;
   discountAmount?: number;
   assignedWarehouseId?: string;
+  shippingLatitude?: number;
+  shippingLongitude?: number;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -828,6 +830,7 @@ export interface RevenueReportParams {
   period?: ReportPeriod;
   warehouseId?: string;
   paymentMethod?: string;
+  cashierId?: string;
 }
 
 export interface TopProductParams {

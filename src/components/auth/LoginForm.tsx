@@ -108,7 +108,7 @@ const LoginForm = ({ onSuccess, onError }) => {
                     }
                     label={<Typography variant="body2">Ghi nhớ đăng nhập</Typography>}
                 />
-                <Link href="#" variant="body2" underline="hover" sx={{ color: IC }}>
+                <Link href="/forgot-password" variant="body2" underline="hover" sx={{ color: IC }}>
                     Quên mật khẩu?
                 </Link>
             </Box>

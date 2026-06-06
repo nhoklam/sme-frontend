@@ -4,46 +4,88 @@ import {
     Alert, InputAdornment, IconButton, Stepper, Step, StepLabel, Container, Fade
 } from '@mui/material';
 import {
-    Email, ArrowBack, LockReset, Visibility, VisibilityOff, CheckCircle,
+    Email, ArrowBack, LockReset, Visibility, VisibilityOff, VpnKey
 } from '@mui/icons-material';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { authApi } from '../../../services/authApi';
+import toast from 'react-hot-toast';
+import { AxiosError } from 'axios';
 
 export default function ForgotPasswordPage() {
+    const navigate = useNavigate();
     const [step, setStep] = useState(0);
     const [email, setEmail] = useState('');
+    const [otp, setOtp] = useState('');
     const [showPass, setShowPass] = useState(false);
     const [newPass, setNewPass] = useState('');
     const [confirmPass, setConfirmPass] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [passwordError, setPasswordError] = useState('');
 
-    const steps = ['Nhập email', 'Xác nhận', 'Đặt lại mật khẩu'];
+    const steps = ['Nhập email', 'Xác minh & Đặt lại'];
+
+    const validatePassword = (password: string) => {
+        if (password.length < 8) return 'Mật khẩu phải có ít nhất 8 ký tự';
+        if (!/[A-Z]/.test(password)) return 'Mật khẩu phải chứa ít nhất 1 chữ hoa';
+        if (!/[a-z]/.test(password)) return 'Mật khẩu phải chứa ít nhất 1 chữ thường';
+        if (!/[0-9]/.test(password)) return 'Mật khẩu phải chứa ít nhất 1 số';
+        return '';
+    };
 
     const handleSendEmail = async () => {
         if (!email.trim()) { setError('Vui lòng nhập email'); return; }
         setError('');
         setLoading(true);
-        await new Promise(r => setTimeout(r, 1000));
-        setLoading(false);
-        setStep(1);
-    };
-
-    const handleVerify = async () => {
-        setError('');
-        setLoading(true);
-        await new Promise(r => setTimeout(r, 800));
-        setLoading(false);
-        setStep(2);
+        try {
+            await authApi.forgotPassword(email);
+            toast.success('Mã OTP đã được gửi đến email của bạn');
+            setStep(1);
+        } catch (err: any) {
+            const axiosError = err as AxiosError<any>;
+            const status = axiosError.response?.status;
+            if (status === 429) {
+                setError('Bạn đã yêu cầu quá nhiều lần. Vui lòng thử lại sau.');
+            } else if (status === 404) {
+                setError('Email không tồn tại trong hệ thống.');
+            } else {
+                setError(axiosError.response?.data?.message || 'Có lỗi xảy ra, vui lòng thử lại');
+            }
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleReset = async () => {
-        if (!newPass || newPass.length < 6) { setError('Mật khẩu phải có ít nhất 6 ký tự'); return; }
+        if (!otp.trim()) { setError('Vui lòng nhập mã OTP'); return; }
+        
+        const passValidation = validatePassword(newPass);
+        if (passValidation) {
+            setPasswordError(passValidation);
+            return;
+        } else {
+            setPasswordError('');
+        }
+
         if (newPass !== confirmPass) { setError('Mật khẩu xác nhận không khớp'); return; }
+        
         setError('');
         setLoading(true);
-        await new Promise(r => setTimeout(r, 1000));
-        setLoading(false);
-        setStep(3);
+        try {
+            await authApi.resetPassword({ email, otp, newPassword: newPass });
+            toast.success('Đặt lại mật khẩu thành công! Vui lòng đăng nhập lại.');
+            navigate('/login');
+        } catch (err: any) {
+            const axiosError = err as AxiosError<any>;
+            const status = axiosError.response?.status;
+            if (status === 400 || status === 401) {
+                setError(axiosError.response?.data?.message || 'Mã OTP không hợp lệ hoặc đã hết hạn');
+            } else {
+                setError(axiosError.response?.data?.message || 'Có lỗi xảy ra khi đặt lại mật khẩu');
+            }
+        } finally {
+            setLoading(false);
+        }
     };
 
     const textFieldStyle = {
@@ -149,30 +191,28 @@ export default function ForgotPasswordPage() {
                         </Box>
 
                         <Box sx={{ p: 4 }}>
-                            {step < 3 && (
-                                <Stepper 
-                                    activeStep={step} 
-                                    sx={{ 
-                                        mb: 4,
-                                        '& .MuiStepLabel-label': { color: 'rgba(26, 26, 46, 0.5)', fontSize: 11, fontWeight: 600 },
-                                        '& .MuiStepLabel-label.Mui-active': { color: '#f5a623 !important' },
-                                        '& .MuiStepLabel-label.Mui-completed': { color: 'rgba(245, 166, 35, 0.7) !important' },
-                                        '& .MuiStepIcon-root': { color: 'rgba(0, 0, 0, 0.08)' },
-                                        '& .MuiStepIcon-text': { fill: '#ffffff', fontWeight: 'bold' },
-                                        '& .MuiStepIcon-root.Mui-active': { color: '#f5a623' },
-                                        '& .MuiStepIcon-root.Mui-active .MuiStepIcon-text': { fill: '#0c0c16' },
-                                        '& .MuiStepIcon-root.Mui-completed': { color: '#f5a623' },
-                                        '& .MuiStepConnector-line': { borderColor: 'rgba(0, 0, 0, 0.08)' }
-                                    }} 
-                                    alternativeLabel
-                                >
-                                    {steps.map(label => (
-                                        <Step key={label}>
-                                            <StepLabel>{label}</StepLabel>
-                                        </Step>
-                                    ))}
-                                </Stepper>
-                            )}
+                            <Stepper 
+                                activeStep={step} 
+                                sx={{ 
+                                    mb: 4,
+                                    '& .MuiStepLabel-label': { color: 'rgba(26, 26, 46, 0.5)', fontSize: 11, fontWeight: 600 },
+                                    '& .MuiStepLabel-label.Mui-active': { color: '#f5a623 !important' },
+                                    '& .MuiStepLabel-label.Mui-completed': { color: 'rgba(245, 166, 35, 0.7) !important' },
+                                    '& .MuiStepIcon-root': { color: 'rgba(0, 0, 0, 0.08)' },
+                                    '& .MuiStepIcon-text': { fill: '#ffffff', fontWeight: 'bold' },
+                                    '& .MuiStepIcon-root.Mui-active': { color: '#f5a623' },
+                                    '& .MuiStepIcon-root.Mui-active .MuiStepIcon-text': { fill: '#0c0c16' },
+                                    '& .MuiStepIcon-root.Mui-completed': { color: '#f5a623' },
+                                    '& .MuiStepConnector-line': { borderColor: 'rgba(0, 0, 0, 0.08)' }
+                                }} 
+                                alternativeLabel
+                            >
+                                {steps.map(label => (
+                                    <Step key={label}>
+                                        <StepLabel>{label}</StepLabel>
+                                    </Step>
+                                ))}
+                            </Stepper>
 
                             {error && (
                                 <Alert severity="error" sx={{ mb: 2, borderRadius: '8px', bgcolor: 'rgba(211, 47, 47, 0.05)', color: '#d32f2f', border: '1px solid rgba(211, 47, 47, 0.12)' }} onClose={() => setError('')}>
@@ -183,7 +223,7 @@ export default function ForgotPasswordPage() {
                             {step === 0 && (
                                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
                                     <Alert severity="info" sx={{ borderRadius: '8px', bgcolor: 'rgba(245, 166, 35, 0.08)', color: '#b27a18', border: '1px solid rgba(245, 166, 35, 0.2)', fontSize: 13, '& .MuiAlert-icon': { color: '#f5a623' } }}>
-                                        Nhập email đăng ký. Chúng tôi sẽ gửi link xác nhận đặt lại mật khẩu.
+                                        Nhập email đăng ký. Chúng tôi sẽ gửi mã OTP 6 số để xác nhận.
                                     </Alert>
                                     <TextField
                                         fullWidth label="Email tài khoản" type="email"
@@ -225,47 +265,32 @@ export default function ForgotPasswordPage() {
                             {step === 1 && (
                                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
                                     <Alert severity="success" sx={{ borderRadius: '8px', bgcolor: 'rgba(16, 185, 129, 0.08)', color: '#059669', border: '1px solid rgba(16, 185, 129, 0.18)', fontSize: 13, '& .MuiAlert-icon': { color: '#10b981' } }}>
-                                        Email xác nhận đã gửi đến <strong>{email}</strong>. Vui lòng kiểm tra hộp thư.
+                                        Mã OTP đã gửi đến <strong>{email}</strong>
                                     </Alert>
-                                    <Typography fontSize={13} sx={{ color: 'rgba(26, 26, 46, 0.6)' }} textAlign="center">
-                                        Trong môi trường demo, nhấn nút dưới để tiếp tục.
-                                    </Typography>
-                                    <Button
-                                        fullWidth variant="contained" size="large"
-                                        onClick={handleVerify} disabled={loading}
-                                        sx={{ 
-                                            borderRadius: '8px', 
-                                            textTransform: 'none', 
-                                            fontWeight: 700, 
-                                            py: 1.5, 
-                                            background: 'linear-gradient(135deg, #f5a623 0%, #d48b10 100%)',
-                                            color: '#0c0c16',
-                                            boxShadow: '0 4px 15px rgba(245, 166, 35, 0.2)',
-                                            transition: 'all 0.3s',
-                                            '&:hover': { 
-                                                background: 'linear-gradient(135deg, #ffb83d 0%, #e0951a 100%)',
-                                                boxShadow: '0 6px 20px rgba(245, 166, 35, 0.3)'
-                                            }
+                                    
+                                    <TextField
+                                        fullWidth label="Mã OTP (6 chữ số)" type="text"
+                                        value={otp} onChange={e => setOtp(e.target.value)}
+                                        autoFocus
+                                        InputProps={{
+                                            startAdornment: (
+                                                <InputAdornment position="start">
+                                                    <VpnKey sx={{ color: 'rgba(26, 26, 46, 0.4)', fontSize: 20 }} />
+                                                </InputAdornment>
+                                            ),
                                         }}
-                                    >
-                                        {loading ? 'Đang xác nhận...' : 'Xác nhận (Demo)'}
-                                    </Button>
-                                    <Button
-                                        fullWidth variant="text" size="small"
-                                        onClick={() => setStep(0)}
-                                        sx={{ textTransform: 'none', color: 'rgba(26, 26, 46, 0.5)', '&:hover': { color: '#f5a623' } }}
-                                    >
-                                        Đổi email khác
-                                    </Button>
-                                </Box>
-                            )}
-
-                            {step === 2 && (
-                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+                                        sx={textFieldStyle}
+                                    />
+                                    
                                     <TextField
                                         fullWidth label="Mật khẩu mới" type={showPass ? 'text' : 'password'}
-                                        value={newPass} onChange={e => setNewPass(e.target.value)}
-                                        autoFocus
+                                        value={newPass} 
+                                        onChange={e => {
+                                            setNewPass(e.target.value);
+                                            if (passwordError) setPasswordError(validatePassword(e.target.value));
+                                        }}
+                                        error={!!passwordError}
+                                        helperText={passwordError || 'Tối thiểu 8 ký tự, có chữ hoa, chữ thường và số'}
                                         InputProps={{
                                             endAdornment: (
                                                 <InputAdornment position="end">
@@ -276,15 +301,17 @@ export default function ForgotPasswordPage() {
                                             ),
                                         }}
                                         sx={textFieldStyle}
-                                        helperText="Ít nhất 6 ký tự"
                                     />
+                                    
                                     <TextField
                                         fullWidth label="Xác nhận mật khẩu mới" type={showPass ? 'text' : 'password'}
                                         value={confirmPass} onChange={e => setConfirmPass(e.target.value)}
                                         error={!!confirmPass && confirmPass !== newPass}
                                         sx={textFieldStyle}
                                         helperText={confirmPass && confirmPass !== newPass ? 'Mật khẩu không khớp' : ''}
+                                        onKeyDown={e => e.key === 'Enter' && handleReset()}
                                     />
+                                    
                                     <Button
                                         fullWidth variant="contained" size="large"
                                         onClick={handleReset} disabled={loading}
@@ -303,53 +330,29 @@ export default function ForgotPasswordPage() {
                                             }
                                         }}
                                     >
-                                        {loading ? 'Đang đặt lại...' : 'Đặt lại mật khẩu'}
+                                        {loading ? 'Đang xử lý...' : 'Xác nhận & Đặt lại mật khẩu'}
+                                    </Button>
+                                    
+                                    <Button
+                                        fullWidth variant="text" size="small"
+                                        onClick={() => setStep(0)}
+                                        disabled={loading}
+                                        sx={{ textTransform: 'none', color: 'rgba(26, 26, 46, 0.5)', '&:hover': { color: '#f5a623' } }}
+                                    >
+                                        Quay lại nhập email
                                     </Button>
                                 </Box>
                             )}
 
-                            {step === 3 && (
-                                <Box sx={{ textAlign: 'center', py: 2 }}>
-                                    <CheckCircle sx={{ fontSize: 64, color: '#10b981', mb: 2 }} />
-                                    <Typography variant="h6" fontWeight={800} color="#1a1a2e" mb={1}>
-                                        Đặt lại thành công!
-                                    </Typography>
-                                    <Typography variant="body2" sx={{ color: 'rgba(26, 26, 46, 0.6)' }} mb={3}>
-                                        Mật khẩu của bạn đã được cập nhật. Hãy đăng nhập lại bằng mật khẩu mới.
-                                    </Typography>
-                                    <Button
-                                        fullWidth variant="contained" size="large" component={Link} to="/login"
-                                        sx={{ 
-                                            borderRadius: '8px', 
-                                            textTransform: 'none', 
-                                            fontWeight: 700, 
-                                            py: 1.5, 
-                                            background: 'linear-gradient(135deg, #f5a623 0%, #d48b10 100%)',
-                                            color: '#0c0c16',
-                                            boxShadow: '0 4px 15px rgba(245, 166, 35, 0.2)',
-                                            transition: 'all 0.3s',
-                                            '&:hover': { 
-                                                background: 'linear-gradient(135deg, #ffb83d 0%, #e0951a 100%)',
-                                                boxShadow: '0 6px 20px rgba(245, 166, 35, 0.3)'
-                                            }
-                                        }}
-                                    >
-                                        Đăng nhập ngay
-                                    </Button>
-                                </Box>
-                            )}
-
-                            {step < 3 && (
-                                <Box sx={{ textAlign: 'center', mt: 3 }}>
-                                    <Button
-                                        component={Link} to="/login"
-                                        startIcon={<ArrowBack sx={{ fontSize: 16 }} />}
-                                        sx={{ textTransform: 'none', color: 'rgba(26, 26, 46, 0.5)', fontSize: 13, '&:hover': { color: '#f5a623' } }}
-                                    >
-                                        Quay lại đăng nhập
-                                    </Button>
-                                </Box>
-                            )}
+                            <Box sx={{ textAlign: 'center', mt: 3 }}>
+                                <Button
+                                    component={Link} to="/login"
+                                    startIcon={<ArrowBack sx={{ fontSize: 16 }} />}
+                                    sx={{ textTransform: 'none', color: 'rgba(26, 26, 46, 0.5)', fontSize: 13, '&:hover': { color: '#f5a623' } }}
+                                >
+                                    Quay lại đăng nhập
+                                </Button>
+                            </Box>
                         </Box>
                     </Paper>
                 </Fade>

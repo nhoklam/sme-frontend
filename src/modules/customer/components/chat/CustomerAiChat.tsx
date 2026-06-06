@@ -47,7 +47,8 @@ const CustomerAiChat = () => {
         setIsLoading(true);
 
         try {
-            const res = await axios.post('http://localhost:8080/api/public/ai/chat', {
+            const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
+            const res = await axios.post(`${apiUrl}/public/ai/chat`, {
                 message: userMsg.content
             });
 

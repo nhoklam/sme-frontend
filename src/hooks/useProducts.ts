@@ -1,84 +1,48 @@
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { productApi } from '../services/productApi';
 import { Product } from '../types';
 
 export const useProducts = (initialParams: any) => {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [totalPages, setTotalPages] = useState(0);
-  const [currentPage, setCurrentPage] = useState(0);
-  const [params, setParams] = useState(initialParams);
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['products', initialParams],
+    queryFn: () => productApi.getProducts(initialParams),
+    staleTime: 60_000,
+  });
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await productApi.getProducts(params);
-        if (res.success) {
-          setProducts(res.data.content);
-          setTotalPages(res.data.totalPages);
-          setCurrentPage(res.data.page);
-        }
-      } catch (err: any) {
-        setError(err.message || 'Lỗi tải sản phẩm');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProducts();
-  }, [params]);
-
-  const setPage = (page: number) => {
-    setParams((prev: any) => ({ ...prev, page }));
+  return {
+    products: data?.success ? data.data.content : [],
+    loading: isLoading,
+    error: error ? (error as any).message || 'Lỗi tải sản phẩm' : null,
+    totalPages: data?.success ? data.data.totalPages : 0,
+    currentPage: data?.success ? data.data.page : 0,
+    refetch,
   };
-
-  return { products, loading, error, totalPages, currentPage, setPage, setParams };
 };
 
 export const useProductDetail = (slug: string) => {
-  const [product, setProduct] = useState<Product | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['product', slug],
+    queryFn: () => productApi.getBySlug(slug),
+    enabled: !!slug,
+    staleTime: 60_000,
+  });
 
-  useEffect(() => {
-    if (!slug) return;
-    const fetchProduct = async () => {
-      setLoading(true);
-      try {
-        const res = await productApi.getBySlug(slug);
-        if (res.success) setProduct(res.data);
-      } catch (err: any) {
-        setError(err.message || 'Lỗi tải chi tiết sản phẩm');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProduct();
-  }, [slug]);
-
-  return { product, loading, error };
+  return {
+    product: data?.success ? data.data : null,
+    loading: isLoading,
+    error: error ? (error as any).message || 'Lỗi tải chi tiết sản phẩm' : null,
+  };
 };
 
 export const useFlashSale = () => {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, isLoading } = useQuery({
+    queryKey: ['flashSale'],
+    queryFn: () => productApi.getFlashSale(),
+    staleTime: 60_000,
+  });
 
-  useEffect(() => {
-    const fetchFlashSale = async () => {
-      setLoading(true);
-      try {
-        const res = await productApi.getFlashSale();
-        if (res.success) setProducts(res.data);
-      } catch (err) {
-        console.error('Error fetching flash sale', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchFlashSale();
-  }, []);
-
-  return { products, loading };
+  return {
+    products: data?.success ? data.data : [],
+    loading: isLoading,
+  };
 };

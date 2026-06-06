@@ -138,7 +138,7 @@ const InventoryValueTab: React.FC<{ warehouseId: string }> = ({ warehouseId }) =
         setLoading(true);
         try {
             const data = await reportService.getInventoryValue(warehouseId || undefined);
-            setInventoryValue(data);
+            setInventoryValue(data.sort((a: any, b: any) => (b.total_value ?? 0) - (a.total_value ?? 0)));
         } catch { /* silent */ }
         finally { setLoading(false); }
     }, [warehouseId]);
@@ -449,7 +449,7 @@ const DeadStockTab: React.FC<{ warehouseId: string }> = ({ warehouseId }) => {
 };
 
 // ─── Merchandise Tab (Hàng hóa) ─────────────────────────────────
-const MerchandiseTab: React.FC<{ warehouseId: string }> = ({ warehouseId }) => {
+const MerchandiseTab: React.FC<{ warehouseId: string; quickFilter: string; customFrom: string; customTo: string }> = ({ warehouseId, quickFilter, customFrom, customTo }) => {
     const [inventoryValue, setInventoryValue] = useState<InventoryValueReport[]>([]);
     const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
     const [lowStockItems, setLowStockItems] = useState<any[]>([]);
@@ -458,19 +458,27 @@ const MerchandiseTab: React.FC<{ warehouseId: string }> = ({ warehouseId }) => {
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
-            const now = new Date();
-            const from = new Date(now.getFullYear(), now.getMonth(), 1);
+            let fromDate: Date, toDate: Date;
+            if (quickFilter === 'custom' && customFrom && customTo) {
+                fromDate = new Date(customFrom);
+                toDate = new Date(customTo + 'T23:59:59');
+            } else {
+                const range = getDateRange(quickFilter);
+                fromDate = range.from;
+                toDate = range.to;
+            }
+
             const [invData, topData, lowData] = await Promise.all([
                 reportService.getInventoryValue(warehouseId || undefined),
-                reportService.getTopProducts({ from: toISO(from), to: toISO(now), limit: 10, ...(warehouseId ? { warehouseId } : {}) }),
+                reportService.getTopProducts({ from: toISO(fromDate), to: toISO(toDate), limit: 10, ...(warehouseId ? { warehouseId } : {}) }),
                 (async () => { try { const { default: inventoryService } = await import('../../../../services/inventoryService'); return await inventoryService.getLowStock(warehouseId || undefined); } catch { return []; } })(),
             ]);
-            setInventoryValue(invData);
+            setInventoryValue(invData.sort((a: any, b: any) => (b.total_value ?? 0) - (a.total_value ?? 0)));
             setTopProducts(topData);
             setLowStockItems(lowData);
         } catch { /* silent */ }
         finally { setLoading(false); }
-    }, [warehouseId]);
+    }, [warehouseId, quickFilter, customFrom, customTo]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -522,7 +530,7 @@ const MerchandiseTab: React.FC<{ warehouseId: string }> = ({ warehouseId }) => {
                         </Grid>
                         <Grid size={{ xs: 12, md: 6 }}>
                             <Paper elevation={0} sx={{ p: 2.5, borderRadius: 2, border: '1px solid #f0f0f0' }}>
-                                <Typography variant="subtitle2" fontWeight={700} mb={2}>Top 10 sản phẩm bán chạy (tháng này)</Typography>
+                                <Typography variant="subtitle2" fontWeight={700} mb={2}>Top 10 sản phẩm bán chạy</Typography>
                                 {topProducts.length > 0 ? (
                                     <ResponsiveContainer width="100%" height={280}>
                                         <BarChart data={topProducts.slice(0, 10).map(p => ({ name: p.name.length > 12 ? p.name.slice(0, 12) + '...' : p.name, sold: p.total_sold }))} margin={{ top: 10, right: 10, bottom: 30 }}>
@@ -595,7 +603,7 @@ const RevenueReportPage: React.FC = () => {
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
 
     const [chartPeriod, setChartPeriod] = useState<'hour' | 'day' | 'dayOfWeek' | 'month' | 'year'>('day');
-    const [quickFilter, setQuickFilter] = useState<string>('thisMonth');
+    const [quickFilter, setQuickFilter] = useState<string>('30days');
     const [customFrom, setCustomFrom] = useState<string>('');
     const [customTo, setCustomTo] = useState<string>('');
     const [paymentMethod, setPaymentMethod] = useState<string>('');
@@ -935,7 +943,7 @@ const RevenueReportPage: React.FC = () => {
                         {activeTab === 2 && <DeadStockTab warehouseId={warehouseId} />}
 
                         {/* ── TAB 3: Hàng hóa ── */}
-                        {activeTab === 3 && <MerchandiseTab warehouseId={warehouseId} />}
+                        {activeTab === 3 && <MerchandiseTab warehouseId={warehouseId} quickFilter={quickFilter} customFrom={customFrom} customTo={customTo} />}
                     </Paper>
                 </Grid>
             </Grid>

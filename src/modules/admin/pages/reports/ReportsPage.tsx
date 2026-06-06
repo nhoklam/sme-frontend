@@ -570,7 +570,7 @@ const InventoryDistributionTab: React.FC<{ warehouses: Warehouse[] }> = ({ wareh
                 value: r.totalValue ?? 0,
                 quantity: r.totalQuantity ?? 0,
                 percent: totalWhValue > 0 ? Math.round((r.totalValue / totalWhValue) * 100) : 0,
-            })));
+            })).sort((a: any, b: any) => b.value - a.value));
         } catch { /* silent */ }
         finally { setLoading(false); }
     }, [warehouseId]);

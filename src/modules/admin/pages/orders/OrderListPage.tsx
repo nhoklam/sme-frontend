@@ -32,6 +32,7 @@ import POSProductSearchBar from '../../../employee/components/pos/POSProductSear
 import PrintInvoiceDialog from '../../../employee/components/pos/PrintInvoiceDialog';
 import PrintShippingLabelDialog from './PrintShippingLabelDialog';
 import { useAuth } from '../../../../store/hooks/useAuth';
+import { useShippingCoordinates } from '../../../../hooks/useShippingCoordinates';
 
 // ── Memoized OrderRow ──────────────────────────────────────────
 const OrderRow = React.memo(({
@@ -261,6 +262,11 @@ const OrderDetailDialog: React.FC<{
     onStatusChange: (order: OrderResponse, newStatus: string) => void;
     onPrint?: () => void;
 }> = ({ order, open, onClose, onStatusChange, onPrint }) => {
+    const [itemsPage, setItemsPage] = useState(0);
+    const ITEMS_PER_PAGE = 10;
+    
+    useEffect(() => { setItemsPage(0); }, [order]);
+
     if (!order) return null;
     const status = STATUS_MAP[order.status as OrderStatus] || { label: order.status, color: '#666', bg: '#f3f4f6', step: 0 };
     const payStatus = PAYMENT_STATUS_MAP[order.paymentStatus as PaymentStatus] || { label: order.paymentStatus, color: '#888' };
@@ -428,7 +434,7 @@ const OrderDetailDialog: React.FC<{
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
-                                        {order.items.map((item, idx) => (
+                                        {order.items.slice(itemsPage * ITEMS_PER_PAGE, (itemsPage + 1) * ITEMS_PER_PAGE).map((item, idx) => (
                                             <TableRow key={idx} sx={{ '&:last-child td': { border: 0 } }}>
                                                 <TableCell sx={{ py: 1.25 }}>
                                                     <Typography variant="body2" fontWeight={600} fontSize={13}>
@@ -453,6 +459,16 @@ const OrderDetailDialog: React.FC<{
                                         ))}
                                     </TableBody>
                                 </Table>
+                                {Math.ceil(order.items.length / ITEMS_PER_PAGE) > 1 && (
+                                    <Box sx={{ p: 1.5, display: 'flex', justifyContent: 'center', borderTop: '1px solid #f0f0f0', bgcolor: '#fafafa' }}>
+                                        <Pagination 
+                                            size="small" 
+                                            count={Math.ceil(order.items.length / ITEMS_PER_PAGE)} 
+                                            page={itemsPage + 1} 
+                                            onChange={(_, p) => setItemsPage(p - 1)} 
+                                        />
+                                    </Box>
+                                )}
                             </Paper>
                         </Grid>
                     )}
@@ -536,6 +552,8 @@ const CreateOrderDialog: React.FC<{
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
 
+    const coordinates = useShippingCoordinates(undefined);
+
     useEffect(() => {
         if (!open) {
             setCustomer(null);
@@ -570,6 +588,9 @@ const CreateOrderDialog: React.FC<{
                 paymentMethod,
                 assignedWarehouseId: assignedWarehouseId || undefined,
                 note: '',
+                // NV-1: Tọa độ tự động tra cứu từ tên Quận/Huyện.
+                shippingLatitude: coordinates?.lat,
+                shippingLongitude: coordinates?.lng,
             };
             // customerId bắt buộc — nếu không có customer thì tạo mới hoặc dùng guest
             if (!customer) {
@@ -824,9 +845,13 @@ const OrderListPage: React.FC = () => {
                 }
             }
 
+            const isAll = source === 'ALL';
+            const fetchPage = isAll ? 0 : page;
+            const fetchSize = isAll ? 200 : PAGE_SIZE;
+
             const params: any = {
                 keyword: search.trim() || undefined,
-                page: 0, size: 9999, 
+                page: fetchPage, size: fetchSize, 
                 fromDate, toDate
             };
 
@@ -917,15 +942,22 @@ const OrderListPage: React.FC = () => {
             }
 
             // Nếu là 'ALL', sắp xếp lại theo thời gian
-            if (source === 'ALL') {
+            if (isAll) {
                 finalOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
             }
 
-            if (paymentMethodFilter) finalOrders = finalOrders.filter(o => o.paymentMethod?.includes(paymentMethodFilter));
+            if (paymentMethodFilter) {
+                finalOrders = finalOrders.filter(o => o.paymentMethod?.includes(paymentMethodFilter));
+            }
 
-            tElements = finalOrders.length;
-            tPages = Math.ceil(tElements / PAGE_SIZE);
-            const paginatedOrders = finalOrders.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+            let paginatedOrders;
+            if (isAll) {
+                tElements = finalOrders.length;
+                tPages = Math.ceil(tElements / PAGE_SIZE);
+                paginatedOrders = finalOrders.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+            } else {
+                paginatedOrders = finalOrders;
+            }
 
             setOrders(paginatedOrders);
             setTotalPages(tPages);

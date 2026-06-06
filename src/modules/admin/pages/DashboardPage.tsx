@@ -102,7 +102,7 @@ const DashboardPage: React.FC = () => {
     // Data state
     const [stats, setStats] = useState<any>(null);
     const [revenueTrend, setRevenueTrend] = useState<RevenueTrendPoint[]>([]);
-    const [quickFilter, setQuickFilter] = useState<'today' | 'yesterday' | 'last7days' | 'thisMonth' | '30days' | '90days' | 'thisYear'>('thisMonth');
+    const [quickFilter, setQuickFilter] = useState<'today' | 'yesterday' | 'last7days' | 'thisMonth' | '30days' | '90days' | 'thisYear'>('30days');
     const [topData, setTopData] = useState<any>({ topProducts: [], topCustomers: [] });
     const [lowStockItems, setLowStockItems] = useState<any[]>([]);
     const [allLowStockItems, setAllLowStockItems] = useState<any[]>([]);
@@ -114,7 +114,7 @@ const DashboardPage: React.FC = () => {
     const [lowStockRowsPerPage, setLowStockRowsPerPage] = useState(5);
 
     // Top chart filter state
-    const [topProductPeriod, setTopProductPeriod] = useState('thisMonth');
+    const [topProductPeriod, setTopProductPeriod] = useState('30days');
     const [topProductMetric, setTopProductMetric] = useState<'sold' | 'revenue'>('revenue');
     const [topCustomerPeriod, setTopCustomerPeriod] = useState('30days');
     const [topCustomerMetric, setTopCustomerMetric] = useState<'revenue' | 'orders'>('revenue');
@@ -175,7 +175,8 @@ const DashboardPage: React.FC = () => {
         // 4. Tải dữ liệu biểu đồ xu hướng doanh thu
         try {
             const now = new Date();
-            const from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const from = new Date(today.getTime() - 30 * 86400000).toISOString();
             const trend = await dashboardService.getRevenueByRange(from, now.toISOString(), 'day', currentUser?.warehouseId);
             setRevenueTrend(trend);
             setChartPeriod('day');
@@ -601,11 +602,10 @@ const DashboardPage: React.FC = () => {
                                         onChange={(e) => handleTopProductPeriodChange(e.target.value)}
                                         style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '12px', fontWeight: 600 }}
                                     >
-                                        <option value="today">Hôm nay</option>
-                                        <option value="yesterday">Hôm qua</option>
-                                        <option value="last7days">7 ngày gần nhất</option>
-                                        <option value="thisMonth">Tháng này</option>
-                                        <option value="thisYear">Năm nay</option>
+                                        <option value="last7days">7 ngày</option>
+                                        <option value="30days">30 ngày</option>
+                                        <option value="90days">90 ngày</option>
+                                        <option value="thisYear">1 năm</option>
                                     </select>
                                 </Box>
                             }
@@ -703,7 +703,10 @@ const DashboardPage: React.FC = () => {
                             {loading ? <Skeleton variant="rectangular" height="100%" /> : (
                                 topData.topCustomers.length > 0 ? (
                                     <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={topData.topCustomers} layout="vertical" margin={{ left: 10, right: 110, top: 5, bottom: 5 }}>
+                                        <BarChart data={[...topData.topCustomers].sort((a, b) => {
+                                            const key = topCustomerMetric === 'revenue' ? 'totalPurchase' : 'totalOrders';
+                                            return (Number(b[key]) || 0) - (Number(a[key]) || 0);
+                                        })} layout="vertical" margin={{ left: 10, right: 110, top: 5, bottom: 5 }}>
                                             <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
                                             <XAxis type="number" hide domain={[0, 'dataMax * 1.3']} />
                                             <YAxis
