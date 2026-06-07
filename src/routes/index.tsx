@@ -26,6 +26,7 @@ const TransfersPage = lazy(() => import('../modules/admin/pages/inventory/Transf
 const InventoryHistoryPage = lazy(() => import('../modules/admin/pages/inventory/InventoryHistoryPage'));
 const StockAlertPage = lazy(() => import('../modules/admin/pages/inventory/StockAlertPage'));
 const CustomerListPage = lazy(() => import('../modules/admin/pages/customers/CustomerListPage'));
+const NotificationPage = lazy(() => import('../modules/admin/pages/NotificationPage'));
 const SupplierPage = lazy(() => import('../modules/admin/pages/suppliers/SupplierPage'));
 const RevenueReportPage = lazy(() => import('../modules/admin/pages/reports/RevenueReportPage'));
 const BusinessReportPage = lazy(() => import('../modules/admin/pages/reports/BusinessReportPage'));
@@ -235,6 +236,7 @@ const AppRoutes: React.FC = () => (
 
 
             <Route path="customers" element={<AdminGuard>{withSuspense(CustomerListPage)}</AdminGuard>} />
+            <Route path="notifications" element={<AdminGuard>{withSuspense(NotificationPage)}</AdminGuard>} />
 
             <Route path="suppliers" element={<AdminGuard>{withSuspense(SupplierPage)}</AdminGuard>} />
 

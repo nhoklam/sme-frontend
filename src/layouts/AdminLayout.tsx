@@ -149,9 +149,11 @@ const AdminLayout = () => {
             switch (payload.type) {
                 case 'NEW_ORDER':
                     toast(`Đơn hàng mới: ${payload.orderCode}`, { icon: '🛒', style: { borderRadius: '10px', background: '#333', color: '#fff' } });
+                    queryClient.invalidateQueries({ queryKey: ['orders'] });
                     break;
                 case 'IMPORT_SUCCESS':
                     toast.success(`Nhập kho thành công: ${payload.orderCode}`);
+                    queryClient.invalidateQueries({ queryKey: ['inventory-all'] });
                     break;
                 case 'LOW_STOCK':
                     toast.error(`Sắp hết hàng: ${payload.productName}`, { icon: '⚠️' });
@@ -160,7 +162,10 @@ const AdminLayout = () => {
                     toast.error(`Hết hàng: ${payload.productName}`, { icon: '🛑' });
                     break;
                 case 'TRANSFER_ARRIVED':
-                    toast(`Có phiếu chuyển kho mới`, { icon: '📦' });
+                    toast(`Có phiếu chuyển kho mới / cập nhật`, { icon: '📦' });
+                    queryClient.invalidateQueries({ queryKey: ['transfers'] });
+                    // Nếu phiếu chuyển ảnh hưởng tồn kho, cập nhật luôn tồn kho
+                    queryClient.invalidateQueries({ queryKey: ['inventory-all'] });
                     break;
                 case 'SHIFT_PENDING_APPROVAL':
                     toast(`Có ca làm việc cần duyệt`, { icon: '🔒' });

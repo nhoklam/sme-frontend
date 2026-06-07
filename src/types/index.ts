@@ -55,6 +55,7 @@ export interface UserResponse {
   warehouseId?: string;
   warehouseName?: string;
   isActive: boolean;
+  isLocked?: boolean;
   createdAt: string;
   lastLoginAt?: string;
   posSettings?: string;

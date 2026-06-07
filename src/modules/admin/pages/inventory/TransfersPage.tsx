@@ -21,6 +21,7 @@ import {
     InternalTransfer, TransferStatus, Warehouse,
     ProductResponse, Inventory, TransferCartItem,
 } from '../../../../types';
+import authService from '../../../../services/authService';
 
 // ── helpers ────────────────────────────────────────────────────
 const STATUS_MAP: Record<TransferStatus, { label: string; color: string; bg: string }> = {
@@ -42,7 +43,9 @@ const TransferDetailDialog: React.FC<{
     onDispatch: () => void;
     onReceive: (items: Array<{ productId: string; receivedQty: number }>) => void;
     loading: boolean;
-}> = ({ open, transfer, warehouses, products, onClose, onDispatch, onReceive, loading }) => {
+    currentUser: any;
+    isAdmin: boolean;
+}> = ({ open, transfer, warehouses, products, onClose, onDispatch, onReceive, loading, currentUser, isAdmin }) => {
     const fromWh = warehouses.find(w => w.id === transfer?.fromWarehouseId);
     const toWh = warehouses.find(w => w.id === transfer?.toWarehouseId);
     const info = transfer ? STATUS_MAP[transfer.status] : { label: '', color: '', bg: '' };
@@ -258,13 +261,13 @@ const TransferDetailDialog: React.FC<{
 
             <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
                 <Button onClick={onClose} variant="outlined">Đóng</Button>
-                {transfer?.status === 'DRAFT' && (
+                {transfer?.status === 'DRAFT' && (isAdmin || (currentUser?.warehouseId && transfer?.fromWarehouseId && String(currentUser.warehouseId).toLowerCase() === String(transfer.fromWarehouseId).toLowerCase())) && (
                     <Button onClick={onDispatch} variant="contained" disabled={loading} sx={{ bgcolor: '#e65100' }}>
                         {loading ? <CircularProgress size={16} sx={{ color: '#fff', mr: 1 }} /> : null}
                         {loading ? 'Đang xử lý...' : 'Xác nhận xuất kho'}
                     </Button>
                 )}
-                {transfer?.status === 'DISPATCHED' && (
+                {transfer?.status === 'DISPATCHED' && (isAdmin || (currentUser?.warehouseId && transfer?.toWarehouseId && String(currentUser.warehouseId).toLowerCase() === String(transfer.toWarehouseId).toLowerCase())) && (
                     <Button onClick={handleConfirmReceive} variant="contained" disabled={loading} sx={{ bgcolor: '#2e7d32' }}>
                         {loading ? <CircularProgress size={16} sx={{ color: '#fff', mr: 1 }} /> : null}
                         {loading ? 'Đang xử lý...' : hasShortage ? `Nhận hàng (${totalReceived} / ${totalQty})` : 'Xác nhận nhận hàng đủ'}
@@ -284,7 +287,9 @@ const CreateTransferDialog: React.FC<{
     onCreated: () => void;
     warehouses: Warehouse[];
     products: ProductResponse[];
-}> = ({ open, onClose, onCreated, warehouses, products }) => {
+    currentUser: any;
+    isAdmin: boolean;
+}> = ({ open, onClose, onCreated, warehouses, products, currentUser, isAdmin }) => {
     const [fromWid, setFromWid] = useState('');
     const [toWid, setToWid] = useState('');
     const [note, setNote] = useState('');
@@ -295,8 +300,17 @@ const CreateTransferDialog: React.FC<{
     const [snack, setSnack] = useState<{ msg: string; sev: 'success' | 'error' } | null>(null);
 
     React.useEffect(() => {
-        if (!open) { setFromWid(''); setToWid(''); setNote(''); setCart([]); setKw(''); }
-    }, [open]);
+        if (!open) { 
+            if (!isAdmin && currentUser?.warehouseId) {
+                setFromWid(currentUser.warehouseId);
+            } else {
+                setFromWid(''); 
+            }
+            setToWid(''); setNote(''); setCart([]); setKw(''); 
+        } else if (!isAdmin && currentUser?.warehouseId) {
+            setFromWid(currentUser.warehouseId);
+        }
+    }, [open, isAdmin, currentUser]);
 
     React.useEffect(() => {
         if (fromWid && open) {
@@ -374,7 +388,7 @@ const CreateTransferDialog: React.FC<{
                     <Grid size={{ xs: 12, sm: 6 }}>
                         <Typography variant="caption" fontWeight={700}>Kho xuất <span style={{ color: '#d32f2f' }}>*</span></Typography>
                         <FormControl fullWidth size="small">
-                            <Select value={fromWid} onChange={e => setFromWid(e.target.value)} displayEmpty>
+                            <Select value={fromWid} onChange={e => setFromWid(e.target.value)} displayEmpty disabled={!isAdmin}>
                                 <MenuItem value="">-- Chọn kho xuất --</MenuItem>
                                 {warehouses.filter(w => w.isActive).map(w => <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>)}
                             </Select>
@@ -538,6 +552,9 @@ const TransfersPage: React.FC = () => {
     const [actionLoading, setActionLoading] = useState(false);
     const [snack, setSnack] = useState<{ msg: string; sev: 'success' | 'error' } | null>(null);
     const PAGE_SIZE = 15;
+
+    const currentUser = authService.getCurrentUser()?.user;
+    const isAdmin = currentUser?.role === 'ROLE_ADMIN';
 
     const qc = useQueryClient();
 
@@ -767,8 +784,10 @@ const TransfersPage: React.FC = () => {
                 onDispatch={handleDispatch}
                 onReceive={handleReceive}
                 loading={actionLoading}
+                currentUser={currentUser}
+                isAdmin={isAdmin}
             />
-            <CreateTransferDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={refresh} warehouses={warehouses} products={productsData} />
+            <CreateTransferDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={refresh} warehouses={warehouses} products={productsData} currentUser={currentUser} isAdmin={isAdmin} />
 
             <Snackbar open={!!snack} autoHideDuration={3000} onClose={() => setSnack(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
                 {snack ? <Alert severity={snack.sev} onClose={() => setSnack(null)} sx={{ borderRadius: 2 }}>{snack.msg}</Alert> : <div />}

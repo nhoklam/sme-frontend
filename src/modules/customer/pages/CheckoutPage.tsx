@@ -10,7 +10,7 @@ import {
 import { SelectChangeEvent } from '@mui/material/Select';
 import {
     ArrowBack, ShoppingCart, LocalShipping, Security,
-    ExpandMore, ExpandLess, CheckCircleOutline, Lock, Close as CloseIcon, LocationOn
+    ExpandMore, ExpandLess, CheckCircleOutline, Lock, Close as CloseIcon, LocationOn, MonetizationOn
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import { useCartContext } from '../../../store/CartContext';
@@ -33,6 +33,7 @@ interface CheckoutFormData {
     ward: string;
     paymentMethod: string;
     note: string;
+    pointsToUse: number;
 }
 
 interface CartItemType {
@@ -99,6 +100,7 @@ const CheckoutPage: React.FC = () => {
         ward: '',
         paymentMethod: 'COD',
         note: '',
+        pointsToUse: 0,
     });
 
     // Derived state for district code
@@ -201,7 +203,8 @@ const CheckoutPage: React.FC = () => {
     const { orderDiscount, shipDiscount } = calcDiscount();
     const discountAmount = orderDiscount + shipDiscount;
     const finalShipFee = rawShipFee - shipDiscount;
-    const finalPrice = totalPrice - orderDiscount + finalShipFee;
+    const pointsDiscount = form.pointsToUse * 100;
+    const finalPrice = Math.max(0, totalPrice - orderDiscount + finalShipFee - pointsDiscount);
 
     const handleTextChange = (field: keyof CheckoutFormData) =>
         (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -270,6 +273,7 @@ const CheckoutPage: React.FC = () => {
                 // NV-1: Tọa độ tự động tra cứu từ tên Quận/Huyện. Gửi đi optional, Backend có fallback.
                 shippingLatitude: coordinates?.lat,
                 shippingLongitude: coordinates?.lng,
+                pointsToUse: form.pointsToUse > 0 ? form.pointsToUse : undefined,
             };
 
             const result = await createOrder.mutateAsync(orderData as any);
@@ -570,6 +574,36 @@ const CheckoutPage: React.FC = () => {
                                 ))}
                             </RadioGroup>
                         </Paper>
+
+                        {/* Điểm thưởng (Loyalty Points) */}
+                        {isLoggedIn && user && (user.loyaltyPoints ?? 0) >= 500 && (
+                            <Paper
+                                elevation={0}
+                                sx={{ borderRadius: '12px', p: 3, mt: 3, border: '1px solid #eef0f2', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}
+                            >
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 2 }}>
+                                    <MonetizationOn sx={{ color: '#f5a623', fontSize: 22 }} />
+                                    <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#1a1a2e' }}>
+                                        Sử dụng điểm tích lũy
+                                    </Typography>
+                                </Box>
+                                <Typography variant="body2" color="text.secondary" mb={2}>
+                                    Bạn đang có <strong>{user.loyaltyPoints} điểm</strong>. Quy đổi: 1 điểm = 100₫.
+                                </Typography>
+                                <FormControl fullWidth size="medium">
+                                    <Select
+                                        value={form.pointsToUse}
+                                        onChange={(e) => setForm(f => ({ ...f, pointsToUse: Number(e.target.value) }))}
+                                        sx={{ borderRadius: '8px' }}
+                                    >
+                                        <MenuItem value={0}>Không sử dụng điểm</MenuItem>
+                                        {[500, 1000, 1500, 2000, 5000].filter(p => p <= (user.loyaltyPoints ?? 0)).map(p => (
+                                            <MenuItem key={p} value={p}>{p} điểm (giảm {fmt(p * 100)})</MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Paper>
+                        )}
                     </Grid>
 
                     {/* ── RIGHT: Summary Box ── */}
@@ -664,6 +698,13 @@ const CheckoutPage: React.FC = () => {
                                         </Box>
                                     );
                                 })}
+
+                                {pointsDiscount > 0 && (
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
+                                        <Typography variant="body2" color="text.secondary">Dùng điểm thưởng ({form.pointsToUse} điểm)</Typography>
+                                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#ff4d4f' }}>-{fmt(pointsDiscount)}</Typography>
+                                    </Box>
+                                )}
                                 
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
                                     <Typography variant="body2" color="text.secondary">Phí vận chuyển</Typography>

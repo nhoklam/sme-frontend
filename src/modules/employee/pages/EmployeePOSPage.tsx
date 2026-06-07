@@ -35,6 +35,7 @@ import promotionService from '../../../services/promotionService';
 import posService from '../../../services/posService';
 import QrPaymentDialog from '../components/pos/QrPaymentDialog';
 import { usePosPaymentWebSocket } from '../../../store/hooks/usePosPaymentWebSocket';
+import POSReceipt from '../components/POSReceipt';
 
 const fmt = (n?: number) =>
     new Intl.NumberFormat('vi-VN', {
@@ -148,6 +149,7 @@ const EmployeePOSPage: React.FC = () => {
     const [heldOpen, setHeldOpen] = useState(false);
     const [checkoutLoading, setCheckoutLoading] = useState(false);
     const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+    const [receiptData, setReceiptData] = useState<any | null>(null);
     const [printInvoice, setPrintInvoice] = useState<any>(null);
     const [printDialogOpen, setPrintDialogOpen] = useState(false);
     const [refundOpen, setRefundOpen] = useState(false);
@@ -174,8 +176,7 @@ const EmployeePOSPage: React.FC = () => {
         setCheckoutOpen(false);
         setCustomerGivenAmount('');
         if (autoPrint) {
-            setPrintInvoice(invoice);
-            setPrintDialogOpen(true);
+            setReceiptData(invoice);
         }
     });
 
@@ -385,8 +386,7 @@ const EmployeePOSPage: React.FC = () => {
             setCustomerGivenAmount('');
 
             if (invoiceData && autoPrint) {
-                setPrintInvoice(invoiceData);
-                setPrintDialogOpen(true);
+                setReceiptData(invoiceData);
             }
         } catch (e: any) {
             const errorMsg = e.response?.data?.message || e.response?.data?.error || 'Thanh toán thất bại';
@@ -598,6 +598,12 @@ const EmployeePOSPage: React.FC = () => {
 
     return (
         <Box sx={{ height: '100vh', bgcolor: '#f5f7fb', display: 'flex', flexDirection: 'column', fontFamily: 'system-ui, sans-serif' }}>
+            <POSReceipt 
+                invoice={receiptData} 
+                warehouseName={currentUser?.warehouseName} 
+                open={!!receiptData} 
+                onClose={() => setReceiptData(null)} 
+            />
             <OpenShiftDialog open={!shift} onOpen={handleOpenShift} loading={openShiftLoading} />
             <CloseShiftDialog 
                 open={closeShiftOpen} 

@@ -17,6 +17,7 @@ import {
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import axiosInstance from '../../../../services/axiosConfig';
+import { authApi } from '../../../../services/authApi';
 // User type defined inline below
 
 
@@ -32,6 +33,7 @@ interface User {
     warehouseId?: string;
     warehouseName?: string;
     lastLoginAt?: string;
+    isLocked?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -433,6 +435,20 @@ const UsersTab: React.FC = () => {
         finally { setTogglingId(null); }
     };
 
+    const handleUnlockUser = async (user: User) => {
+        setTogglingId(`unlock_${user.id}`);
+        try {
+            await authApi.unlockUser(user.username ?? '');
+            refetch();
+            setSnack(`Đã mở khóa tài khoản ${user.username} thành công!`);
+        } catch (e: any) {
+            const msg = e.response?.data?.message || 'Có lỗi xảy ra khi mở khóa';
+            setSnack(`Lỗi: ${msg}`);
+        } finally {
+            setTogglingId(null);
+        }
+    };
+
     return (
         <Box>
             {/* Toolbar */}
@@ -515,17 +531,40 @@ const UsersTab: React.FC = () => {
                                                 <Typography variant="caption" color="#6b7280">{u.warehouseName ?? '—'}</Typography>
                                             </TableCell>
                                             <TableCell>
-                                                <Chip
-                                                    label={u.active !== false ? 'Hoạt động' : 'Bị khóa'}
-                                                    size="small"
-                                                    sx={{ height: 20, fontSize: 10, fontWeight: 700, bgcolor: u.active !== false ? '#f0fdf4' : '#fef2f2', color: u.active !== false ? '#16a34a' : '#dc2626' }}
-                                                />
+                                                <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                                                    <Chip
+                                                        label={u.active !== false ? 'Hoạt động' : 'Bị khóa'}
+                                                        size="small"
+                                                        sx={{ height: 20, fontSize: 10, fontWeight: 700, bgcolor: u.active !== false ? '#f0fdf4' : '#fef2f2', color: u.active !== false ? '#16a34a' : '#dc2626' }}
+                                                    />
+                                                    {u.isLocked && (
+                                                        <Chip
+                                                            label="Bị khóa đăng nhập"
+                                                            size="small"
+                                                            sx={{ height: 20, fontSize: 10, fontWeight: 700, bgcolor: '#fef3c7', color: '#d97706', border: '1px solid #fde68a' }}
+                                                        />
+                                                    )}
+                                                </Box>
                                             </TableCell>
                                             <TableCell>
                                                 <Typography variant="caption" color="#9ca3af">{fmtDate(u.lastLoginAt)}</Typography>
                                             </TableCell>
                                             <TableCell>
                                                 <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                                    {u.isLocked && (
+                                                        <Tooltip title="Mở khóa đăng nhập (Lockout)">
+                                                            <Button
+                                                                size="small"
+                                                                variant="contained"
+                                                                color="warning"
+                                                                disabled={togglingId === `unlock_${u.id}`}
+                                                                onClick={() => handleUnlockUser(u)}
+                                                                sx={{ height: 24, fontSize: 10, textTransform: 'none', px: 1, minWidth: 'auto', boxShadow: 'none' }}
+                                                            >
+                                                                {togglingId === `unlock_${u.id}` ? 'Đang mở...' : 'Mở khóa'}
+                                                            </Button>
+                                                        </Tooltip>
+                                                    )}
                                                     <Tooltip title="Chỉnh sửa">
                                                         <IconButton size="small" onClick={() => setEditUser(u)} sx={{ color: '#f59e0b', '&:hover': { bgcolor: '#fef3c7' } }}>
                                                             <Edit sx={{ fontSize: 16 }} />
