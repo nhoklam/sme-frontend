@@ -18,6 +18,7 @@ import {
 import reportService from '../../../../services/reportService';
 import financeService from '../../../../services/financeService';
 import warehouseService from '../../../../services/warehouseService';
+import { useAuth } from '../../../../store/hooks/useAuth';
 import type { Warehouse } from '../../../../types';
 import { formatCurrency } from '../../../../utils/formatters';
 
@@ -115,6 +116,8 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ title, value, icon, color, lo
 
 // ─── Main Component ────────────────────────────────────────────
 const BusinessReportPage: React.FC = () => {
+    const { user: currentUser, isAdmin } = useAuth();
+
     const [warehouseId, setWarehouseId] = useState<string>('');
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
 
@@ -132,8 +135,10 @@ const BusinessReportPage: React.FC = () => {
     const [chartData, setChartData] = useState<any[]>([]);
 
     useEffect(() => {
-        warehouseService.getAll().then(setWarehouses).catch(() => { });
-    }, []);
+        if (isAdmin) {
+            warehouseService.getAll().then(setWarehouses).catch(() => { });
+        }
+    }, [isAdmin]);
 
     const fetchData = useCallback(async (filter = quickFilter, forcedPeriod = chartPeriod) => {
         setLoading(true);
@@ -145,7 +150,7 @@ const BusinessReportPage: React.FC = () => {
             // 1. Lấy dữ liệu doanh thu & giá vốn
             const revenueRes = await reportService.getRevenue({
                 from: toISO(from), to: toISO(to), period: apiPeriod as any,
-                ...(warehouseId ? { warehouseId } : {}),
+                ...(warehouseId && isAdmin ? { warehouseId } : {}),
             });
 
             // 2. Lấy dữ liệu chi phí vận hành từ sổ quỹ (Phiếu chi)
@@ -153,7 +158,7 @@ const BusinessReportPage: React.FC = () => {
                 from: toISO(from), to: toISO(to),
                 transactionType: 'OUT',
                 size: 1000,
-                ...(warehouseId ? { warehouseId } : {}),
+                ...(warehouseId && isAdmin ? { warehouseId } : {}),
             });
 
             const totalRev = revenueRes.reduce((s, d) => s + (d.revenue ?? 0), 0);
@@ -235,7 +240,7 @@ const BusinessReportPage: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [warehouseId, quickFilter, chartPeriod]);
+    }, [warehouseId, quickFilter, chartPeriod, isAdmin]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -270,12 +275,14 @@ const BusinessReportPage: React.FC = () => {
                     <Typography variant="body2" color="#8c8c8c" fontSize={13}>Hiệu quả hoạt động, chi phí và lợi nhuận thuần</Typography>
                 </Box>
                 <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                    <FormControl size="small" sx={{ minWidth: 200, bgcolor: '#fff' }}>
-                        <Select value={warehouseId} onChange={e => setWarehouseId(e.target.value)} displayEmpty>
-                            <MenuItem value="">Tất cả chi nhánh</MenuItem>
-                            {warehouses.map(w => <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>)}
-                        </Select>
-                    </FormControl>
+                    {isAdmin && (
+                        <FormControl size="small" sx={{ minWidth: 200, bgcolor: '#fff' }}>
+                            <Select value={warehouseId} onChange={e => setWarehouseId(e.target.value)} displayEmpty>
+                                <MenuItem value="">Tất cả chi nhánh</MenuItem>
+                                {warehouses.map(w => <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>)}
+                            </Select>
+                        </FormControl>
+                    )}
                 </Box>
             </Box>
 

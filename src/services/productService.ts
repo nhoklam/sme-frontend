@@ -18,11 +18,17 @@ const productService = {
         page?: number;
         size?: number;
         warehouseId?: string;
+        minPrice?: number;
+        maxPrice?: number;
+        minRating?: number;
     }): Promise<PageResponse<ProductResponse>> => {
         const query = new URLSearchParams();
         if (params.keyword?.trim()) query.set('keyword', params.keyword.trim());
         if (params.categoryId) query.set('categoryId', params.categoryId);
         if (params.isActive !== undefined) query.set('isActive', String(params.isActive));
+        if (params.minPrice !== undefined) query.set('minPrice', String(params.minPrice));
+        if (params.maxPrice !== undefined) query.set('maxPrice', String(params.maxPrice));
+        if (params.minRating !== undefined) query.set('minRating', String(params.minRating));
         if (params.sortBy) query.set('sortBy', params.sortBy);
         if (params.warehouseId) query.set('warehouseId', params.warehouseId);
         query.set('page', String(params.page ?? 0));
@@ -67,8 +73,10 @@ const productService = {
     },
 
     // Lấy danh sách đánh giá
-    getReviews: async (productId: string, page = 0, size = 10): Promise<PageResponse<any>> => {
-        const res = await axiosInstance.get<ApiResponse<PageResponse<any>>>(`/products/${productId}/reviews?page=${page}&size=${size}`);
+    getReviews: async (productId: string, rating?: number | null, page = 0, size = 10): Promise<PageResponse<any>> => {
+        let url = `/products/${productId}/reviews?page=${page}&size=${size}`;
+        if (rating) url += `&rating=${rating}`;
+        const res = await axiosInstance.get<ApiResponse<PageResponse<any>>>(url);
         return res.data.data;
     },
 };

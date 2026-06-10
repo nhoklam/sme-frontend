@@ -23,7 +23,7 @@ export default function ForgotPasswordPage() {
     const [error, setError] = useState('');
     const [passwordError, setPasswordError] = useState('');
 
-    const steps = ['Nhập email', 'Xác minh & Đặt lại'];
+    const steps = ['Nhập email', 'Xác minh OTP', 'Đặt lại mật khẩu'];
 
     const validatePassword = (password: string) => {
         if (password.length < 8) return 'Mật khẩu phải có ít nhất 8 ký tự';
@@ -56,9 +56,22 @@ export default function ForgotPasswordPage() {
         }
     };
 
+    const handleVerifyOtp = async () => {
+        if (!otp.trim() || otp.length !== 6) { setError('Vui lòng nhập mã OTP 6 số'); return; }
+        setError('');
+        setLoading(true);
+        try {
+            await authApi.verifyOtp(email, otp);
+            setStep(2);
+        } catch (err: any) {
+            const axiosError = err as AxiosError<any>;
+            setError(axiosError.response?.data?.message || 'Mã OTP không hợp lệ');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleReset = async () => {
-        if (!otp.trim()) { setError('Vui lòng nhập mã OTP'); return; }
-        
         const passValidation = validatePassword(newPass);
         if (passValidation) {
             setPasswordError(passValidation);
@@ -80,6 +93,7 @@ export default function ForgotPasswordPage() {
             const status = axiosError.response?.status;
             if (status === 400 || status === 401) {
                 setError(axiosError.response?.data?.message || 'Mã OTP không hợp lệ hoặc đã hết hạn');
+                setStep(1); // Go back to OTP step
             } else {
                 setError(axiosError.response?.data?.message || 'Có lỗi xảy ra khi đặt lại mật khẩu');
             }
@@ -280,8 +294,47 @@ export default function ForgotPasswordPage() {
                                             ),
                                         }}
                                         sx={textFieldStyle}
+                                        onKeyDown={e => e.key === 'Enter' && handleVerifyOtp()}
                                     />
                                     
+                                    <Button
+                                        fullWidth variant="contained" size="large"
+                                        onClick={handleVerifyOtp} disabled={loading}
+                                        sx={{ 
+                                            borderRadius: '8px', 
+                                            textTransform: 'none', 
+                                            fontWeight: 700, 
+                                            py: 1.5, 
+                                            background: 'linear-gradient(135deg, #f5a623 0%, #d48b10 100%)',
+                                            color: '#0c0c16',
+                                            boxShadow: '0 4px 15px rgba(245, 166, 35, 0.2)',
+                                            transition: 'all 0.3s',
+                                            '&:hover': { 
+                                                background: 'linear-gradient(135deg, #ffb83d 0%, #e0951a 100%)',
+                                                boxShadow: '0 6px 20px rgba(245, 166, 35, 0.3)'
+                                            }
+                                        }}
+                                    >
+                                        {loading ? 'Đang kiểm tra...' : 'Tiếp tục'}
+                                    </Button>
+                                    
+                                    <Button
+                                        fullWidth variant="text" size="small"
+                                        onClick={() => setStep(0)}
+                                        disabled={loading}
+                                        sx={{ textTransform: 'none', color: 'rgba(26, 26, 46, 0.5)', '&:hover': { color: '#f5a623' } }}
+                                    >
+                                        Gửi lại mã OTP
+                                    </Button>
+                                </Box>
+                            )}
+
+                            {step === 2 && (
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+                                    <Alert severity="info" sx={{ borderRadius: '8px', bgcolor: 'rgba(245, 166, 35, 0.08)', color: '#b27a18', border: '1px solid rgba(245, 166, 35, 0.2)', fontSize: 13, '& .MuiAlert-icon': { color: '#f5a623' } }}>
+                                        Mã OTP hợp lệ. Vui lòng đặt mật khẩu mới.
+                                    </Alert>
+
                                     <TextField
                                         fullWidth label="Mật khẩu mới" type={showPass ? 'text' : 'password'}
                                         value={newPass} 
@@ -289,6 +342,7 @@ export default function ForgotPasswordPage() {
                                             setNewPass(e.target.value);
                                             if (passwordError) setPasswordError(validatePassword(e.target.value));
                                         }}
+                                        autoFocus
                                         error={!!passwordError}
                                         helperText={passwordError || 'Tối thiểu 8 ký tự, có chữ hoa, chữ thường và số'}
                                         InputProps={{
@@ -310,6 +364,15 @@ export default function ForgotPasswordPage() {
                                         sx={textFieldStyle}
                                         helperText={confirmPass && confirmPass !== newPass ? 'Mật khẩu không khớp' : ''}
                                         onKeyDown={e => e.key === 'Enter' && handleReset()}
+                                        InputProps={{
+                                            endAdornment: (
+                                                <InputAdornment position="end">
+                                                    <IconButton onClick={() => setShowPass(!showPass)} edge="end" sx={{ color: 'rgba(26, 26, 46, 0.4)', '&:hover': { color: '#f5a623' } }}>
+                                                        {showPass ? <VisibilityOff sx={{ fontSize: 18 }} /> : <Visibility sx={{ fontSize: 18 }} />}
+                                                    </IconButton>
+                                                </InputAdornment>
+                                            ),
+                                        }}
                                     />
                                     
                                     <Button
@@ -339,7 +402,7 @@ export default function ForgotPasswordPage() {
                                         disabled={loading}
                                         sx={{ textTransform: 'none', color: 'rgba(26, 26, 46, 0.5)', '&:hover': { color: '#f5a623' } }}
                                     >
-                                        Quay lại nhập email
+                                        Hủy thao tác
                                     </Button>
                                 </Box>
                             )}

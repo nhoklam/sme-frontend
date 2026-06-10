@@ -16,6 +16,7 @@ import { notificationService, Notification } from '../../../services/notificatio
 import { formatDistanceToNow, format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import warehouseService from '../../../services/warehouseService';
+import { decrementUnread, resetUnread } from '../../../store/notificationCount';
 
 const NotificationPage: React.FC = () => {
     const navigate = useNavigate();
@@ -55,10 +56,9 @@ const NotificationPage: React.FC = () => {
 
     const handleMarkAsRead = async (notif: Notification) => {
         if (!notif.isRead) {
-            try {
-                await notificationService.markAsRead(notif.id);
-                setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
-            } catch (err) { }
+            setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
+            decrementUnread();
+            notificationService.markAsRead(notif.id);
         }
 
         if (notif.type === 'LOW_STOCK') navigate('/admin/inventory/import');
@@ -68,8 +68,9 @@ const NotificationPage: React.FC = () => {
 
     const handleMarkAllAsRead = async () => {
         try {
-            await notificationService.markAllAsRead();
-            fetchNotifications();
+            setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+            resetUnread();
+            notificationService.markAllAsRead();
         } catch (err) { }
     };
 

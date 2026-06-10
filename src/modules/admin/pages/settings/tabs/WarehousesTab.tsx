@@ -137,25 +137,88 @@ export default function WarehousesTab() {
 
         try {
             // Thử tìm lần 1 với đầy đủ số nhà
-            let res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query1)}&format=json&limit=1`);
+            let res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query1)}&format=json&limit=1&addressdetails=1&accept-language=vi`);
             let data = await res.json();
             
             // Nếu không ra, thử tìm lần 2 chỉ với tên đường
             if (!data || data.length === 0) {
-                res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query2)}&format=json&limit=1`);
+                res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query2)}&format=json&limit=1&addressdetails=1&accept-language=vi`);
                 data = await res.json();
             }
 
             if (data && data.length > 0) {
                 const lat = parseFloat(data[0].lat);
                 const lng = parseFloat(data[0].lon);
-                setForm(p => ({ ...p, latitude: lat, longitude: lng }));
+                const addr = data[0].address;
+                
+                let matchedDistrictCode = form.provinceCode;
+                if (addr) {
+                    const districtStr = [addr.city_district, addr.county, addr.city, addr.town, addr.suburb]
+                        .filter(Boolean)
+                        .join(' ')
+                        .toLowerCase();
+                        
+                    const matchedDistrict = HCM_DISTRICTS.find(d => {
+                        const dName = d.name.toLowerCase();
+                        return districtStr.includes(dName) || 
+                               districtStr.includes(dName.replace('tp ', 'thành phố ')) ||
+                               dName.includes(districtStr.replace('quận ', ''));
+                    });
+                    if (matchedDistrict) {
+                        matchedDistrictCode = matchedDistrict.code;
+                    }
+                }
+
+                setForm(p => ({ ...p, latitude: lat, longitude: lng, provinceCode: matchedDistrictCode }));
                 toast.success('Đã tìm thấy vị trí trên bản đồ');
             } else {
                 toast.error('Không tìm thấy địa chỉ, vui lòng kéo ghim thủ công!');
             }
         } catch (e) {
             toast.error('Lỗi khi gọi dịch vụ bản đồ');
+        }
+    };
+
+    const handleMapPinDrag = async (lat: number, lng: number) => {
+        setForm(p => ({ ...p, latitude: lat, longitude: lng }));
+        
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=vi`);
+            const data = await res.json();
+            
+            if (data && data.address) {
+                const addr = data.address;
+                const road = addr.road || '';
+                const house = addr.house_number || '';
+                const ward = addr.suburb || addr.quarter || addr.village || '';
+                
+                const parts = [];
+                if (house || road) parts.push([house, road].filter(Boolean).join(' '));
+                if (ward) parts.push(ward);
+                
+                const newAddress = parts.join(', ');
+                
+                // Combine possible district fields because Nominatim uses them inconsistently
+                const districtStr = [addr.city_district, addr.county, addr.city, addr.town, addr.suburb]
+                    .filter(Boolean)
+                    .join(' ')
+                    .toLowerCase();
+                    
+                const matchedDistrict = HCM_DISTRICTS.find(d => {
+                    const dName = d.name.toLowerCase();
+                    return districtStr.includes(dName) || 
+                           districtStr.includes(dName.replace('tp ', 'thành phố ')) ||
+                           dName.includes(districtStr.replace('quận ', ''));
+                });
+
+                setForm(p => ({ 
+                    ...p, 
+                    address: newAddress || p.address,
+                    provinceCode: matchedDistrict ? matchedDistrict.code : p.provinceCode
+                }));
+            }
+        } catch (e) {
+            console.error('Reverse geocoding failed', e);
         }
     };
 
@@ -259,7 +322,7 @@ export default function WarehousesTab() {
             {/* Modal */}
             <Dialog open={showModal} onClose={() => { setShowModal(false); setEditing(null); }} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
                 <DialogTitle sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    {editing ? 'Sửa thông tin chi nhánh' : 'Khai báo chi nhánh mới'}
+                    {editing ? 'Sửa thông tin chi nhánh' : 'Tạo chi nhánh mới'}
                     <IconButton onClick={() => { setShowModal(false); setEditing(null); }}><Close /></IconButton>
                 </DialogTitle>
                 <DialogContent dividers>
@@ -299,12 +362,6 @@ export default function WarehousesTab() {
                                     {HCM_DISTRICTS.map(p => <MenuItem key={p.code} value={p.code}>{p.name}</MenuItem>)}
                                 </Select>
                             </FormControl>
-                            {/* Centroid for Routing: Tọa độ tâm quận tự động điền dùng cho tính khoảng cách Smart Routing */}
-                            {form.provinceCode && form.latitude && form.longitude && (
-                                <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
-                                    📍 Tọa độ Routing: {form.latitude}, {form.longitude}
-                                </Typography>
-                            )}
                         </Grid>
                         <Grid size={{ xs: 12, sm: 6 }}>
                             <Typography variant="caption" fontWeight={700} color="#64748b" mb={0.5} display="block">Số điện thoại</Typography>
@@ -342,7 +399,7 @@ export default function WarehousesTab() {
                                 <LocationPickerMap 
                                     lat={form.latitude ? parseFloat(form.latitude.toString()) : 10.7769}
                                     lng={form.longitude ? parseFloat(form.longitude.toString()) : 106.7009}
-                                    onLocationChange={(lat: number, lng: number) => setForm(p => ({ ...p, latitude: lat, longitude: lng }))} 
+                                    onLocationChange={handleMapPinDrag} 
                                 />
                             </React.Suspense>
                         </Grid>

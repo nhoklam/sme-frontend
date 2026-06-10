@@ -19,6 +19,7 @@ import productService from '../../../../../services/productService';
 import categoryService from '../../../../../services/categoryService';
 import { exportToExcel, fmtVnd } from '../../../../../utils/excelExport';
 import AdjustInventoryModal from '../components/AdjustInventoryModal';
+import { buildCategoryTreeFlat } from '../../../../../utils/categoryUtils';
 import TransactionHistoryModal from '../components/TransactionHistoryModal';
 import { purchaseService } from '../../../../../services/purchaseService';
 import { StockCountTab, SavedReceipt } from './StockCountTab';
@@ -396,8 +397,10 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
                             startAdornment={<CategoryIcon sx={{ fontSize: 16, color: '#bbb', mr: 0.5 }} />}
                         >
                             <MenuItem value="">Tất cả danh mục</MenuItem>
-                            {categories.filter(c => c.isActive).map(c => (
-                                <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+                            {buildCategoryTreeFlat(categories.filter((c: any) => c.isActive)).map(c => (
+                                <MenuItem key={c.id} value={c.id} sx={{ pl: c.level * 2 + 2 }}>
+                                    {c.level > 0 ? '— ' : ''}{c.name}
+                                </MenuItem>
                             ))}
                         </Select>
                     </FormControl>

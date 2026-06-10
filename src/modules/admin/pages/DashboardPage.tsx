@@ -263,9 +263,18 @@ const DashboardPage: React.FC = () => {
 
     const handleTopCustomerPeriodChange = async (period: string) => {
         setTopCustomerPeriod(period);
-        // Customers endpoint doesn't support date range in current backend, 
-        // but we update state for UI consistency. 
-        // In a real scenario, you'd call customerService.getTopSpenders with new params if possible.
+        try {
+            const tData = await dashboardService.getTopData(currentUser?.warehouseId, period, topCustomerMetric);
+            setTopData((prev: any) => ({ ...prev, topCustomers: tData.topCustomers }));
+        } catch (e) { console.error(e); }
+    };
+
+    const handleTopCustomerMetricChange = async (metric: string) => {
+        setTopCustomerMetric(metric as any);
+        try {
+            const tData = await dashboardService.getTopData(currentUser?.warehouseId, topCustomerPeriod, metric);
+            setTopData((prev: any) => ({ ...prev, topCustomers: tData.topCustomers }));
+        } catch (e) { console.error(e); }
     };
 
     const todayStr = new Date().toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -303,10 +312,10 @@ const DashboardPage: React.FC = () => {
                             <Typography variant="body2" color="#64748b" fontWeight={600}>{todayStr}</Typography>
                         </Box>
                         <Divider orientation="vertical" flexItem sx={{ height: 16, my: 'auto' }} />
-                        <Tooltip title={isConnected ? 'Dữ liệu thời gian thực đang hoạt động' : 'Đang ngoại tuyến'}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 0.5, borderRadius: 2, bgcolor: isConnected ? '#f0fdf4' : '#fef2f2', border: `1px solid ${isConnected ? '#bbf7d0' : '#fecaca'}` }}>
-                                <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: isConnected ? '#22c55e' : '#ef4444', animation: isConnected ? 'pulse 2s infinite' : 'none' }} />
-                                <Typography fontSize={11} fontWeight={800} color={isConnected ? '#166534' : '#991b1b'}>{isConnected ? 'LIVE' : 'OFFLINE'}</Typography>
+                        <Tooltip title={isConnected ? 'Dữ liệu thời gian thực đang hoạt động' : 'Kết nối thời gian thực đang chờ'}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 0.5, borderRadius: 2, bgcolor: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                                <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#22c55e', animation: 'pulse 2s infinite' }} />
+                                <Typography fontSize={11} fontWeight={800} color={'#166534'}>ONLINE</Typography>
                             </Box>
                         </Tooltip>
                     </Box>
@@ -680,7 +689,7 @@ const DashboardPage: React.FC = () => {
                                 <Box sx={{ display: 'flex', gap: 1 }}>
                                     <select
                                         value={topCustomerMetric}
-                                        onChange={(e) => setTopCustomerMetric(e.target.value as any)}
+                                        onChange={(e) => handleTopCustomerMetricChange(e.target.value)}
                                         style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '12px', fontWeight: 600 }}
                                     >
                                         <option value="revenue">Doanh thu</option>
@@ -718,15 +727,27 @@ const DashboardPage: React.FC = () => {
                                                 width={120}
                                             />
                                             <RTooltip
-                                                formatter={(val: any) => [fmtCurrency(val), 'Tổng chi tiêu']}
+                                                formatter={(val: any) => [
+                                                    topCustomerMetric === 'revenue' ? fmtCurrency(val) : `${Number(val).toLocaleString()} đơn`,
+                                                    topCustomerMetric === 'revenue' ? 'Tổng chi tiêu' : 'Số lượng đơn'
+                                                ]}
                                                 contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                                             />
-                                            <Bar dataKey="totalPurchase" name="Tổng chi tiêu" fill="#1A2E85" radius={[0, 4, 4, 0]} barSize={22}>
+                                            <Bar
+                                                dataKey={topCustomerMetric === 'revenue' ? 'totalPurchase' : 'totalOrders'}
+                                                name={topCustomerMetric === 'revenue' ? 'Tổng chi tiêu' : 'Số lượng đơn'}
+                                                fill="#1A2E85"
+                                                radius={[0, 4, 4, 0]}
+                                                barSize={22}
+                                            >
                                                 <LabelList
-                                                    dataKey="totalPurchase"
+                                                    dataKey={topCustomerMetric === 'revenue' ? 'totalPurchase' : 'totalOrders'}
                                                     position="right"
                                                     style={{ fill: '#1A2E85', fontSize: 11, fontWeight: 700 }}
-                                                    formatter={(v: any) => Number(v) > 1000000 ? fmtShort(v) : fmtCurrency(v)}
+                                                    formatter={(v: any) => topCustomerMetric === 'revenue'
+                                                        ? (Number(v) > 1000000 ? fmtShort(v) : fmtCurrency(v))
+                                                        : `${Number(v).toLocaleString()} đơn`
+                                                    }
                                                 />
                                             </Bar>
                                         </BarChart>

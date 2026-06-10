@@ -21,8 +21,11 @@ import {
 } from 'recharts';
 import * as XLSX from 'xlsx';
 import axiosInstance from '../../../../services/axiosConfig';
+import reportService from '../../../../services/reportService';
 import warehouseService from '../../../../services/warehouseService';
-import { Warehouse } from '../../../../types';
+import userService from '../../../../services/userService';
+import { useAuth } from '../../../../store/hooks/useAuth';
+import type { Warehouse, UserResponse } from '../../../../types';
 
 const fmtCurrency = (n?: number) =>
     new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(n ?? 0);
@@ -306,8 +309,8 @@ const ImportTab: React.FC<ImportTabProps> = ({
 // ─────────────────────────────────────────────────────────────
 // ── TAB 1: DOANH THU ─────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────
-const RevenueTab: React.FC<{ warehouses: Warehouse[] }> = ({ warehouses }) => {
-    const [params, setParams] = useState({ from: monthStart(), to: today(), warehouseId: '', groupBy: 'day' });
+const RevenueTab: React.FC<{ warehouses: Warehouse[], cashiers: UserResponse[], isAdmin: boolean, currentUser: any }> = ({ warehouses, cashiers, isAdmin, currentUser }) => {
+    const [params, setParams] = useState({ from: monthStart(), to: today(), warehouseId: '', cashierId: '', groupBy: 'day' });
     const [data, setData] = useState<any[]>([]);
     const [summary, setSummary] = useState({ revenue: 0, orders: 0, avgOrder: 0, grossProfit: 0 });
     const [loading, setLoading] = useState(false);
@@ -320,7 +323,8 @@ const RevenueTab: React.FC<{ warehouses: Warehouse[] }> = ({ warehouses }) => {
                 from: new Date(params.from).toISOString(),
                 to: new Date(params.to + 'T23:59:59').toISOString(),
                 groupBy: params.groupBy,
-                ...(params.warehouseId ? { warehouseId: params.warehouseId } : {}),
+                ...(params.warehouseId && isAdmin ? { warehouseId: params.warehouseId } : {}),
+                ...(params.cashierId && !isAdmin ? { cashierId: params.cashierId } : {}),
             });
             const [revenueRes, topRes] = await Promise.all([
                 axiosInstance.get(`/reports/revenue?${q}`),
@@ -390,12 +394,22 @@ const RevenueTab: React.FC<{ warehouses: Warehouse[] }> = ({ warehouses }) => {
                         onChange={e => setParams(p => ({ ...p, from: e.target.value }))} InputLabelProps={{ shrink: true }} sx={{ minWidth: 145 }} />
                     <TextField size="small" type="date" label="Đến ngày" value={params.to}
                         onChange={e => setParams(p => ({ ...p, to: e.target.value }))} InputLabelProps={{ shrink: true }} sx={{ minWidth: 145 }} />
-                    <FormControl size="small" sx={{ minWidth: 180 }}>
-                        <Select value={params.warehouseId} onChange={e => setParams(p => ({ ...p, warehouseId: e.target.value }))} displayEmpty>
-                            <MenuItem value="">Tất cả chi nhánh</MenuItem>
-                            {warehouses.filter(w => w.isActive).map(w => <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>)}
-                        </Select>
-                    </FormControl>
+                    {isAdmin && (
+                        <FormControl size="small" sx={{ minWidth: 180 }}>
+                            <Select value={params.warehouseId} onChange={e => setParams(p => ({ ...p, warehouseId: e.target.value }))} displayEmpty>
+                                <MenuItem value="">Tất cả chi nhánh</MenuItem>
+                                {warehouses.filter(w => w.isActive).map(w => <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>)}
+                            </Select>
+                        </FormControl>
+                    )}
+                    {!isAdmin && (
+                        <FormControl size="small" sx={{ minWidth: 180 }}>
+                            <Select value={params.cashierId} onChange={e => setParams(p => ({ ...p, cashierId: e.target.value }))} displayEmpty>
+                                <MenuItem value="">Tất cả nhân viên</MenuItem>
+                                {cashiers.map(c => <MenuItem key={c.id} value={c.id}>{c.fullName}</MenuItem>)}
+                            </Select>
+                        </FormControl>
+                    )}
                     <FormControl size="small" sx={{ minWidth: 120 }}>
                         <Select value={params.groupBy} onChange={e => setParams(p => ({ ...p, groupBy: e.target.value }))}>
                             <MenuItem value="day">Theo ngày</MenuItem>
@@ -538,7 +552,7 @@ const RevenueTab: React.FC<{ warehouses: Warehouse[] }> = ({ warehouses }) => {
 // ─────────────────────────────────────────────────────────────
 // ── TAB 4: PHÂN BỔ KHO ───────────────────────────────────────
 // ─────────────────────────────────────────────────────────────
-const InventoryDistributionTab: React.FC<{ warehouses: Warehouse[] }> = ({ warehouses }) => {
+const InventoryDistributionTab: React.FC<{ warehouses: Warehouse[], isAdmin: boolean }> = ({ warehouses, isAdmin }) => {
     const [warehouseId, setWarehouseId] = useState('');
     const [byCategoryData, setByCategoryData] = useState<any[]>([]);
     const [byWarehouseData, setByWarehouseData] = useState<any[]>([]);
@@ -621,12 +635,14 @@ const InventoryDistributionTab: React.FC<{ warehouses: Warehouse[] }> = ({ wareh
             {/* Filter */}
             <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #e5e7eb', mb: 2 }}>
                 <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <FormControl size="small" sx={{ minWidth: 200 }}>
-                        <Select value={warehouseId} onChange={e => setWarehouseId(e.target.value)} displayEmpty>
-                            <MenuItem value="">Tất cả chi nhánh (pie danh mục)</MenuItem>
-                            {warehouses.filter(w => w.isActive).map(w => <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>)}
-                        </Select>
-                    </FormControl>
+                    {isAdmin && (
+                        <FormControl size="small" sx={{ minWidth: 200 }}>
+                            <Select value={warehouseId} onChange={e => setWarehouseId(e.target.value)} displayEmpty>
+                                <MenuItem value="">Tất cả chi nhánh (pie danh mục)</MenuItem>
+                                {warehouses.filter(w => w.isActive).map(w => <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>)}
+                            </Select>
+                        </FormControl>
+                    )}
                     <Button size="small" variant="outlined" startIcon={<Refresh sx={{ fontSize: 14 }} />} onClick={load} sx={{ textTransform: 'none', borderColor: '#e0e0e0', color: '#555' }}>Làm mới</Button>
                     <Button size="small" variant="outlined" startIcon={<FileDownloadOutlined sx={{ fontSize: 14 }} />}
                         onClick={() => downloadExcel([...byCategoryData, ...byWarehouseData.map(r => ({ ...r, name: `[Chi nhánh] ${r.name}` }))], 'phan-bo-kho')}
@@ -789,11 +805,20 @@ const InventoryDistributionTab: React.FC<{ warehouses: Warehouse[] }> = ({ wareh
 // MAIN PAGE
 // ─────────────────────────────────────────────────────────────
 const ReportsPage: React.FC = () => {
+    const { user: currentUser, isAdmin } = useAuth();
+
     const [tab, setTab] = useState(0);
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+    const [cashiers, setCashiers] = useState<UserResponse[]>([]);
     const [snack, setSnack] = useState('');
 
-    useEffect(() => { warehouseService.getAll().then(setWarehouses).catch(() => { }); }, []);
+    useEffect(() => {
+        if (isAdmin) {
+            warehouseService.getAll().then(setWarehouses).catch(() => { });
+        } else {
+            userService.getAll({ warehouseId: currentUser?.warehouseId }).then(setCashiers).catch(() => {});
+        }
+    }, [isAdmin, currentUser?.warehouseId]);
 
     // Import handlers
     const handleImportSupplier = async (file: File): Promise<ImportResult> => {
@@ -829,10 +854,10 @@ const ReportsPage: React.FC = () => {
 
     const renderContent = () => {
         switch (tab) {
-            case 0: return <RevenueTab warehouses={warehouses} />;
-            case 1: case 2: return <RevenueTab warehouses={warehouses} />;
-            case 3: return <InventoryDistributionTab warehouses={warehouses} />;
-            case 4: return <InventoryDistributionTab warehouses={warehouses} />;
+            case 0: return <RevenueTab warehouses={warehouses} cashiers={cashiers} isAdmin={isAdmin} currentUser={currentUser} />;
+            case 1: case 2: return <RevenueTab warehouses={warehouses} cashiers={cashiers} isAdmin={isAdmin} currentUser={currentUser} />;
+            case 3: return <InventoryDistributionTab warehouses={warehouses} isAdmin={isAdmin} />;
+            case 4: return <InventoryDistributionTab warehouses={warehouses} isAdmin={isAdmin} />;
             case 5: return (
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                     <ImportTab title="Import Nhà Cung Cấp từ Excel" description="Nhập hàng loạt danh mục nhà cung cấp" templateFilename="mau-nha-cung-cap" color="#7c3aed" icon={<Business />} onImport={handleImportSupplier}
@@ -845,7 +870,7 @@ const ReportsPage: React.FC = () => {
                         tips={['SKU phải là duy nhất trong hệ thống.', 'categoryName phải khớp chính xác với danh mục đã có.', 'warehouseName phải khớp với tên chi nhánh/kho.', 'Giá bán sỉ phải nhỏ hơn hoặc bằng giá bán lẻ.', 'Tối đa 1000 dòng mỗi lần import.']} />
                 </Box>
             );
-            default: return <RevenueTab warehouses={warehouses} />;
+            default: return <RevenueTab warehouses={warehouses} cashiers={cashiers} isAdmin={isAdmin} currentUser={currentUser} />;
         }
     };
 
@@ -889,15 +914,28 @@ const ReportsPage: React.FC = () => {
                         <Paper elevation={0} sx={{ borderRadius: 2, p: 2.5, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
                             <Typography fontWeight={700} fontSize={13} color="#8c8c8c" textTransform="uppercase" mb={2}>Bộ lọc dữ liệu</Typography>
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                <Box>
-                                    <Typography variant="body2" color="#8c8c8c" fontSize={12} mb={1}>Chi nhánh / Kho</Typography>
-                                    <FormControl size="small" fullWidth>
-                                        <Select displayEmpty defaultValue="">
-                                            <MenuItem value="">Tất cả chi nhánh</MenuItem>
-                                            {warehouses.filter(w => w.isActive).map(w => <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>)}
-                                        </Select>
-                                    </FormControl>
-                                </Box>
+                                {isAdmin && (
+                                    <Box>
+                                        <Typography variant="body2" color="#8c8c8c" fontSize={12} mb={1}>Chi nhánh / Kho</Typography>
+                                        <FormControl size="small" fullWidth>
+                                            <Select displayEmpty defaultValue="">
+                                                <MenuItem value="">Tất cả chi nhánh</MenuItem>
+                                                {warehouses.filter(w => w.isActive).map(w => <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>)}
+                                            </Select>
+                                        </FormControl>
+                                    </Box>
+                                )}
+                                {!isAdmin && (
+                                    <Box>
+                                        <Typography variant="body2" color="#8c8c8c" fontSize={12} mb={1}>Nhân viên</Typography>
+                                        <FormControl size="small" fullWidth>
+                                            <Select displayEmpty defaultValue="">
+                                                <MenuItem value="">Tất cả nhân viên</MenuItem>
+                                                {cashiers.map(c => <MenuItem key={c.id} value={c.id}>{c.fullName}</MenuItem>)}
+                                            </Select>
+                                        </FormControl>
+                                    </Box>
+                                )}
                                 <Box>
                                     <Typography variant="body2" color="#8c8c8c" fontSize={12} mb={1}>Thời gian báo cáo</Typography>
                                     <FormControl size="small" fullWidth>

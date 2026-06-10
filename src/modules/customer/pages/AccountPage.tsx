@@ -113,7 +113,7 @@ const AccountPage = () => {
                 </Box>
 
                 {/* Content Area Below */}
-                <Box sx={{ width: '100%', maxWidth: 800 }}>
+                <Box sx={{ width: '100%', maxWidth: 1100 }}>
                     <Paper sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid #eef0f2', boxShadow: '0 8px 30px rgba(0,0,0,0.04)' }}>
                         <Tabs
                             value={tabValue}

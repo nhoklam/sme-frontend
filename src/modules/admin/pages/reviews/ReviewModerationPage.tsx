@@ -5,7 +5,7 @@ import {
   Pagination, Skeleton, Switch, Tooltip, Alert, Button, Dialog,
   DialogTitle, DialogContent, DialogActions, Rating
 } from '@mui/material';
-import { Delete, CheckCircle, Pending, Comment } from '@mui/icons-material';
+import { Delete, CheckCircle, Pending, Comment, VisibilityOff, Visibility } from '@mui/icons-material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { reviewApi } from '../../../../services/reviewApi';
@@ -154,7 +154,7 @@ export default function ReviewModerationPage() {
                           <Tooltip title={review.isApproved ? "Ẩn đánh giá (Block)" : "Hiện đánh giá (Duyệt)"}>
                             <span>
                               <IconButton size="small" color={review.isApproved ? "warning" : "success"} onClick={() => handleToggleStatus(review.id)}>
-                                {review.isApproved ? <Pending fontSize="small" /> : <CheckCircle fontSize="small" />}
+                                {review.isApproved ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
                               </IconButton>
                             </span>
                           </Tooltip>

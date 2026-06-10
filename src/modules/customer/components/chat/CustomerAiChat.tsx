@@ -41,6 +41,11 @@ const CustomerAiChat = () => {
     const handleSend = async (text: string = inputValue.trim()) => {
         if (!text) return;
 
+        const historyData = messages
+            .filter(m => m.id !== 'welcome')
+            .slice(-6)
+            .map(m => ({ role: m.role, content: m.content }));
+
         const userMsg: Message = { id: Date.now().toString(), role: 'user', content: text };
         setMessages(prev => [...prev, userMsg]);
         setInputValue('');
@@ -49,7 +54,8 @@ const CustomerAiChat = () => {
         try {
             const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
             const res = await axios.post(`${apiUrl}/public/ai/chat`, {
-                message: userMsg.content
+                message: userMsg.content,
+                history: historyData
             });
 
             if (res.data.success) {

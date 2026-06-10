@@ -20,6 +20,11 @@ export default function AIDocumentsTab() {
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [searching, setSearching] = useState(false);
     const [showTest, setShowTest] = useState(false);
+    
+    // View Document state
+    const [viewDoc, setViewDoc] = useState<KnowledgeDocument | null>(null);
+    const [viewChunks, setViewChunks] = useState<string[]>([]);
+    const [loadingChunks, setLoadingChunks] = useState(false);
 
     const loadDocs = useCallback(async () => {
         setLoading(true);
@@ -82,6 +87,19 @@ export default function AIDocumentsTab() {
             toast.error('Lỗi khi tìm kiếm ngữ nghĩa');
         } finally {
             setSearching(false);
+        }
+    };
+
+    const handleViewDoc = async (doc: KnowledgeDocument) => {
+        setViewDoc(doc);
+        setLoadingChunks(true);
+        try {
+            const res = await aiService.getDocumentChunks(doc.id);
+            setViewChunks(res.data.data);
+        } catch (err) {
+            toast.error('Lỗi khi tải chi tiết tài liệu');
+        } finally {
+            setLoadingChunks(false);
         }
     };
 
@@ -155,7 +173,13 @@ export default function AIDocumentsTab() {
                                 docs.map(doc => (
                                     <TableRow key={doc.id} hover>
                                         <TableCell>
-                                            <Typography fontWeight={600} fontSize={14} color="#1e293b">{doc.title || doc.fileName}</Typography>
+                                            <Typography 
+                                                fontWeight={700} fontSize={14} color="#2563eb" 
+                                                sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+                                                onClick={() => handleViewDoc(doc)}
+                                            >
+                                                {doc.title || doc.fileName}
+                                            </Typography>
                                             <Typography variant="caption" color="text.secondary">{doc.fileName}</Typography>
                                         </TableCell>
                                         <TableCell>
@@ -207,7 +231,7 @@ export default function AIDocumentsTab() {
                             variant="contained" 
                             onClick={handleTestSearch} 
                             disabled={searching}
-                            sx={{ px: 3, textTransform: 'none', fontWeight: 700 }}
+                            sx={{ minWidth: 120, textTransform: 'none', fontWeight: 700 }}
                         >
                             {searching ? 'Đang tìm...' : 'Truy xuất'}
                         </Button>
@@ -224,12 +248,12 @@ export default function AIDocumentsTab() {
                                         color="success"
                                         sx={{ position: 'absolute', top: 12, right: 12, fontWeight: 700, fontSize: 10 }}
                                     />
-                                    <Typography variant="body2" sx={{ pr: 12, fontStyle: 'italic' }}>
-                                        "...{res.content}..."
+                                    <Typography variant="body2" sx={{ pr: 12, fontStyle: 'italic', whiteSpace: 'pre-wrap' }}>
+                                        "...{res.content || res.text || res.formattedContent || (res.metadata && res.metadata.content) || (res.metadata && res.metadata.text) || 'Không có nội dung'}..."
                                     </Typography>
                                     <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
                                         <Description sx={{ fontSize: 14, color: '#94a3b8' }} />
-                                        <Typography variant="caption" color="text.secondary">Nguồn: {res.metadata?.fileName || 'Tài liệu hệ thống'}</Typography>
+                                        <Typography variant="caption" color="text.secondary">Nguồn: {res.metadata?.source || res.metadata?.fileName || res.metadata?.documentId || 'Tài liệu hệ thống'}</Typography>
                                     </Box>
                                 </Paper>
                             ))}
@@ -238,6 +262,36 @@ export default function AIDocumentsTab() {
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setShowTest(false)} sx={{ textTransform: 'none', fontWeight: 700 }}>Đóng</Button>
+                </DialogActions>
+            </Dialog>
+            {/* Dialog View Document Chunks */}
+            <Dialog open={!!viewDoc} onClose={() => setViewDoc(null)} maxWidth="md" fullWidth>
+                <DialogTitle sx={{ fontWeight: 800 }}>Nội dung tài liệu: {viewDoc?.title}</DialogTitle>
+                <DialogContent dividers>
+                    {loadingChunks ? (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <LinearProgress />
+                            <Typography variant="body2" color="text.secondary" align="center">Đang tải nội dung...</Typography>
+                        </Box>
+                    ) : viewChunks.length === 0 ? (
+                        <Alert severity="info">Không tìm thấy nội dung cho tài liệu này.</Alert>
+                    ) : (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            {viewChunks.map((chunk, i) => (
+                                <Paper key={i} variant="outlined" sx={{ p: 2, bgcolor: '#f8fafc' }}>
+                                    <Typography variant="caption" fontWeight={800} color="#64748b" display="block" mb={1}>
+                                        ĐOẠN {i + 1}
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                                        {chunk}
+                                    </Typography>
+                                </Paper>
+                            ))}
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setViewDoc(null)} sx={{ textTransform: 'none', fontWeight: 700 }}>Đóng</Button>
                 </DialogActions>
             </Dialog>
         </Box>

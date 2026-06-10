@@ -162,8 +162,8 @@ const OrderHistory = () => {
                                                 size="small"
                                             />
                                         </TableCell>
-                                        <TableCell align="right">
-                                            <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); setSelectedOrder(order); }}>
+                                        <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                                            <Button size="small" variant="outlined" sx={{ whiteSpace: 'nowrap', minWidth: 'max-content' }} onClick={(e) => { e.stopPropagation(); setSelectedOrder(order); }}>
                                                 Chi tiết
                                             </Button>
                                         </TableCell>

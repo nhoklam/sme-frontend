@@ -8,7 +8,7 @@ import {
     Select, MenuItem, FormControl, Skeleton, Pagination,
     Alert, Grid, Card, CardContent, Tooltip,
     Dialog, DialogTitle, DialogContent, DialogActions,
-    Divider,
+    Divider, Popover,
 } from '@mui/material';
 import {
     Search, Refresh, ArrowBack,
@@ -21,6 +21,7 @@ import {
 import axiosInstance from '../../../../services/axiosConfig';
 import warehouseService from '../../../../services/warehouseService';
 import productService from '../../../../services/productService';
+import userService from '../../../../services/userService';
 import useAuth from '../../../../store/hooks/useAuth';
 import { InventoryTransaction, PageResponse, ApiResponse, ProductResponse } from '../../../../types';
 import { exportToExcel } from '../../../../utils/excelExport';
@@ -74,6 +75,7 @@ interface EnrichedTransaction extends InventoryTransaction {
     productSku?: string;
     productImage?: string;
     warehouseName?: string;
+    createdByName?: string;
 }
 
 // ── API fetch helper ──
@@ -233,7 +235,7 @@ const TransactionDetailDialog: React.FC<{
                 {transaction.createdBy && (
                     <Box sx={{ mt: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
                         <InfoOutlined sx={{ fontSize: 13, color: '#bbb' }} />
-                        <Typography variant="caption" color="#888">Thực hiện bởi: <strong>{transaction.createdBy}</strong></Typography>
+                        <Typography variant="caption" color="#888">Thực hiện bởi: <strong>{transaction.createdByName || transaction.createdBy}</strong></Typography>
                     </Box>
                 )}
             </DialogContent>
@@ -281,6 +283,7 @@ const InventoryHistoryPage: React.FC = () => {
     const [exporting, setExporting] = useState(false);
     const [detailOpen, setDetailOpen] = useState(false);
     const [selectedTx, setSelectedTx] = useState<EnrichedTransaction | null>(null);
+    const [dateMenuAnchor, setDateMenuAnchor] = useState<HTMLButtonElement | null>(null);
 
     const applyPreset = (preset: string) => {
         const range = getDateRange(preset);
@@ -314,6 +317,18 @@ const InventoryHistoryPage: React.FC = () => {
         warehouses?.forEach(w => m.set(w.id, w.name));
         return m;
     }, [warehouses]);
+
+    const { data: usersData } = useQuery({
+        queryKey: ['users-all'],
+        queryFn: () => userService.getAll(),
+        staleTime: 5 * 60 * 1000,
+    });
+
+    const userMap = React.useMemo(() => {
+        const m = new Map<string, string>();
+        usersData?.forEach(u => m.set(u.id, u.fullName || u.username));
+        return m;
+    }, [usersData]);
 
     const {
         data: historyData,
@@ -355,9 +370,10 @@ const InventoryHistoryPage: React.FC = () => {
                 productSku: anyTx.productSku ?? product?.sku ?? product?.isbnBarcode,
                 productImage: anyTx.productImage ?? product?.imageUrl,
                 warehouseName: anyTx.warehouseName ?? (warehouseId ? warehouseMap.get(warehouseId) : undefined),
+                createdByName: tx.createdBy ? (userMap.get(tx.createdBy) || tx.createdBy) : undefined,
             };
         });
-    }, [transactions, productMap, warehouseMap]);
+    }, [transactions, productMap, warehouseMap, userMap]);
 
     const clearAllFilters = () => {
         setSelectedWarehouse(''); setSelectedType(''); setKeyword('');
@@ -511,54 +527,7 @@ const InventoryHistoryPage: React.FC = () => {
                 </Grid>
             )}
 
-            {/* Date Range Filter */}
-            <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #f0f0f0', mb: 1.5 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
-                    <CalendarToday sx={{ fontSize: 15, color: '#555' }} />
-                    <Typography variant="caption" fontWeight={700} color="#555">Lọc theo ngày</Typography>
-                    {PRESETS.map(p => (
-                        <Button key={p.key} size="small"
-                            variant={activePreset === p.key ? 'contained' : 'outlined'}
-                            onClick={() => applyPreset(p.key)}
-                            sx={{
-                                textTransform: 'none', fontSize: 11, minWidth: 0, px: 1.25, py: 0.4, height: 26,
-                                bgcolor: activePreset === p.key ? '#1976d2' : undefined,
-                                borderColor: activePreset === p.key ? '#1976d2' : '#e0e0e0',
-                                color: activePreset === p.key ? '#fff' : '#555',
-                            }}>
-                            {p.label}
-                        </Button>
-                    ))}
-                    {(fromDate || toDate) && (
-                        <Button size="small" onClick={clearDateFilter}
-                            sx={{ textTransform: 'none', color: '#d32f2f', fontSize: 11, ml: 0.5 }}>
-                            Xóa ngày
-                        </Button>
-                    )}
-                </Box>
-                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography variant="caption" color="#555" sx={{ minWidth: 28 }}>Từ</Typography>
-                        <TextField size="small" type="date" value={fromDate}
-                            onChange={e => { setFromDate(e.target.value); setActivePreset(''); setPage(0); }}
-                            inputProps={{ max: toDate || undefined }}
-                            sx={{ width: 155 }} />
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography variant="caption" color="#555" sx={{ minWidth: 28 }}>Đến</Typography>
-                        <TextField size="small" type="date" value={toDate}
-                            onChange={e => { setToDate(e.target.value); setActivePreset(''); setPage(0); }}
-                            inputProps={{ min: fromDate || undefined }}
-                            sx={{ width: 155 }} />
-                    </Box>
-                    {dateRangeLabel && (
-                        <Chip icon={<CalendarToday sx={{ fontSize: 13 }} />} label={dateRangeLabel} size="small"
-                            sx={{ height: 24, fontSize: 11, bgcolor: '#e3f2fd', color: '#1565c0', fontWeight: 600 }} />
-                    )}
-                </Box>
-            </Paper>
-
-            {/* Keyword / Warehouse / Type Filters */}
+            {/* Filters Bar */}
             <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #f0f0f0', mb: 2 }}>
                 <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
                     <FilterAlt sx={{ fontSize: 15, color: '#888' }} />
@@ -566,9 +535,77 @@ const InventoryHistoryPage: React.FC = () => {
                         value={keyword} onChange={e => { setKeyword(e.target.value); setPage(0); }}
                         sx={{ flex: 1, minWidth: 200 }}
                         InputProps={{ startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 17, color: '#bbb' }} /></InputAdornment> }} />
+                    
+                    <Button 
+                        size="small" 
+                        variant="outlined" 
+                        startIcon={<CalendarToday sx={{ fontSize: 16 }} />}
+                        onClick={(e) => setDateMenuAnchor(e.currentTarget)}
+                        sx={{ 
+                            textTransform: 'none', 
+                            color: dateRangeLabel ? '#1976d2' : '#555', 
+                            borderColor: dateRangeLabel ? '#1976d2' : '#e0e0e0',
+                            height: 40,
+                            bgcolor: dateRangeLabel ? '#eff6ff' : 'transparent',
+                        }}
+                    >
+                        {dateRangeLabel || 'Lọc ngày'}
+                    </Button>
+                    <Popover
+                        open={Boolean(dateMenuAnchor)}
+                        anchorEl={dateMenuAnchor}
+                        onClose={() => setDateMenuAnchor(null)}
+                        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+                        PaperProps={{ sx: { p: 2, width: 320, mt: 1, borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.1)' } }}
+                    >
+                        <Typography variant="caption" fontWeight={700} color="#555" display="block" mb={1.5}>Gợi ý nhanh</Typography>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+                            {PRESETS.map(p => (
+                                <Button key={p.key} size="small"
+                                    variant={activePreset === p.key ? 'contained' : 'outlined'}
+                                    onClick={() => applyPreset(p.key)}
+                                    sx={{
+                                        textTransform: 'none', fontSize: 11, minWidth: 0, px: 1.25, py: 0.4, height: 26,
+                                        bgcolor: activePreset === p.key ? '#1976d2' : undefined,
+                                        borderColor: activePreset === p.key ? '#1976d2' : '#e0e0e0',
+                                        color: activePreset === p.key ? '#fff' : '#555',
+                                    }}>
+                                    {p.label}
+                                </Button>
+                            ))}
+                        </Box>
+                        <Divider sx={{ my: 1.5 }} />
+                        <Typography variant="caption" fontWeight={700} color="#555" display="block" mb={1.5}>Tùy chọn khoảng thời gian</Typography>
+                        <Box sx={{ display: 'flex', gap: 1.5, mb: 2 }}>
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                                <Typography variant="caption" color="#888" display="block" mb={0.5}>Từ ngày</Typography>
+                                <TextField fullWidth size="small" type="date" value={fromDate}
+                                    onChange={e => { setFromDate(e.target.value); setActivePreset(''); setPage(0); }}
+                                    inputProps={{ max: toDate || undefined, style: { fontSize: 13, padding: '6.5px 8px' } }} />
+                            </Box>
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                                <Typography variant="caption" color="#888" display="block" mb={0.5}>Đến ngày</Typography>
+                                <TextField fullWidth size="small" type="date" value={toDate}
+                                    onChange={e => { setToDate(e.target.value); setActivePreset(''); setPage(0); }}
+                                    inputProps={{ min: fromDate || undefined, style: { fontSize: 13, padding: '6.5px 8px' } }} />
+                            </Box>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                            {(fromDate || toDate) && (
+                                <Button size="small" onClick={clearDateFilter} sx={{ textTransform: 'none', color: '#d32f2f' }}>
+                                    Xóa trắng
+                                </Button>
+                            )}
+                            <Button size="small" variant="contained" onClick={() => setDateMenuAnchor(null)} sx={{ textTransform: 'none' }}>
+                                Đóng
+                            </Button>
+                        </Box>
+                    </Popover>
+
                     {isAdmin && (
-                        <FormControl size="small" sx={{ minWidth: 200 }}>
-                            <Select value={selectedWarehouse} onChange={e => { setSelectedWarehouse(e.target.value); setPage(0); }} displayEmpty>
+                        <FormControl size="small" sx={{ minWidth: 160 }}>
+                            <Select value={selectedWarehouse} onChange={e => { setSelectedWarehouse(e.target.value); setPage(0); }} displayEmpty sx={{ height: 40 }}>
                                 <MenuItem value="">Tất cả kho</MenuItem>
                                 {warehouses?.filter(w => w.isActive).map(w => (
                                     <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>
@@ -577,7 +614,7 @@ const InventoryHistoryPage: React.FC = () => {
                         </FormControl>
                     )}
                     <FormControl size="small" sx={{ minWidth: 160 }}>
-                        <Select value={selectedType} onChange={e => { setSelectedType(e.target.value); setPage(0); }} displayEmpty>
+                        <Select value={selectedType} onChange={e => { setSelectedType(e.target.value); setPage(0); }} displayEmpty sx={{ height: 40 }}>
                             <MenuItem value="">Tất cả loại</MenuItem>
                             {Object.entries(TX_TYPE_MAP).map(([k, v]) => (
                                 <MenuItem key={k} value={k}>{v.label}</MenuItem>
@@ -586,8 +623,8 @@ const InventoryHistoryPage: React.FC = () => {
                     </FormControl>
                     {activeFilterCount > 0 && (
                         <Button size="small" variant="outlined" onClick={clearAllFilters}
-                            sx={{ textTransform: 'none', color: '#d32f2f', borderColor: '#d32f2f', fontSize: 12 }}>
-                            Xóa tất cả ({activeFilterCount})
+                            sx={{ textTransform: 'none', color: '#d32f2f', borderColor: '#d32f2f', height: 40, px: 2 }}>
+                            Xóa lọc ({activeFilterCount})
                         </Button>
                     )}
                 </Box>
@@ -671,7 +708,7 @@ const InventoryHistoryPage: React.FC = () => {
                                         <TableRow key={tx.id} hover
                                             onClick={() => { setSelectedTx(tx); setDetailOpen(true); }}
                                             sx={{ bgcolor: idx % 2 === 0 ? '#fff' : '#fafafa', cursor: 'pointer' }}>
-                                            <TableCell sx={{ py: 1.25 }}>
+                                            <TableCell sx={{ py: 1.25, whiteSpace: 'nowrap' }}>
                                                 <Typography variant="caption" fontFamily="monospace" fontSize={11}>
                                                     {tx.createdAt ? new Date(tx.createdAt).toLocaleString('vi-VN') : '—'}
                                                 </Typography>
@@ -689,8 +726,17 @@ const InventoryHistoryPage: React.FC = () => {
                                                         <Box component="img" src={tx.productImage} alt={tx.productName}
                                                             sx={{ width: 28, height: 36, objectFit: 'contain', borderRadius: 0.5, border: '1px solid #e0e0e0' }} />
                                                     )}
-                                                    <Box>
-                                                        <Typography variant="body2" fontWeight={600} fontSize={12}>{tx.productName}</Typography>
+                                                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                                                        <Tooltip title={tx.productName}>
+                                                            <Typography variant="body2" fontWeight={600} fontSize={12} sx={{
+                                                                display: '-webkit-box',
+                                                                WebkitLineClamp: 2,
+                                                                WebkitBoxOrient: 'vertical',
+                                                                overflow: 'hidden'
+                                                            }}>
+                                                                {tx.productName}
+                                                            </Typography>
+                                                        </Tooltip>
                                                         {tx.productSku && (
                                                             <Typography variant="caption" color="text.secondary" fontFamily="monospace" fontSize={10}>
                                                                 {tx.productSku}
@@ -725,7 +771,7 @@ const InventoryHistoryPage: React.FC = () => {
                                                 </Tooltip>
                                             </TableCell>
                                             <TableCell sx={{ py: 1.25 }}>
-                                                <Typography variant="caption" color="text.secondary">{tx.createdBy || '—'}</Typography>
+                                                <Typography variant="caption" color="text.secondary">{tx.createdByName || tx.createdBy || '—'}</Typography>
                                             </TableCell>
                                         </TableRow>
                                     );
@@ -760,13 +806,7 @@ const InventoryHistoryPage: React.FC = () => {
                 )}
             </Paper>
 
-            {!isMissingEndpoint && (
-                <Alert severity="info" sx={{ mt: 2, borderRadius: 2 }}>
-                    <Typography variant="caption">
-                        Click vào bất kỳ dòng nào để xem chi tiết giao dịch và điều hướng đến phiếu nhập/đơn hàng liên quan.
-                    </Typography>
-                </Alert>
-            )}
+            
 
             <TransactionDetailDialog
                 open={detailOpen}

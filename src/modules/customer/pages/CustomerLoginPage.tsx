@@ -42,9 +42,38 @@ const CustomerLoginPage: React.FC = () => {
     const [fullName, setFullName] = useState('');
     const [email, setEmail] = useState('');
 
+    const validateRegisterForm = (): boolean => {
+        const phoneRegex = /^(84|0[3|5|7|8|9])+([0-9]{8})\b$/;
+        if (!phoneRegex.test(phone)) {
+            setError('Số điện thoại không hợp lệ (Ví dụ: 0987654321)');
+            return false;
+        }
+
+        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+        if (!passwordRegex.test(password)) {
+            setError('Mật khẩu quá yếu (Yêu cầu ≥ 8 ký tự, gồm 1 chữ HOA, 1 chữ thường và 1 số)');
+            return false;
+        }
+
+        if (email) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                setError('Định dạng Email không hợp lệ');
+                return false;
+            }
+        }
+
+        return true;
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
+        
+        if (!isLogin && !validateRegisterForm()) {
+            return;
+        }
+
         setLoading(true);
 
         try {

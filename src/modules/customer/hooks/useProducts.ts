@@ -11,6 +11,9 @@ interface UseProductsParams {
     sortBy?: string;
     page?: number;
     size?: number;
+    minPrice?: number;
+    maxPrice?: number;
+    minRating?: number;
 }
 
 interface UseProductsResult {
@@ -36,6 +39,9 @@ export const useProducts = (params: UseProductsParams): UseProductsResult => {
             sortBy: params.sortBy,
             page: params.page ?? 0,
             size: params.size ?? 20,
+            minPrice: params.minPrice,
+            maxPrice: params.maxPrice,
+            minRating: params.minRating,
         }),
         staleTime: 2 * 60 * 1000, // 2 phút
     });
@@ -132,10 +138,10 @@ export const usePriceHistory = (productId: string) => {
     };
 };
 
-export const useProductReviews = (productId: string, page = 0, size = 10) => {
+export const useProductReviews = (productId: string, rating: number | null = null, page = 0, size = 10) => {
     const { data, isLoading, isError, error } = useQuery({
-        queryKey: ['product_reviews', productId, page, size],
-        queryFn: () => productService.getReviews(productId, page, size),
+        queryKey: ['product_reviews', productId, rating, page, size],
+        queryFn: () => productService.getReviews(productId, rating, page, size),
         enabled: !!productId,
     });
 

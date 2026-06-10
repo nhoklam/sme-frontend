@@ -5,7 +5,7 @@ import {
     Box, Container, Grid, Typography, Button, IconButton,
     Chip, Rating, Divider, Breadcrumbs, Link, Paper,
     Tabs, Tab, Avatar, TextField, LinearProgress, Modal,
-    Skeleton, Alert, useTheme, TableContainer, Table, TableBody, TableRow, TableCell,
+    Skeleton, Alert, useTheme, TableContainer, Table, TableBody, TableRow, TableCell, Pagination,
 } from '@mui/material';
 import {
     ShoppingCart, FavoriteBorder, Favorite, Share,
@@ -130,8 +130,11 @@ const ProductDetailPage = () => {
     });
     const related = relatedProducts.filter(p => p.id !== product?.id).slice(0, 4);
 
+    const [reviewPage, setReviewPage] = useState(0);
+    const [reviewRating, setReviewRating] = useState<number | null>(null);
+
     // Lấy reviews thực tế
-    const { reviews, totalElements: totalReviews } = useProductReviews(id ?? '');
+    const { reviews, totalElements: totalReviews, totalPages: reviewTotalPages } = useProductReviews(id ?? '', reviewRating, reviewPage, 5);
 
     if (isLoading) {
         return (
@@ -385,55 +388,51 @@ const ProductDetailPage = () => {
                     </Tabs>
                     <Box sx={{ p: { xs: 3, md: 4 } }}>
                         <TabPanel value={tab} index={0}>
-                            <Grid container spacing={4}>
-                                <Grid size={{ xs: 12, md: 6 }}>
-                                    <Typography variant="h6" fontWeight={700} sx={{ mb: 2.5, fontFamily: '"Playfair Display", serif', color: 'var(--color-primary, #0a192f)' }}>Thông số chi tiết</Typography>
-                                    <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #eef2f6', borderRadius: 2, overflow: 'hidden' }}>
-                                        <Table size="small">
-                                            <TableBody>
-                                                {[
-                                                    ['Mã sản phẩm (SKU)', product.sku || 'Đang cập nhật'],
-                                                    ['Tác giả', product.author || 'Nhiều tác giả'],
-                                                    ['Nhà xuất bản', product.publisher || 'Nhà Xuất Bản Trẻ'],
-                                                    ['Năm xuất bản', product.year || '2024'],
-                                                    ['Số trang', product.pages ? `${product.pages} trang` : 'Đang cập nhật'],
-                                                    ['Trọng lượng', product.weight ? `${product.weight} gr` : 'Đang cập nhật'],
-                                                    ['Định dạng bìa', product.unit || 'Bìa mềm'],
-                                                ].map(([label, val], idx) => (
-                                                    <TableRow key={label} sx={{ bgcolor: idx % 2 === 0 ? '#fcfdfd' : '#ffffff' }}>
-                                                        <TableCell sx={{ fontWeight: 600, color: 'text.secondary', width: '40%', py: 1.5, borderBottom: '1px solid #eef2f6' }}>{label}</TableCell>
-                                                        <TableCell sx={{ color: 'var(--color-primary, #0a192f)', fontWeight: 500, py: 1.5, borderBottom: '1px solid #eef2f6' }}>{val}</TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
-                                    </TableContainer>
-                                </Grid>
-                                <Grid size={{ xs: 12, md: 6 }}>
-                                    <Typography variant="h6" fontWeight={700} sx={{ mb: 2.5, fontFamily: '"Playfair Display", serif', color: 'var(--color-primary, #0a192f)' }}>Giới thiệu sách</Typography>
-                                    <Box>
-                                        <Typography variant="body1" color="text.secondary" sx={{ 
-                                            lineHeight: 1.9, 
-                                            whiteSpace: 'pre-line',
-                                            display: '-webkit-box',
-                                            WebkitLineClamp: showFullDesc ? 'unset' : 6,
-                                            WebkitBoxOrient: 'vertical',
-                                            overflow: 'hidden'
-                                        }}>
-                                            {product.description || 'Chưa có mô tả chi tiết cho cuốn sách này.'}
-                                        </Typography>
-                                        {product.description && product.description.length > 300 && (
-                                            <Button 
-                                                onClick={() => setShowFullDesc(!showFullDesc)} 
-                                                sx={{ mt: 1, p: 0, textTransform: 'none', fontWeight: 600, color: 'var(--color-secondary, #f5a623)', '&:hover': { bgcolor: 'transparent', textDecoration: 'underline' } }}
-                                                disableRipple
-                                            >
-                                                {showFullDesc ? 'Thu gọn' : 'Xem thêm'}
-                                            </Button>
-                                        )}
-                                    </Box>
-                                </Grid>
-                            </Grid>
+                            <Box sx={{ maxWidth: 900, mx: 'auto' }}>
+                                <Typography variant="h6" fontWeight={700} sx={{ mb: 2.5, fontFamily: '"Playfair Display", serif', color: 'var(--color-primary, #0a192f)' }}>Thông số chi tiết</Typography>
+                                <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #eef2f6', borderRadius: 2, overflow: 'hidden', mb: 5 }}>
+                                    <Table size="small">
+                                        <TableBody>
+                                            {[
+                                                ['Mã sản phẩm (SKU)', product.sku || 'Đang cập nhật'],
+                                                ['Tác giả', product.author || 'Nhiều tác giả'],
+                                                ['Nhà xuất bản', product.publisher || 'Nhà Xuất Bản Trẻ'],
+                                                ['Năm xuất bản', product.year || '2024'],
+                                                ['Số trang', product.pages ? `${product.pages} trang` : 'Đang cập nhật'],
+                                                ['Trọng lượng', product.weight ? `${product.weight} gr` : 'Đang cập nhật'],
+                                                ['Định dạng bìa', product.unit || 'Bìa mềm'],
+                                            ].map(([label, val], idx) => (
+                                                <TableRow key={label} sx={{ bgcolor: idx % 2 === 0 ? '#fcfdfd' : '#ffffff' }}>
+                                                    <TableCell sx={{ fontWeight: 600, color: 'text.secondary', width: '30%', py: 1.5, borderBottom: '1px solid #eef2f6' }}>{label}</TableCell>
+                                                    <TableCell sx={{ color: 'var(--color-primary, #0a192f)', fontWeight: 500, py: 1.5, borderBottom: '1px solid #eef2f6' }}>{val}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
+
+                                <Typography variant="h6" fontWeight={700} sx={{ mb: 2.5, fontFamily: '"Playfair Display", serif', color: 'var(--color-primary, #0a192f)' }}>Giới thiệu sách</Typography>
+                                <Box>
+                                    <Typography variant="body1" color="text.secondary" sx={{ 
+                                        lineHeight: 1.9, 
+                                        whiteSpace: 'pre-line',
+                                        display: '-webkit-box',
+                                        WebkitLineClamp: showFullDesc ? 'unset' : 6,
+                                        WebkitBoxOrient: 'vertical',
+                                        overflow: 'hidden'
+                                    }}>
+                                        {product.description || 'Chưa có mô tả chi tiết cho cuốn sách này.'}
+                                    </Typography>
+                                    {product.description && product.description.length > 300 && (
+                                        <Button 
+                                            onClick={() => setShowFullDesc(!showFullDesc)} 
+                                            sx={{ mt: 1.5, px: 3, py: 1, textTransform: 'none', fontWeight: 600, color: 'var(--color-secondary, #f5a623)', border: '1px solid var(--color-secondary, #f5a623)', borderRadius: 2, '&:hover': { bgcolor: 'rgba(245, 166, 35, 0.05)' } }}
+                                        >
+                                            {showFullDesc ? 'Thu gọn nội dung' : 'Xem thêm nội dung'}
+                                        </Button>
+                                    )}
+                                </Box>
+                            </Box>
                         </TabPanel>
 
                         <TabPanel value={tab} index={1}>
@@ -446,6 +445,24 @@ const ProductDetailPage = () => {
                                     </Box>
                                 </Grid>
                                 <Grid size={{ xs: 12, md: 8 }}>
+                                    <Box sx={{ mb: 3, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                        <Chip 
+                                            label="Tất cả" 
+                                            onClick={() => { setReviewRating(null); setReviewPage(0); }} 
+                                            color={reviewRating === null ? "primary" : "default"} 
+                                            variant={reviewRating === null ? "filled" : "outlined"} 
+                                        />
+                                        {[5, 4, 3, 2, 1].map(r => (
+                                            <Chip 
+                                                key={r} 
+                                                label={`${r} Sao`} 
+                                                onClick={() => { setReviewRating(r); setReviewPage(0); }} 
+                                                color={reviewRating === r ? "primary" : "default"} 
+                                                variant={reviewRating === r ? "filled" : "outlined"} 
+                                            />
+                                        ))}
+                                    </Box>
+
                                     {reviews.length > 0 ? reviews.map((r: any) => (
                                         <Box key={r.id} sx={{ mb: 3, pb: 3, borderBottom: '1px solid #eef2f6', '&:last-child': { borderBottom: 'none', pb: 0 } }}>
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1.5 }}>
@@ -466,7 +483,18 @@ const ProductDetailPage = () => {
                                             )}
                                         </Box>
                                     )) : (
-                                        <Typography variant="body1" color="text.secondary">Chưa có đánh giá nào cho sản phẩm này.</Typography>
+                                        <Typography variant="body1" color="text.secondary">Chưa có đánh giá nào cho bộ lọc này.</Typography>
+                                    )}
+
+                                    {reviewTotalPages > 1 && (
+                                        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+                                            <Pagination 
+                                                count={reviewTotalPages} 
+                                                page={reviewPage + 1} 
+                                                onChange={(_, p) => setReviewPage(p - 1)} 
+                                                color="primary" 
+                                            />
+                                        </Box>
                                     )}
                                 </Grid>
                             </Grid>
@@ -479,7 +507,7 @@ const ProductDetailPage = () => {
                     <Box>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
                             <Box sx={{ width: 6, height: 28, bgcolor: 'var(--color-secondary, #f5a623)', borderRadius: 2 }} />
-                            <Typography variant="h5" fontWeight={800} sx={{ fontFamily: '"Playfair Display", serif', color: 'var(--color-primary, #0a192f)' }}>Sách cùng danh mục</Typography>
+                            <Typography variant="h5" fontWeight={800} sx={{ fontFamily: '"Playfair Display", serif', color: 'var(--color-primary, #0a192f)' }}>Sản phẩm liên quan</Typography>
                         </Box>
                         <Grid container spacing={3}>
                             {related.map(p => {

@@ -23,6 +23,9 @@ export default function POSReceipt({ open, onClose, invoice, warehouseName }: Pr
         } catch { return d; }
     };
 
+    const customerGiven = invoice.payments?.reduce((s, p) => s + p.amount, 0) || invoice.finalAmount;
+    const change = Math.max(0, customerGiven - invoice.finalAmount);
+
     return (
         <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 2 } }}>
             <DialogContent sx={{ p: 3, display: 'flex', justifyContent: 'center', bgcolor: '#f9fafb' }}>
@@ -32,7 +35,7 @@ export default function POSReceipt({ open, onClose, invoice, warehouseName }: Pr
                         width: '80mm',
                         bgcolor: '#fff',
                         p: '10px 15px',
-                        fontFamily: '"Courier New", Courier, monospace',
+                        fontFamily: '"Times New Roman", Times, serif',
                         color: '#000',
                         fontSize: '12px',
                         lineHeight: 1.4,
@@ -41,9 +44,10 @@ export default function POSReceipt({ open, onClose, invoice, warehouseName }: Pr
                 >
                     <Box sx={{ textAlign: 'center', mb: 2 }}>
                         <Typography sx={{ fontWeight: 800, fontSize: '18px', fontFamily: 'inherit' }}>SME BOOKSTORE</Typography>
-                        <Typography sx={{ fontSize: '12px', fontFamily: 'inherit' }}>{warehouseName || 'Chi nhánh trung tâm'}</Typography>
-                        <Typography sx={{ fontSize: '12px', fontFamily: 'inherit' }}>---------------------------------</Typography>
-                        <Typography sx={{ fontWeight: 700, fontSize: '14px', mt: 1, fontFamily: 'inherit' }}>HÓA ĐƠN BÁN LẺ</Typography>
+                        <Typography sx={{ fontSize: '12px', fontFamily: 'inherit' }}>491 Đỗ Xuân Hợp, Phước Long B, Thủ Đức</Typography>
+                        <Typography sx={{ fontSize: '12px', fontFamily: 'inherit' }}>ĐT: 0367287044</Typography>
+                        <Typography sx={{ fontSize: '12px', fontFamily: 'inherit', mt: 0.5 }}>---------------------------------</Typography>
+                        <Typography sx={{ fontWeight: 700, fontSize: '14px', mt: 1, fontFamily: 'inherit' }}>HÓA ĐƠN</Typography>
                     </Box>
 
                     <Box sx={{ mb: 2, fontSize: '11px' }}>
@@ -104,12 +108,22 @@ export default function POSReceipt({ open, onClose, invoice, warehouseName }: Pr
 
                     <Typography sx={{ fontSize: '12px', fontFamily: 'inherit', mb: 1 }}>---------------------------------</Typography>
 
-                    <Box sx={{ mb: 2, fontSize: '11px', textAlign: 'center' }}>
-                        {invoice.payments?.map((p, i) => (
-                            <Box key={i}>
-                                Thanh toán qua: <strong>{p.method}</strong> ({fmtMoney(p.amount)})
-                            </Box>
-                        ))}
+                    <Box sx={{ mb: 2, fontSize: '11px' }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                            <Box>Khách đưa:</Box>
+                            <Box>{fmtMoney(customerGiven)}</Box>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                            <Box>Tiền trả lại:</Box>
+                            <Box>{fmtMoney(change)}</Box>
+                        </Box>
+                        <Box sx={{ mt: 1, textAlign: 'center', fontStyle: 'italic', color: '#555' }}>
+                            {invoice.payments?.map((p, i) => (
+                                <Box key={i}>
+                                    (Thanh toán qua: {p.method})
+                                </Box>
+                            ))}
+                        </Box>
                     </Box>
 
                     <Box sx={{ textAlign: 'center', fontSize: '11px', fontStyle: 'italic', mt: 3, mb: 1 }}>
@@ -133,7 +147,7 @@ export default function POSReceipt({ open, onClose, invoice, warehouseName }: Pr
                     }
                     #printable-receipt, #printable-receipt * {
                         visibility: visible;
-                        font-family: "Courier New", Courier, monospace !important;
+                        font-family: "Times New Roman", Times, serif !important;
                     }
                     #printable-receipt {
                         position: absolute;

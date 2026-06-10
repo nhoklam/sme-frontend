@@ -95,18 +95,26 @@ const dashboardService = {
         };
     },
 
-    getTopData: async (warehouseId?: string) => {
+    getTopData: async (warehouseId?: string, periodStr: string = '30days', metric: string = 'revenue') => {
         const now = new Date();
-        const from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
-        const to = now.toISOString();
+        let days = 30;
+        if (periodStr === 'last7days') days = 7;
+        else if (periodStr === '90days') days = 90;
+        else if (periodStr === 'thisYear') days = 365;
 
-        const [products, customers] = await Promise.all([
+        const from = new Date(now.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
+        const to = now.toISOString();
+        
+        let customerUrl = `/reports/top-customers?from=${from}&to=${to}&limit=10&metric=${metric}`;
+        if (warehouseId) customerUrl += `&warehouseId=${warehouseId}`;
+
+        const [products, customersRes] = await Promise.all([
             reportService.getTopProducts({ from, to, warehouseId, limit: 10 }),
-            customerService.getTopSpenders(0, 10),
+            axiosInstance.get<ApiResponse<any[]>>(customerUrl)
         ]);
 
         const rawProducts = Array.isArray(products) ? products : [];
-        const rawCustomers = Array.isArray(customers) ? customers : (customers?.content ?? []);
+        const rawCustomers = customersRes.data.data || [];
 
         return {
             topProducts: rawProducts.map((p: any) => {
@@ -119,8 +127,9 @@ const dashboardService = {
                 };
             }),
             topCustomers: rawCustomers.map((c: any) => ({
-                fullName: String(c.fullName || c.full_name || ''),
-                totalPurchase: Number(c.totalSpent || c.total_spent || c.totalPurchase || 0),
+                fullName: String(c.fullName || c.fullname || c.full_name || 'Khách hàng'),
+                totalPurchase: Number(c.totalPurchase || c.totalpurchase || c.total_purchase || 0),
+                totalOrders: Number(c.totalOrders || c.totalorders || c.total_orders || 0),
             })),
         };
     }

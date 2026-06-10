@@ -52,6 +52,41 @@ export default function PromotionPage() {
         queryFn: () => promotionService.getAll({ page, size: 10, keyword: search }),
     });
 
+    const { data: allPromotionsData } = useQuery({
+        queryKey: ['promotions-all'],
+        queryFn: () => promotionService.getAll({ page: 0, size: 1000 }),
+    });
+
+    const stats = React.useMemo(() => {
+        const list = allPromotionsData?.content || [];
+        const now = new Date();
+        let running = 0;
+        let pending = 0;
+        let used = 0;
+        
+        list.forEach(p => {
+            used += (p.usedCount || 0);
+            if (p.isActive) {
+                const start = p.startDate ? new Date(p.startDate) : null;
+                const end = p.endDate ? new Date(p.endDate) : null;
+                
+                // Add timezone offset to fix comparison issues since DB dates are UTC but represent local
+                // Or simply compare timestamps
+                const startMs = start ? start.getTime() : 0;
+                const endMs = end ? end.getTime() : Infinity;
+                const nowMs = now.getTime();
+
+                if (startMs <= nowMs && endMs >= nowMs) {
+                    running++;
+                } else if (startMs > nowMs) {
+                    pending++;
+                }
+            }
+        });
+        
+        return { running, pending, used };
+    }, [allPromotionsData]);
+
     const handleEdit = (p: Promotion) => {
         setSelected(p);
         setCreateOpen(true);
@@ -100,9 +135,9 @@ export default function PromotionPage() {
             {/* Stats */}
             <Grid container spacing={2.5} sx={{ mb: 3 }}>
                 {[
-                    { label: 'Đang chạy', value: '0', color: '#059669', bg: '#ecfdf5', icon: <CheckCircle /> },
-                    { label: 'Chờ kích hoạt', value: '0', color: '#d97706', bg: '#fffbeb', icon: <Event /> },
-                    { label: 'Mã đã sử dụng', value: '0', color: '#1976d2', bg: '#eff6ff', icon: <ConfirmationNumber /> },
+                    { label: 'Đang chạy', value: stats.running.toString(), color: '#059669', bg: '#ecfdf5', icon: <CheckCircle /> },
+                    { label: 'Chờ kích hoạt', value: stats.pending.toString(), color: '#d97706', bg: '#fffbeb', icon: <Event /> },
+                    { label: 'Mã đã sử dụng', value: stats.used.toString(), color: '#1976d2', bg: '#eff6ff', icon: <ConfirmationNumber /> },
                 ].map((s, i) => (
                     <Grid size={{ xs: 12, sm: 4 }} key={i}>
                         <Card elevation={0} sx={{ borderRadius: 3, border: '1px solid #f0f0f0' }}>

@@ -12,6 +12,7 @@ import categoryService from '../../../../../services/categoryService';
 import productService from '../../../../../services/productService';
 import { exportToExcel, fmtVnd } from '../../../../../utils/excelExport';
 import useAuth from '../../../../../store/hooks/useAuth';
+import { buildCategoryTreeFlat } from '../../../../../utils/categoryUtils';
 import { Warehouse, ProductResponse, DeadStockItem } from '../../../../../types';
 
 const fmtCurrency = (n?: number) =>
@@ -195,8 +196,10 @@ const DeadStockTab: React.FC<Props> = ({ warehouses }) => {
                 <FormControl size="small" sx={{ minWidth: 180 }}>
                     <Select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)} displayEmpty>
                         <MenuItem value="">Tất cả danh mục</MenuItem>
-                        {categories.filter(c => c.isActive).map(c => (
-                            <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+                        {buildCategoryTreeFlat(categories.filter((c: any) => c.isActive)).map(c => (
+                            <MenuItem key={c.id} value={c.id} sx={{ pl: c.level * 2 + 2 }}>
+                                {c.level > 0 ? '— ' : ''}{c.name}
+                            </MenuItem>
                         ))}
                     </Select>
                 </FormControl>

@@ -5,12 +5,12 @@ import {
     TextField, InputAdornment, Select, MenuItem,
     FormControl, Chip, IconButton, Drawer, Badge,
     Pagination, Skeleton, Fade, Divider, Slider,
-    Breadcrumbs, Link
+    Breadcrumbs, Link, Popover, Menu
 } from '@mui/material';
 import { SelectChangeEvent } from '@mui/material/Select';
 import {
     Search, FilterList, Close, GridView, ViewList,
-    ChevronRight, Star
+    ChevronRight, Star, KeyboardArrowDown
 } from '@mui/icons-material';
 import { useProducts } from '../hooks/useProducts';
 import { useCategories, DisplayCategory } from '../hooks/useCategories';
@@ -19,10 +19,10 @@ import QuickViewModal from '../../../components/common/QuickViewModal';
 import { useCartContext } from '../../../store/CartContext';
 
 const SORT_OPTIONS = [
-    { value: 'popular', label: 'Phổ biến nhất' },
+    { value: 'soldDesc', label: 'Bán chạy nhất' },
     { value: 'newest', label: 'Mới nhất' },
-    { value: 'price_asc', label: 'Giá tăng dần' },
-    { value: 'price_desc', label: 'Giá giảm dần' },
+    { value: 'priceAsc', label: 'Giá tăng dần' },
+    { value: 'priceDesc', label: 'Giá giảm dần' },
 ];
 
 interface ShopFilters {
@@ -34,127 +34,7 @@ interface ShopFilters {
     rating?: number;
 }
 
-interface FilterSidebarProps {
-    filters: ShopFilters;
-    setFilters: React.Dispatch<React.SetStateAction<ShopFilters>>;
-    onClear: () => void;
-    categories: DisplayCategory[];
-    categoriesLoading: boolean;
-    onClose?: () => void;
-}
-
-const FilterSidebar: React.FC<FilterSidebarProps> = ({
-    filters, setFilters, onClear, categories, categoriesLoading, onClose,
-}) => {
-    const [priceRange, setPriceRange] = useState<number[]>([0, 1000000]);
-
-    const handlePriceChange = (event: Event, newValue: number | number[]) => {
-        setPriceRange(newValue as number[]);
-    };
-
-    const handlePriceCommit = (event: Event | React.SyntheticEvent<Element, Event>, newValue: number | number[]) => {
-        const [min, max] = newValue as number[];
-        setFilters(f => ({ ...f, minPrice: min, maxPrice: max }));
-    };
-
-    return (
-        <Box>
-            {/* Header */}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, pb: 1.5, borderBottom: '2px solid var(--color-primary)' }}>
-                <Typography variant="h6" sx={{ fontFamily: '"Playfair Display", serif', fontWeight: 700, color: 'var(--color-primary)' }}>
-                    Bộ lọc
-                </Typography>
-                {(filters.category || filters.minPrice || filters.rating) && (
-                    <Typography
-                        onClick={() => { onClear(); onClose?.(); }}
-                        sx={{ fontSize: '0.85rem', color: 'var(--color-secondary)', cursor: 'pointer', fontWeight: 600, '&:hover': { textDecoration: 'underline' } }}
-                    >
-                        Xóa lọc
-                    </Typography>
-                )}
-            </Box>
-
-            {/* Categories */}
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5, color: 'var(--color-primary)' }}>Danh mục</Typography>
-
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mb: 3, maxHeight: 250, overflowY: 'auto' }}>
-                {categoriesLoading
-                    ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} height={40} sx={{ borderRadius: 1 }} />)
-                    : categories.map(cat => {
-                        const active = filters.category === cat.name;
-                        return (
-                            <Box
-                                key={cat.id}
-                                onClick={() => setFilters(f => ({ ...f, category: active ? '' : cat.name, categoryId: active ? '' : cat.id }))}
-                                sx={{
-                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1.5, py: 1, borderRadius: 1, cursor: 'pointer',
-                                    bgcolor: active ? 'rgba(245, 166, 35, 0.1)' : 'transparent',
-                                    borderLeft: active ? '3px solid var(--color-secondary)' : '3px solid transparent',
-                                    '&:hover': { bgcolor: 'rgba(245, 166, 35, 0.05)' },
-                                }}
-                            >
-                                <Typography sx={{ fontSize: '0.9rem', fontWeight: active ? 700 : 500, color: active ? 'var(--color-secondary)' : 'var(--text-primary)' }}>
-                                    {cat.name}
-                                </Typography>
-                                {active && <ChevronRight sx={{ fontSize: 18, color: 'var(--color-secondary)' }} />}
-                            </Box>
-                        );
-                    })
-                }
-            </Box>
-
-            <Divider sx={{ my: 2 }} />
-
-            {/* Price Filter */}
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2, color: 'var(--color-primary)' }}>Khoảng giá</Typography>
-            <Box sx={{ px: 1 }}>
-                <Slider
-                    value={priceRange}
-                    onChange={handlePriceChange}
-                    onChangeCommitted={handlePriceCommit}
-                    valueLabelDisplay="auto"
-                    min={0}
-                    max={1000000}
-                    step={50000}
-                    valueLabelFormat={(val) => `${(val / 1000)}k`}
-                    sx={{
-                        color: 'var(--color-secondary)',
-                        '& .MuiSlider-thumb': { '&:hover, &.Mui-focusVisible': { boxShadow: '0px 0px 0px 8px rgba(245, 166, 35, 0.16)' } }
-                    }}
-                />
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                    <Typography variant="caption" color="text.secondary">0đ</Typography>
-                    <Typography variant="caption" color="text.secondary">1.000.000đ</Typography>
-                </Box>
-            </Box>
-
-            <Divider sx={{ my: 2 }} />
-
-            {/* Rating Filter */}
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5, color: 'var(--color-primary)' }}>Đánh giá</Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                {[5, 4, 3].map(star => (
-                    <Box
-                        key={star}
-                        onClick={() => setFilters(f => ({ ...f, rating: f.rating === star ? undefined : star }))}
-                        sx={{
-                            display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer', p: 1, borderRadius: 1,
-                            bgcolor: filters.rating === star ? 'rgba(245, 166, 35, 0.1)' : 'transparent',
-                            '&:hover': { bgcolor: 'rgba(245, 166, 35, 0.05)' }
-                        }}
-                    >
-                        <Box sx={{ display: 'flex', color: 'var(--color-secondary)' }}>
-                            {Array.from({ length: 5 }).map((_, i) => (
-                                <Star key={i} sx={{ fontSize: 18, color: i < star ? 'var(--color-secondary)' : '#e0e0e0' }} />
-                            ))}
-                        </Box>
-                        <Typography variant="body2" sx={{ fontWeight: filters.rating === star ? 700 : 400 }}>Từ {star} sao</Typography>
-                    </Box>
-                ))}
-            </Box>
-        </Box>
-    );
-};
+// Removed FilterSidebar Component as we use horizontal filters now
 
 // Product Card Skeleton matching new ProductCard component
 const ProductCardSkeleton = () => (
@@ -182,9 +62,8 @@ const ShopPage: React.FC = () => {
         categoryId: '',
         search: '',
     });
-    const [sort, setSort] = useState('popular');
+    const [sort, setSort] = useState('soldDesc');
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-    const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
     const [page, setPage] = useState(0);
     const [searchInput, setSearchInput] = useState('');
 
@@ -192,9 +71,20 @@ const ShopPage: React.FC = () => {
 
     const { categories, flatCategories, isLoading: categoriesLoading } = useCategories();
 
+    // Horizontal Filter States
+    const [priceRange, setPriceRange] = useState<number[]>([0, 1000000]);
+    const [priceAnchorEl, setPriceAnchorEl] = useState<HTMLButtonElement | null>(null);
+    const [ratingAnchorEl, setRatingAnchorEl] = useState<HTMLButtonElement | null>(null);
+
+    const handlePriceClick = (event: React.MouseEvent<HTMLButtonElement>) => { setPriceAnchorEl(event.currentTarget); };
+    const handlePriceClose = () => { setPriceAnchorEl(null); };
+    
+    const handleRatingClick = (event: React.MouseEvent<HTMLButtonElement>) => { setRatingAnchorEl(event.currentTarget); };
+    const handleRatingClose = () => { setRatingAnchorEl(null); };
+
     useEffect(() => {
         const categoryName = searchParams.get('category') || '';
-        const sortParam = searchParams.get('sort') || 'popular';
+        const sortParam = searchParams.get('sort') || 'soldDesc';
         const searchKeyword = searchParams.get('search') || '';
         const matchedCat = flatCategories.find(c => c.name === categoryName);
 
@@ -220,6 +110,10 @@ const ShopPage: React.FC = () => {
     const { products, totalElements, totalPages, isLoading: productsLoading } = useProducts({
         keyword: filters.search || undefined,
         categoryId: filters.categoryId || undefined,
+        minPrice: filters.minPrice,
+        maxPrice: filters.maxPrice,
+        minRating: filters.rating,
+        sortBy: sort !== 'soldDesc' ? sort : 'soldDesc',
         page,
         size: 16, // Show 16 products per page for better grid (4x4 or 3x5)
     });
@@ -240,6 +134,21 @@ const ShopPage: React.FC = () => {
     const handlePageChange = (_event: React.ChangeEvent<unknown>, value: number) => {
         setPage(value - 1);
         window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const renderCategoryOptions = (nodes: any[], level = 0): React.ReactNode[] => {
+        let items: React.ReactNode[] = [];
+        nodes.forEach(node => {
+            items.push(
+                <MenuItem key={node.id} value={node.id} sx={{ fontSize: '0.9rem', pl: 2 + level * 2 }}>
+                    {level > 0 ? '— '.repeat(level) : ''}{node.name}
+                </MenuItem>
+            );
+            if (node.children && node.children.length > 0) {
+                items = items.concat(renderCategoryOptions(node.children, level + 1));
+            }
+        });
+        return items;
     };
 
     return (
@@ -274,36 +183,140 @@ const ShopPage: React.FC = () => {
                             </Typography>
                         )}
                     </Breadcrumbs>
-                    <Typography variant="h4" sx={{ fontFamily: '"Playfair Display", serif', fontWeight: 700, mt: 1, color: 'var(--color-primary)' }}>
-                        {filters.category || 'Tất cả sách'}
+                </Container>
+            </Box>
+
+            {/* Premium Hero Banner - Light Version */}
+            <Box sx={{ 
+                bgcolor: 'rgba(245, 166, 35, 0.04)', 
+                borderBottom: '1px solid rgba(245, 166, 35, 0.15)',
+                py: { xs: 3, md: 5 }, 
+                mb: 4, 
+            }}>
+                <Container maxWidth="lg" sx={{ textAlign: 'center' }}>
+                    <Typography variant="h3" sx={{ 
+                        fontFamily: '"Playfair Display", serif', 
+                        fontWeight: 700, 
+                        mb: 1.5, 
+                        color: 'var(--color-primary)' 
+                    }}>
+                        {filters.category || 'Tất Cả Sách'}
+                    </Typography>
+                    <Typography variant="subtitle1" sx={{ color: 'text.secondary', maxWidth: 600, mx: 'auto' }}>
+                        Khám phá kho tàng tri thức với <Typography component="span" fontWeight="bold" color="var(--color-secondary)">{totalElements || 0}</Typography> sản phẩm đang chờ bạn
                     </Typography>
                 </Container>
             </Box>
 
             <Container maxWidth="lg" sx={{ py: 4 }}>
                 <Grid container spacing={4}>
-                    {/* Sidebar */}
-                    <Grid size={{ xs: 12, md: 3 }} sx={{ display: { xs: 'none', md: 'block' } }}>
-                        <Paper elevation={0} sx={{ borderRadius: '12px', p: 3, position: 'sticky', top: 90, border: '1px solid var(--color-border)', bgcolor: 'var(--bg-paper)' }}>
-                            <FilterSidebar
-                                filters={filters}
-                                setFilters={(updater) => { setFilters(updater); setPage(0); }}
-                                onClear={clearFilters}
-                                categories={categories}
-                                categoriesLoading={categoriesLoading}
-                            />
-                        </Paper>
-                    </Grid>
-
-                    {/* Main Content */}
-                    <Grid size={{ xs: 12, md: 9 }}>
-                        {/* Toolbar */}
+                    {/* Main Content Full Width */}
+                    <Grid size={{ xs: 12 }}>
+                        {/* Horizontal Toolbar */}
                         <Paper elevation={0} sx={{ borderRadius: '12px', px: 3, py: 2, mb: 3, border: '1px solid var(--color-border)', bgcolor: 'var(--bg-paper)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
-                            <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500 }}>
-                                {productsLoading ? 'Đang tải...' : <>Hiển thị <Typography component="span" sx={{ color: 'var(--color-primary)', fontWeight: 700 }}>{totalElements}</Typography> kết quả</>}
-                            </Typography>
+                            
+                            {/* Left Filters */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                                {/* Category Dropdown */}
+                                <FormControl size="small" sx={{ minWidth: 200 }}>
+                                    <Select
+                                        value={filters.categoryId || 'all'}
+                                        onChange={(e: SelectChangeEvent) => {
+                                            const catId = e.target.value;
+                                            if (catId === 'all') {
+                                                setFilters(f => ({ ...f, category: '', categoryId: '' }));
+                                            } else {
+                                                const cat = flatCategories.find(c => c.id === catId);
+                                                if (cat) setFilters(f => ({ ...f, category: cat.name, categoryId: cat.id }));
+                                            }
+                                            setPage(0);
+                                        }}
+                                        displayEmpty
+                                        sx={{ borderRadius: '8px', fontSize: '0.9rem', bgcolor: 'var(--bg-default)' }}
+                                    >
+                                        <MenuItem value="all" sx={{ fontSize: '0.9rem' }}>Tất cả danh mục</MenuItem>
+                                        {renderCategoryOptions(categories)}
+                                    </Select>
+                                </FormControl>
 
+                                {/* Price Dropdown */}
+                                <Button 
+                                    variant="outlined" 
+                                    endIcon={<KeyboardArrowDown />}
+                                    onClick={handlePriceClick}
+                                    sx={{ borderRadius: '8px', color: 'text.primary', borderColor: 'var(--color-border)' }}
+                                >
+                                    Khoảng giá
+                                </Button>
+                                <Popover
+                                    open={Boolean(priceAnchorEl)}
+                                    anchorEl={priceAnchorEl}
+                                    onClose={handlePriceClose}
+                                    anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                                    PaperProps={{ sx: { p: 3, width: 300, mt: 1, borderRadius: '12px' } }}
+                                >
+                                    <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 700 }}>Chọn khoảng giá</Typography>
+                                    <Slider
+                                        value={priceRange}
+                                        onChange={(e, val) => setPriceRange(val as number[])}
+                                        onChangeCommitted={(e, val) => {
+                                            const [min, max] = val as number[];
+                                            setFilters(f => ({ ...f, minPrice: min, maxPrice: max }));
+                                            setPage(0);
+                                            handlePriceClose();
+                                        }}
+                                        valueLabelDisplay="auto"
+                                        min={0} max={1000000} step={50000}
+                                        valueLabelFormat={(val) => `${val / 1000}k`}
+                                        sx={{ color: 'var(--color-secondary)' }}
+                                    />
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+                                        <Typography variant="caption" color="text.secondary">0đ</Typography>
+                                        <Typography variant="caption" color="text.secondary">1.000.000đ</Typography>
+                                    </Box>
+                                </Popover>
+
+                                {/* Rating Dropdown */}
+                                <Button 
+                                    variant="outlined" 
+                                    endIcon={<KeyboardArrowDown />}
+                                    onClick={handleRatingClick}
+                                    sx={{ borderRadius: '8px', color: 'text.primary', borderColor: 'var(--color-border)' }}
+                                >
+                                    Đánh giá
+                                </Button>
+                                <Menu
+                                    anchorEl={ratingAnchorEl}
+                                    open={Boolean(ratingAnchorEl)}
+                                    onClose={handleRatingClose}
+                                    PaperProps={{ sx: { mt: 1, borderRadius: '12px', minWidth: 200 } }}
+                                >
+                                    {[5, 4, 3].map(star => (
+                                        <MenuItem 
+                                            key={star} 
+                                            onClick={() => {
+                                                setFilters(f => ({ ...f, rating: star }));
+                                                setPage(0);
+                                                handleRatingClose();
+                                            }}
+                                            sx={{ display: 'flex', gap: 1, py: 1.5 }}
+                                        >
+                                            <Box sx={{ display: 'flex', color: 'var(--color-secondary)' }}>
+                                                {Array.from({ length: 5 }).map((_, i) => (
+                                                    <Star key={i} sx={{ fontSize: 18, color: i < star ? 'var(--color-secondary)' : '#e0e0e0' }} />
+                                                ))}
+                                            </Box>
+                                            <Typography variant="body2">Từ {star} sao</Typography>
+                                        </MenuItem>
+                                    ))}
+                                </Menu>
+                            </Box>
+
+                            {/* Right Sort & Count */}
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500, display: { xs: 'none', md: 'block' } }}>
+                                    {productsLoading ? 'Đang tải...' : <>Hiển thị <Typography component="span" sx={{ color: 'var(--color-primary)', fontWeight: 700 }}>{totalElements}</Typography> kết quả</>}
+                                </Typography>
                                 <FormControl size="small" sx={{ minWidth: 180 }}>
                                     <Select
                                         value={sort}
@@ -316,15 +329,6 @@ const ShopPage: React.FC = () => {
                                         ))}
                                     </Select>
                                 </FormControl>
-
-                                <Button
-                                    variant="outlined"
-                                    onClick={() => setMobileFilterOpen(true)}
-                                    sx={{ display: { xs: 'flex', md: 'none' }, borderRadius: '8px', borderColor: 'var(--color-border)', color: 'text.primary' }}
-                                    startIcon={<Badge badgeContent={activeFilterCount} color="secondary"><FilterList /></Badge>}
-                                >
-                                    Lọc
-                                </Button>
                             </Box>
                         </Paper>
 
@@ -336,7 +340,10 @@ const ShopPage: React.FC = () => {
                                     <Chip label={filters.category} onDelete={() => { setFilters(f => ({ ...f, category: '', categoryId: '' })); setPage(0); }} sx={{ bgcolor: 'rgba(245, 166, 35, 0.1)', color: 'var(--color-secondary)', fontWeight: 600, borderRadius: '4px' }} />
                                 )}
                                 {filters.search && (
-                                    <Chip label={`"${filters.search}"`} onDelete={() => { setSearchInput(''); setFilters(f => ({ ...f, search: '' })); setPage(0); }} sx={{ bgcolor: 'rgba(245, 166, 35, 0.1)', color: 'var(--color-secondary)', fontWeight: 600, borderRadius: '4px' }} />
+                                    <Chip label={`Từ khóa: "${filters.search}"`} onDelete={() => { setSearchInput(''); setFilters(f => ({ ...f, search: '' })); setPage(0); }} sx={{ bgcolor: 'rgba(245, 166, 35, 0.1)', color: 'var(--color-secondary)', fontWeight: 600, borderRadius: '4px' }} />
+                                )}
+                                {filters.minPrice !== undefined && filters.maxPrice !== undefined && (
+                                    <Chip label={`Giá: ${(filters.minPrice/1000)}k - ${(filters.maxPrice/1000)}k`} onDelete={() => { setFilters(f => ({ ...f, minPrice: undefined, maxPrice: undefined })); setPage(0); }} sx={{ bgcolor: 'rgba(245, 166, 35, 0.1)', color: 'var(--color-secondary)', fontWeight: 600, borderRadius: '4px' }} />
                                 )}
                                 {filters.rating !== undefined && (
                                     <Chip label={`Từ ${filters.rating} sao`} onDelete={() => { setFilters(f => ({ ...f, rating: undefined })); setPage(0); }} sx={{ bgcolor: 'rgba(245, 166, 35, 0.1)', color: 'var(--color-secondary)', fontWeight: 600, borderRadius: '4px' }} />
@@ -415,23 +422,6 @@ const ShopPage: React.FC = () => {
                     </Grid>
                 </Grid>
             </Container>
-
-            {/* Mobile filter drawer */}
-            <Drawer anchor="left" open={mobileFilterOpen} onClose={() => setMobileFilterOpen(false)} PaperProps={{ sx: { width: 280, p: 3 } }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                    <Typography variant="h6" sx={{ fontFamily: '"Playfair Display", serif', fontWeight: 700, color: 'var(--color-primary)' }}>Bộ lọc</Typography>
-                    <IconButton onClick={() => setMobileFilterOpen(false)}><Close /></IconButton>
-                </Box>
-                <FilterSidebar
-                    filters={filters}
-                    setFilters={(updater) => { setFilters(updater); setPage(0); }}
-                    onClear={clearFilters}
-                    categories={categories}
-                    categoriesLoading={categoriesLoading}
-                    onClose={() => setMobileFilterOpen(false)}
-                />
-            </Drawer>
-
             {/* Quick View Modal */}
             <QuickViewModal
                 open={!!quickViewProduct}

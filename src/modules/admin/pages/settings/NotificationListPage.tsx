@@ -13,6 +13,7 @@ import { notificationService, Notification } from '../../../../services/notifica
 import warehouseService from '../../../../services/warehouseService';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import { decrementUnread, resetUnread } from '../../../../store/notificationCount';
 
 /**
  * Render message thân thiện từ payload.
@@ -90,16 +91,18 @@ const NotificationListPage: React.FC = () => {
 
     const handleMarkAsRead = async (id: string) => {
         try {
-            await notificationService.markAsRead(id);
             setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+            decrementUnread();
+            notificationService.markAsRead(id);
         } catch { }
     };
 
     const handleMarkAllAsRead = async () => {
         try {
-            await notificationService.markAllAsRead();
             setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
             setSnack({ open: true, message: 'Đã đánh dấu tất cả là đã đọc', severity: 'success' });
+            resetUnread();
+            notificationService.markAllAsRead();
         } catch { }
     };
 

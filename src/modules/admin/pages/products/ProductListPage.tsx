@@ -18,6 +18,7 @@ import BarcodePrintDialog, { BarcodePrintItem } from '../../../../components/com
 import ProductFormDialog from './ProductFormDialog';
 import ProductImportDialog from './ProductImportDialog';
 import authService from '../../../../services/authService';
+import { buildCategoryTreeFlat } from '../../../../utils/categoryUtils';
 
 // ── Helpers ──────────────────────────────────────────────────
 const fmtCurrency = (n) =>
@@ -386,7 +387,11 @@ const ProductListPage = () => {
                                 <FormControl fullWidth size="small">
                                     <Select value={categoryId} onChange={e => { setCategoryId(e.target.value); setPage(0); }} displayEmpty sx={{ fontSize: 13 }}>
                                         <MenuItem value="">Tất cả danh mục</MenuItem>
-                                        {categories.map(c => <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>{c.name}</MenuItem>)}
+                                        {buildCategoryTreeFlat(categories).map(c => (
+                                            <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13, pl: c.level * 2 + 2 }}>
+                                                {c.level > 0 ? '— ' : ''}{c.name}
+                                            </MenuItem>
+                                        ))}
                                     </Select>
                                 </FormControl>
                             </Grid>

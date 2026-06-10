@@ -17,13 +17,11 @@ interface StoredUser {
   user: any;
 }
 
-// Public routes that do NOT require authentication
-// These APIs are called from the customer-facing pages (no login required)
 const PUBLIC_PREFIXES = [
   '/products',
   '/categories',
-  '/auth',         // login/register endpoints are public
-  '/customers/me', // Nếu chưa đăng nhập → 401 nhưng không redirect
+  '/auth',        
+  '/customers/me',
 ];
 
 const isPublicRoute = (url: string = ''): boolean =>
@@ -97,8 +95,6 @@ axiosInstance.interceptors.response.use(
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
     if (error.response?.status === 401 && !originalRequest._retry) {
-      // For public routes (product listing, categories, etc.), 
-      // don't redirect to login — just reject silently so the page still renders
       const requestUrl = originalRequest.url ?? '';
       if (isPublicRoute(requestUrl)) {
         return Promise.reject(error);

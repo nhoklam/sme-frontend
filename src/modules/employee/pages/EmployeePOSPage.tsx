@@ -62,6 +62,7 @@ interface CartItem {
     productId: string;
     productName: string;
     isbnBarcode: string;
+    sku?: string;
     quantity: number;
     unitPrice: number;
     originalRetailPrice: number;
@@ -338,6 +339,10 @@ const EmployeePOSPage: React.FC = () => {
 
     const handleCheckout = async () => {
         if (!shift) return;
+        if (activeOrder.items.some(i => i.quantity === 0)) {
+            setSnack({ msg: 'Có sản phẩm số lượng bằng 0 trong giỏ hàng. Vui lòng cập nhật hoặc xóa trước khi thanh toán.', sev: 'error' });
+            return;
+        }
         setCheckoutLoading(true);
         try {
             let actualAmount = customerGivenAmount !== '' ? Number(customerGivenAmount) : finalAmount;
@@ -480,7 +485,7 @@ const EmployeePOSPage: React.FC = () => {
             const items = ex
                 ? o.items.map(i => i.productId === p.id ? { ...i, quantity: i.quantity + 1, subtotal: (i.quantity + 1) * i.unitPrice } : i)
                 : [...o.items, {
-                    productId: p.id, productName: p.name, isbnBarcode: p.isbnBarcode,
+                    productId: p.id, productName: p.name, isbnBarcode: p.isbnBarcode, sku: p.sku,
                     quantity: 1, unitPrice, originalRetailPrice: p.retailPrice,
                     wholesalePrice: p.wholesalePrice ?? p.retailPrice,
                     macPrice: p.macPrice, subtotal: unitPrice, imageUrl: p.imageUrl, unit: p.unit,
@@ -522,7 +527,7 @@ const EmployeePOSPage: React.FC = () => {
     };
 
     const updateQty = (id: string, qty: number) => {
-        if (qty < 1) { updateOrder(o => ({ ...o, items: o.items.filter(i => i.productId !== id) })); return; }
+        if (qty < 0) qty = 0;
         updateOrder(o => ({ ...o, items: o.items.map(i => i.productId === id ? { ...i, quantity: qty, subtotal: qty * i.unitPrice } : i) }));
     };
 
@@ -774,7 +779,7 @@ const EmployeePOSPage: React.FC = () => {
                                                                     {item.productName}
                                                                 </Typography>
                                                             </Tooltip>
-                                                            <Typography fontSize={12} color="#8c8c8c">{item.isbnBarcode}</Typography>
+                                                            <Typography fontSize={12} color="#8c8c8c">{item.sku || item.isbnBarcode}</Typography>
                                                         </Box>
                                                     </Box>
                                                 </td>
@@ -794,7 +799,7 @@ const EmployeePOSPage: React.FC = () => {
                                                 <td style={{ padding: '12px 16px' }}>
                                                     <Box sx={{ display: 'flex', alignItems: 'center', border: '1px solid #d9d9d9', borderRadius: 1, width: 'fit-content' }}>
                                                         <Box onClick={() => updateQty(item.productId, item.quantity - 1)} sx={{ px: 1, py: 0.5, cursor: 'pointer', color: '#595959', '&:hover': { bgcolor: '#f5f5f5' } }}>-</Box>
-                                                        <TextField size="small" type="number" value={item.quantity}
+                                                        <TextField size="small" value={item.quantity}
                                                             onChange={e => { const val = parseInt(e.target.value); if (!isNaN(val)) updateQty(item.productId, val); else if (e.target.value === '') updateQty(item.productId, 0); }}
                                                             sx={{ width: 45, '& fieldset': { border: 'none' }, '& input': { textAlign: 'center', py: 0.5, px: 0 } }} />
                                                         <Box onClick={() => updateQty(item.productId, item.quantity + 1)} sx={{ px: 1, py: 0.5, cursor: 'pointer', color: '#595959', '&:hover': { bgcolor: '#f5f5f5' } }}>+</Box>
@@ -916,7 +921,7 @@ const EmployeePOSPage: React.FC = () => {
                         <Box display="flex" alignItems="center" justifyContent="space-between" mb={0.5}>
                             <Box display="flex" alignItems="center" gap={0.5}>
                                 <Percent sx={{ fontSize: 14, color: '#1890ff' }} />
-                                <Typography variant="caption" color="#595959" fontWeight={600}>% Giảm giá đơn</Typography>
+                                <Typography variant="caption" color="#595959" fontWeight={600}> Giảm giá đơn</Typography>
                             </Box>
                             {(activeOrder.orderDiscount > 0 || activeOrder.orderDiscountAmt > 0) && (
                                 <Typography
@@ -1009,9 +1014,13 @@ const EmployeePOSPage: React.FC = () => {
                     <Box mb={1.5}>
                         <Typography variant="caption" fontWeight={600} color="#595959" mb={0.5} display="block">Tiền khách đưa</Typography>
                         <TextField
-                            fullWidth size="small" type="number"
-                            value={customerGivenAmount === '' ? finalAmount : customerGivenAmount}
-                            onChange={e => setCustomerGivenAmount(e.target.value === '' ? '' : Number(e.target.value))}
+                            fullWidth size="small"
+                            placeholder={new Intl.NumberFormat('vi-VN').format(finalAmount)}
+                            value={customerGivenAmount === '' ? '' : new Intl.NumberFormat('vi-VN').format(customerGivenAmount)}
+                            onChange={e => {
+                                const val = e.target.value.replace(/\D/g, '');
+                                setCustomerGivenAmount(val === '' ? '' : Number(val));
+                            }}
                             InputProps={{
                                 endAdornment: <Typography fontWeight={700} color="#262626">₫</Typography>,
                                 sx: { fontWeight: 700, fontSize: 16, color: '#262626' }
@@ -1028,7 +1037,7 @@ const EmployeePOSPage: React.FC = () => {
 
                     {/* Hoàn tất */}
                     <Box mb={1.5}>
-                        <Button fullWidth variant="contained" size="large" onClick={handleCheckout} disabled={activeOrder.items.length === 0 || !shift || checkoutLoading} sx={{ height: 50, fontSize: 15, fontWeight: 700, borderRadius: 2, bgcolor: '#1890ff', textTransform: 'none', boxShadow: '0 2px 0 rgba(24,144,255,0.1)', '&:hover': { bgcolor: '#40a9ff' } }}>
+                        <Button fullWidth variant="contained" size="large" onClick={handleCheckout} disabled={activeOrder.items.length === 0 || activeOrder.items.some(i => i.quantity === 0) || !shift || checkoutLoading} sx={{ height: 50, fontSize: 15, fontWeight: 700, borderRadius: 2, bgcolor: '#1890ff', textTransform: 'none', boxShadow: '0 2px 0 rgba(24,144,255,0.1)', '&:hover': { bgcolor: '#40a9ff' } }}>
                             {checkoutLoading ? <CircularProgress size={24} color="inherit" /> : `Thanh toán · ${fmt(finalAmount)}`}
                         </Button>
                     </Box>

@@ -59,8 +59,35 @@ const BranchSelector: React.FC = () => {
         }
     };
 
-    // Only ROLE_ADMIN can switch branches like this
-    if (currentUser?.role !== 'ROLE_ADMIN') return null;
+    // For non-admin users (Manager, Cashier), they cannot switch branches, 
+    // but we should elegantly display their assigned branch.
+    if (currentUser?.role !== 'ROLE_ADMIN') {
+        return (
+            <Box
+                sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    bgcolor: '#eff6ff',
+                    border: '1px solid #bfdbfe',
+                    borderRadius: 2,
+                    px: 1.5,
+                    py: 0.5,
+                    mr: 2,
+                    boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.5)',
+                }}
+            >
+                <Storefront sx={{ color: '#2563eb', fontSize: 18, mr: 1 }} />
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                    <Typography variant="caption" sx={{ fontSize: 9, color: '#3b82f6', fontWeight: 800, textTransform: 'uppercase', lineHeight: 1, letterSpacing: '0.5px' }}>
+                        Chi nhánh làm việc
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 700, fontSize: 13, color: '#1e3a8a', lineHeight: 1.2, mt: 0.25 }}>
+                        {currentWarehouseName}
+                    </Typography>
+                </Box>
+            </Box>
+        );
+    }
 
     return (
         <>

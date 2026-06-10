@@ -249,8 +249,7 @@ const PurchaseOrderDetailDialog: React.FC<{
                         <Table size="small">
                             <TableHead>
                                 <TableRow sx={{ bgcolor: '#f5f5f5' }}>
-                                    <TableCell sx={{ fontWeight: 800, fontSize: 12, textAlign: 'center', borderBottom: '2px solid #aaa', width: 200 }}>Sản phẩm</TableCell>
-                                    <TableCell sx={{ fontWeight: 800, fontSize: 12, textAlign: 'center', borderBottom: '2px solid #aaa', width: 100 }}>SKU</TableCell>
+                                    <TableCell sx={{ fontWeight: 800, fontSize: 12, textAlign: 'center', borderBottom: '2px solid #aaa', width: 280 }}>Sản phẩm</TableCell>
                                     <TableCell sx={{ fontWeight: 800, fontSize: 12, textAlign: 'center', borderBottom: '2px solid #aaa', width: 60 }}>SL</TableCell>
                                     <TableCell sx={{ fontWeight: 800, fontSize: 12, textAlign: 'right', borderBottom: '2px solid #aaa', width: 110 }}>Giá nhập</TableCell>
                                     <TableCell sx={{ fontWeight: 800, fontSize: 12, textAlign: 'right', borderBottom: '2px solid #aaa', width: 120 }}>Thành tiền</TableCell>
@@ -264,11 +263,6 @@ const PurchaseOrderDetailDialog: React.FC<{
                                             <TableCell sx={{ py: 1.25 }}>
                                                 <Typography variant="body2" fontWeight={600} fontSize={12.5}>
                                                     {product?.name || item.productId.slice(0, 8)}
-                                                </Typography>
-                                            </TableCell>
-                                            <TableCell sx={{ textAlign: 'center' }}>
-                                                <Typography variant="caption" fontFamily="monospace" color="#555" fontSize={11}>
-                                                    {product?.sku || product?.isbnBarcode || '—'}
                                                 </Typography>
                                             </TableCell>
                                             <TableCell sx={{ textAlign: 'center' }}>
@@ -287,7 +281,7 @@ const PurchaseOrderDetailDialog: React.FC<{
                                 })}
                                 {/* Total Row */}
                                 <TableRow>
-                                    <TableCell colSpan={2} sx={{ borderTop: '2px solid #333' }} />
+                                    <TableCell colSpan={1} sx={{ borderTop: '2px solid #333' }} />
                                     <TableCell sx={{ textAlign: 'center', fontWeight: 800, borderTop: '2px solid #333', fontSize: 13 }}>
                                         {totalQty}
                                     </TableCell>

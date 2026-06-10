@@ -18,6 +18,7 @@ import toast from 'react-hot-toast';
 import { Category, Supplier, UpdateProductRequest, CreateProductRequest } from '../../../../types';
 import JsBarcode from 'jsbarcode';
 import authService from '../../../../services/authService';
+import { buildCategoryTreeFlat } from '../../../../utils/categoryUtils';
 
 const fmt = (n?: number) =>
     n == null ? '—' : new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n);
@@ -298,42 +299,11 @@ const ProductFormDialog: React.FC<Props> = ({ open, onClose, onSuccess, productI
                                                 <FormControl fullWidth size="small" error={!!errors.categoryId} sx={inputStyles}>
                                                     <Select value={form.categoryId} onChange={set('categoryId')} displayEmpty>
                                                         <MenuItem value="" disabled>— Chọn danh mục —</MenuItem>
-                                                        {(() => {
-                                                            const roots = categories.filter(c => !c.parentId);
-                                                            const getChildren = (parentId: string) => categories.filter(c => c.parentId === parentId);
-                                                            const items: React.ReactNode[] = [];
-                                                            roots.forEach(root => {
-                                                                const children = getChildren(root.id);
-                                                                if (children.length > 0) {
-                                                                    // Parent as group header (not selectable)
-                                                                    items.push(
-                                                                        <MenuItem key={`header-${root.id}`} disabled sx={{ 
-                                                                            fontSize: 12, fontWeight: 800, color: '#1e293b', 
-                                                                            textTransform: 'uppercase', letterSpacing: '0.5px',
-                                                                            bgcolor: '#f1f5f9', mt: 0.5,
-                                                                            '&.Mui-disabled': { opacity: 1 }
-                                                                        }}>
-                                                                            {root.name}
-                                                                        </MenuItem>
-                                                                    );
-                                                                    children.forEach(child => {
-                                                                        items.push(
-                                                                            <MenuItem key={child.id} value={child.id} sx={{ fontSize: 13, pl: 4 }}>
-                                                                                ↳ {child.name}
-                                                                            </MenuItem>
-                                                                        );
-                                                                    });
-                                                                } else {
-                                                                    // Standalone category (no children)
-                                                                    items.push(
-                                                                        <MenuItem key={root.id} value={root.id} sx={{ fontSize: 13 }}>
-                                                                            {root.name}
-                                                                        </MenuItem>
-                                                                    );
-                                                                }
-                                                            });
-                                                            return items;
-                                                        })()}
+                                                        {buildCategoryTreeFlat(categories).map(c => (
+                                                            <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13, pl: c.level * 2 + 2 }}>
+                                                                {c.level > 0 ? '— ' : ''}{c.name}
+                                                            </MenuItem>
+                                                        ))}
                                                     </Select>
                                                 </FormControl>
                                             </Grid>

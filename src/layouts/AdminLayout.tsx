@@ -22,6 +22,7 @@ import toast from 'react-hot-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import AIChatWidget from '../components/common/AIChatWidget';
+import { registerCountSetter, unregisterCountSetter } from '../store/notificationCount';
 
 /**
  * Render message thân thiện từ payload:
@@ -126,6 +127,12 @@ const AdminLayout = () => {
         }
     }, [currentUser]);
 
+    // Đăng ký setter để NotificationListPage có thể cập nhật badge trực tiếp
+    React.useEffect(() => {
+        registerCountSetter(setUnreadCount);
+        return () => unregisterCountSetter();
+    }, []);
+
     useWebSocket({
         warehouseId: currentUser?.warehouseId,
         onMessage: (payload: WsPayload) => {
@@ -177,14 +184,9 @@ const AdminLayout = () => {
 
     const handleMarkAsRead = async (notif: Notification) => {
         try {
-            if (!notif.isRead) {
-                await notificationService.markAsRead(notif.id);
-                loadNotifications();
-            }
-
             setNotifAnchorEl(null);
 
-            // Điều hướng dựa trên loại thông báo
+            // Điều hướng dựa trên loại thông báo (thực hiện ngay lập tức)
             if (notif.type === 'LOW_STOCK') {
                 navigate('/admin/inventory/import');
             } else if (notif.type === 'TRANSFER_ARRIVED') {
@@ -192,14 +194,21 @@ const AdminLayout = () => {
             } else if (notif.type === 'NEW_ORDER' && notif.payload?.orderId) {
                 navigate(`/admin/orders/${notif.payload.orderId}`);
             }
+
+            if (!notif.isRead) {
+                setUnreadCount(prev => Math.max(0, prev - 1));
+                setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
+                notificationService.markAsRead(notif.id);
+            }
         } catch { }
     };
 
     const handleMarkAllAsRead = async () => {
         try {
-            await notificationService.markAllAsRead();
-            loadNotifications();
             setNotifAnchorEl(null);
+            setUnreadCount(0);
+            setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+            notificationService.markAllAsRead();
         } catch { }
     };
 

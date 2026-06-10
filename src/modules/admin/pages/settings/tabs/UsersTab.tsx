@@ -51,7 +51,7 @@ export default function UsersTab() {
     const isManager = currentUser?.role === 'ROLE_MANAGER';
     const managerWarehouseId = currentUser?.warehouseId || '';
 
-    const [users, setUsers] = useState<UserResponse[]>([]);
+    const [allUsers, setAllUsers] = useState<UserResponse[]>([]);
     const [warehouses, setWarehouses] = useState<WarehouseType[]>([]);
     const [loading, setLoading] = useState(true);
     const [filters, setFilters] = useState({
@@ -70,35 +70,42 @@ export default function UsersTab() {
     const loadData = async () => {
         setLoading(true);
         try {
-            const cleanFilters: any = {};
-            if (filters.keyword) cleanFilters.keyword = filters.keyword;
-            if (isManager) {
-                cleanFilters.role = 'ROLE_CASHIER';
-                cleanFilters.warehouseId = managerWarehouseId;
-            } else {
-                if (filters.role) cleanFilters.role = filters.role;
-                if (filters.warehouseId) cleanFilters.warehouseId = filters.warehouseId;
-            }
             const [u, w] = await Promise.all([
-                userService.getAll(cleanFilters),
+                userService.getAll(),
                 warehouseService.getAll(),
             ]);
-            const filteredUsers = isManager
-                ? u.filter(user => user.role === 'ROLE_CASHIER')
-                : u.filter(user => user.role !== 'ROLE_CUSTOMER');
-            setUsers(filteredUsers);
+            setAllUsers(u);
             setWarehouses(w);
         } catch { toast.error('Lỗi tải dữ liệu'); }
         finally { setLoading(false); }
     };
 
-    useEffect(() => { loadData(); }, [filters.role, filters.warehouseId]);
+    useEffect(() => { loadData(); }, []);
 
-    // Debounce keyword search
-    useEffect(() => {
-        const t = setTimeout(() => loadData(), 400);
-        return () => clearTimeout(t);
-    }, [filters.keyword]);
+    const displayedUsers = useMemo(() => {
+        let list = isManager
+            ? allUsers.filter(user => user.role === 'ROLE_CASHIER')
+            : allUsers.filter(user => user.role !== 'ROLE_CUSTOMER');
+
+        if (filters.keyword) {
+            const kw = removeDiacritics(filters.keyword.toLowerCase());
+            list = list.filter(u => 
+                removeDiacritics(u.fullName.toLowerCase()).includes(kw) ||
+                removeDiacritics(u.username.toLowerCase()).includes(kw) ||
+                (u.email && removeDiacritics(u.email.toLowerCase()).includes(kw))
+            );
+        }
+
+        if (filters.role) {
+            list = list.filter(u => u.role === filters.role);
+        }
+
+        if (filters.warehouseId) {
+            list = list.filter(u => u.warehouseId === filters.warehouseId);
+        }
+
+        return list;
+    }, [allUsers, filters, isManager]);
 
     const handleOpenModal = (user?: UserResponse) => {
         if (user) {
@@ -203,9 +210,9 @@ export default function UsersTab() {
                         <TableBody>
                             {loading ? (
                                 <TableRow><TableCell colSpan={7} align="center" sx={{ py: 8 }}><CircularProgress size={32} /></TableCell></TableRow>
-                            ) : users.length === 0 ? (
+                            ) : displayedUsers.length === 0 ? (
                                 <TableRow><TableCell colSpan={7} align="center" sx={{ py: 8, color: '#94a3b8' }}>Không có nhân sự nào</TableCell></TableRow>
-                            ) : users.map(u => {
+                            ) : displayedUsers.map(u => {
                                 const rc = getRoleColor(u.role);
                                 return (
                                     <TableRow key={u.id} hover sx={{ opacity: u.isActive ? 1 : 0.6 }}>

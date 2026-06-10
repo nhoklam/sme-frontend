@@ -20,6 +20,9 @@ export const authApi = {
   forgotPassword: async (email: string) => {
     return axiosInstance.post<any, ApiResponse<void>>('/auth/forgot-password', { email });
   },
+  verifyOtp: async (email: string, otp: string) => {
+    return axiosInstance.post<any, ApiResponse<void>>('/auth/verify-otp', { email, otp });
+  },
   resetPassword: async (data: { email: string; otp: string; newPassword: string }) => {
     return axiosInstance.post<any, ApiResponse<void>>('/auth/reset-password', data);
   },

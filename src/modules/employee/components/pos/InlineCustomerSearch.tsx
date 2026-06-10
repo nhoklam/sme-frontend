@@ -28,18 +28,19 @@ const InlineCustomerSearch: React.FC<Props> = ({ customer, onSelect, inputRef: e
     const inputRef = externalRef ?? internalRef;
 
     useEffect(() => {
-        const loadDefault = async () => {
-            try {
-                const r = await customerService.search({ keyword: '', page: 0, size: 5 });
-                setDefaultCustomers(r.content ?? []);
-            } catch { }
-        };
-        loadDefault();
-    }, []);
-
-    useEffect(() => {
+        if (!showDrop) return;
         const q = query.trim();
-        if (q.length < 1) { setResults([]); return; }
+        if (q.length < 1) { 
+            const loadDefault = async () => {
+                try {
+                    const r = await customerService.search({ keyword: '', page: 0, size: 5 });
+                    setDefaultCustomers(r.content ?? []);
+                } catch { }
+            };
+            loadDefault();
+            setResults([]); 
+            return; 
+        }
         const t = setTimeout(async () => {
             setLoading(true);
             try {
@@ -49,7 +50,7 @@ const InlineCustomerSearch: React.FC<Props> = ({ customer, onSelect, inputRef: e
             finally { setLoading(false); }
         }, 280);
         return () => clearTimeout(t);
-    }, [query]);
+    }, [query, showDrop]);
 
     useEffect(() => {
         const h = (e: MouseEvent) => {

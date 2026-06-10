@@ -13,7 +13,9 @@ import {
 
 import reportService from '../../../../services/reportService';
 import warehouseService from '../../../../services/warehouseService';
-import type { Warehouse, InvoiceResponse } from '../../../../types';
+import userService from '../../../../services/userService';
+import { useAuth } from '../../../../store/hooks/useAuth';
+import type { Warehouse, InvoiceResponse, UserResponse } from '../../../../types';
 import { formatCurrency } from '../../../../utils/formatters';
 import {
     PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend,
@@ -104,8 +106,13 @@ const isPaymentEwallet = (method: string) => {
 
 // ─── Main Component ────────────────────────────────────────────
 const EndOfDayReportPage: React.FC = () => {
+    const { user: currentUser, isAdmin } = useAuth();
+
     const [warehouseId, setWarehouseId] = useState<string>('');
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+
+    const [cashierId, setCashierId] = useState<string>('');
+    const [cashiers, setCashiers] = useState<UserResponse[]>([]);
 
     const [quickFilter, setQuickFilter] = useState<string>('yesterday'); // default to yesterday to match screenshot example
 
@@ -119,8 +126,12 @@ const EndOfDayReportPage: React.FC = () => {
     const [rowsPerPage, setRowsPerPage] = useState(10);
 
     useEffect(() => {
-        warehouseService.getAll().then(setWarehouses).catch(() => { });
-    }, []);
+        if (isAdmin) {
+            warehouseService.getAll().then(setWarehouses).catch(() => { });
+        } else {
+            userService.getAll({ warehouseId: currentUser?.warehouseId }).then(setCashiers).catch(() => {});
+        }
+    }, [isAdmin, currentUser?.warehouseId]);
 
     const fetchData = useCallback(async (filter = quickFilter) => {
         setLoading(true);
@@ -131,7 +142,8 @@ const EndOfDayReportPage: React.FC = () => {
             const invoiceRes = await reportService.getInvoices({
                 from: toISO(from), to: toISO(to),
                 size: 200,
-                ...(warehouseId ? { warehouseId } : {}),
+                ...(warehouseId && isAdmin ? { warehouseId } : {}),
+                ...(cashierId && !isAdmin ? { cashierId } : {}),
             });
             setInvoices(invoiceRes.content || []);
         } catch (e) {
@@ -140,7 +152,7 @@ const EndOfDayReportPage: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [warehouseId, quickFilter]);
+    }, [warehouseId, quickFilter, cashierId, isAdmin]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -257,14 +269,28 @@ const EndOfDayReportPage: React.FC = () => {
                             <Typography variant="body2" color="#666" fontSize={13}>{dateRangeStr}</Typography>
                         </Box>
 
-                        {/* Thêm Lọc Kho ở đây */}
-                        <Typography variant="body2" color="#666" fontSize={13} mb={1}>Chi nhánh / Kho</Typography>
-                        <FormControl size="small" fullWidth sx={{ mb: 3 }}>
-                            <Select value={warehouseId} onChange={e => setWarehouseId(e.target.value)} displayEmpty sx={{ fontSize: 14, borderRadius: 1.5 }}>
-                                <MenuItem value="">Tất cả chi nhánh</MenuItem>
-                                {warehouses.map(w => <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>)}
-                            </Select>
-                        </FormControl>
+                        {isAdmin && (
+                            <>
+                                <Typography variant="body2" color="#666" fontSize={13} mb={1}>Chi nhánh / Kho</Typography>
+                                <FormControl size="small" fullWidth sx={{ mb: 3 }}>
+                                    <Select value={warehouseId} onChange={e => setWarehouseId(e.target.value)} displayEmpty sx={{ fontSize: 14, borderRadius: 1.5 }}>
+                                        <MenuItem value="">Tất cả chi nhánh</MenuItem>
+                                        {warehouses.map(w => <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>)}
+                                    </Select>
+                                </FormControl>
+                            </>
+                        )}
+                        {!isAdmin && (
+                            <>
+                                <Typography variant="body2" color="#666" fontSize={13} mb={1}>Nhân viên</Typography>
+                                <FormControl size="small" fullWidth sx={{ mb: 3 }}>
+                                    <Select value={cashierId} onChange={e => setCashierId(e.target.value)} displayEmpty sx={{ fontSize: 14, borderRadius: 1.5 }}>
+                                        <MenuItem value="">Tất cả nhân viên</MenuItem>
+                                        {cashiers.map(c => <MenuItem key={c.id} value={c.id}>{c.fullName}</MenuItem>)}
+                                    </Select>
+                                </FormControl>
+                            </>
+                        )}
 
                         <Button
                             variant="outlined"

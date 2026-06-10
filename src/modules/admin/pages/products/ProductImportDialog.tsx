@@ -9,6 +9,7 @@ import { UploadFile, CheckCircle, Error as ErrorIcon } from '@mui/icons-material
 import * as XLSX from 'xlsx';
 import productService from '../../../../services/productService';
 import { CreateProductRequest } from '../../../../types';
+import { buildCategoryTreeFlat } from '../../../../utils/categoryUtils';
 
 interface ProductImportDialogProps {
     open: boolean;
@@ -154,8 +155,10 @@ export default function ProductImportDialog({ open, onClose, onSuccess, categori
                                     onChange={(e) => setDefaultCategory(e.target.value)}
                                     label="Danh mục mặc định *"
                                 >
-                                    {categories.filter(c => c.isActive).map(c => (
-                                        <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+                                    {buildCategoryTreeFlat(categories.filter((c: any) => c.isActive)).map(c => (
+                                        <MenuItem key={c.id} value={c.id} sx={{ pl: c.level * 2 + 2 }}>
+                                            {c.level > 0 ? '— ' : ''}{c.name}
+                                        </MenuItem>
                                     ))}
                                 </Select>
                             </FormControl>

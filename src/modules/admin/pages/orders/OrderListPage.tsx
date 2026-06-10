@@ -720,6 +720,8 @@ const OrderListPage: React.FC = () => {
     const [paymentMethodFilter, setPaymentMethodFilter] = useState('');
     const [provinceFilter, setProvinceFilter] = useState('');
     const [warehouseFilter, setWarehouseFilter] = useState('');
+    const [employeeFilter, setEmployeeFilter] = useState('');
+    const [employees, setEmployees] = useState<any[]>([]);
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [dateRange, setDateRange] = useState('last_30_days');
     const [customStartDate, setCustomStartDate] = useState('');
@@ -749,7 +751,14 @@ const OrderListPage: React.FC = () => {
 
     useEffect(() => {
         setWarehouseFilter(userWarehouseId || '');
-    }, [userWarehouseId]);
+        if (isManager || isAdmin) {
+            import('../../../../services/userService').then(({ default: userService }) => {
+                userService.getAll({ warehouseId: userWarehouseId || undefined }).then(users => {
+                    setEmployees(users.filter(u => u.role === 'ROLE_CASHIER' || u.role === 'ROLE_MANAGER'));
+                }).catch(() => {});
+            });
+        }
+    }, [userWarehouseId, isManager, isAdmin]);
 
     useEffect(() => {
         if (urlOrderId) {
@@ -949,9 +958,16 @@ const OrderListPage: React.FC = () => {
             if (paymentMethodFilter) {
                 finalOrders = finalOrders.filter(o => o.paymentMethod?.includes(paymentMethodFilter));
             }
+            if (employeeFilter) {
+                finalOrders = finalOrders.filter(o => 
+                    (o.createdByName === employeeFilter) || 
+                    (o.cashierName === employeeFilter)
+                );
+            }
 
             let paginatedOrders;
-            if (isAll) {
+            // Nếu có dùng bộ lọc client (paymentMethod, employee) thì ép tính lại toàn bộ dựa trên finalOrders hiện có
+            if (isAll || paymentMethodFilter || employeeFilter) {
                 tElements = finalOrders.length;
                 tPages = Math.ceil(tElements / PAGE_SIZE);
                 paginatedOrders = finalOrders.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
@@ -962,7 +978,16 @@ const OrderListPage: React.FC = () => {
             setOrders(paginatedOrders);
             setTotalPages(tPages);
             setTotalElements(tElements);
-            if (statsRes) {
+            
+            // Tính lại Stats nếu có lọc client
+            if (paymentMethodFilter || employeeFilter) {
+                setStats({
+                    totalCount: finalOrders.length,
+                    pendingCount: finalOrders.filter(o => ['PENDING', 'PAYMENT_PENDING', 'WAITING_FOR_CONSOLIDATION'].includes(o.status)).length,
+                    paidCount: finalOrders.filter(o => o.paymentStatus === 'PAID').length,
+                    totalRevenue: finalOrders.filter(o => o.status !== 'CANCELLED' && o.status !== 'RETURNED').reduce((sum, o) => sum + (o.finalAmount || 0), 0)
+                });
+            } else if (statsRes) {
                 setStats(statsRes);
             }
         } catch (e: any) {
@@ -970,9 +995,9 @@ const OrderListPage: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [page, search, statusFilter, paymentStatusFilter, paymentMethodFilter, provinceFilter, warehouseFilter, source, dateRange, customStartDate, customEndDate]);
+    }, [page, search, statusFilter, paymentStatusFilter, paymentMethodFilter, provinceFilter, warehouseFilter, employeeFilter, source, dateRange, customStartDate, customEndDate]);
 
-    useEffect(() => { setPage(0); }, [search, statusFilter, paymentStatusFilter, paymentMethodFilter, provinceFilter, warehouseFilter, source, dateRange, customStartDate, customEndDate]);
+    useEffect(() => { setPage(0); }, [search, statusFilter, paymentStatusFilter, paymentMethodFilter, provinceFilter, warehouseFilter, employeeFilter, source, dateRange, customStartDate, customEndDate]);
     useEffect(() => { loadOrders(); }, [loadOrders]);
 
     const handleAction = React.useCallback(async (action: string, order: OrderResponse) => {
@@ -1056,10 +1081,10 @@ const OrderListPage: React.FC = () => {
 
     const clearFilters = () => {
         setSearch(''); setStatusFilter(''); setPaymentStatusFilter('');
-        setPaymentMethodFilter(''); setProvinceFilter('');
+        setPaymentMethodFilter(''); setProvinceFilter(''); setEmployeeFilter('');
     };
 
-    const activeFilterCount = [search, statusFilter, paymentStatusFilter, paymentMethodFilter, provinceFilter].filter(Boolean).length;
+    const activeFilterCount = [search, statusFilter, paymentStatusFilter, paymentMethodFilter, provinceFilter, employeeFilter].filter(Boolean).length;
     return (
         <Box sx={{ p: 3, bgcolor: '#f8f9fb', minHeight: '100vh' }}>
             {/* Header */}
@@ -1215,6 +1240,21 @@ const OrderListPage: React.FC = () => {
                                     : PROVINCES.map(p => <MenuItem key={p.code} value={p.code} sx={{ fontSize: 13 }}>{p.name}</MenuItem>)}
                             </Select>
                         </FormControl>
+                        {/* Lọc theo nhân viên (Chỉ dành cho Quản lý) */}
+                        {isManager && (
+                            <FormControl size="small" sx={{ minWidth: 170 }}>
+                                <Select value={employeeFilter}
+                                    onChange={(e: SelectChangeEvent<string>) => setEmployeeFilter(e.target.value)}
+                                    displayEmpty sx={{ fontSize: 13 }}>
+                                    <MenuItem value="">Tất cả nhân viên</MenuItem>
+                                    {employees.map(emp => (
+                                        <MenuItem key={emp.id} value={emp.fullName || emp.username} sx={{ fontSize: 13 }}>
+                                            {emp.fullName || emp.username}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        )}
                         {activeFilterCount > 0 && (
                             <Button size="small" onClick={clearFilters}
                                 sx={{ textTransform: 'none', color: '#d32f2f', fontSize: 12, fontWeight: 600 }}>
@@ -1233,6 +1273,7 @@ const OrderListPage: React.FC = () => {
                         {paymentStatusFilter && <Chip size="small" label={PAYMENT_OPTIONS.find(o => o.value === paymentStatusFilter)?.label} onDelete={() => setPaymentStatusFilter('')} sx={{ bgcolor: '#e8f5e9', color: '#2e7d32', fontWeight: 600 }} />}
                         {paymentMethodFilter && <Chip size="small" label={paymentMethodFilter} onDelete={() => setPaymentMethodFilter('')} sx={{ bgcolor: '#f3e5f5', color: '#6a1b9a', fontWeight: 600 }} />}
                         {provinceFilter && <Chip size="small" label={getProvinceName(provinceFilter)} onDelete={() => setProvinceFilter('')} sx={{ bgcolor: '#e1f5fe', color: '#0277bd', fontWeight: 600 }} />}
+                        {employeeFilter && <Chip size="small" label={`Nhân viên: ${employeeFilter}`} onDelete={() => setEmployeeFilter('')} sx={{ bgcolor: '#e8eaf6', color: '#3f51b5', fontWeight: 600 }} />}
                     </Box>
                 )}
             </Paper>

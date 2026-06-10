@@ -16,6 +16,7 @@ import warehouseService from '../../../../../services/warehouseService';
 import { purchaseService } from '../../../../../services/purchaseService';
 import { exportToExcel } from '../../../../../utils/excelExport';
 import useAuth from '../../../../../store/hooks/useAuth';
+import { buildCategoryTreeFlat } from '../../../../../utils/categoryUtils';
 import { LowStockItem, Warehouse, ProductResponse } from '../../../../../types';
 
 const fmtCurrency = (n?: number) =>
@@ -332,57 +333,45 @@ const LowStockTab: React.FC<Props> = ({ warehouses }) => {
         if (!accessibleWarehouseIds.length || !products.length) { setItems([]); return; }
         setLoading(true);
         try {
-            const allInventories = await Promise.all(
-                accessibleWarehouseIds.map(id =>
-                    inventoryService.getByWarehouse(id).catch(() => [])
-                )
-            );
+            // Fetch low stock items from backend (which uses the accurate minQuantity and quantity logic)
+            // If isAdmin and no specific warehouse is forced, we can fetch all by passing undefined
+            // But since we want to be explicit, we can just fetch for the accessible warehouses
+            let allLowStockItems: LowStockItem[] = [];
+            
+            if (isAdmin) {
+                // Admin gets all low stock across the whole system
+                allLowStockItems = await inventoryService.getLowStock();
+            } else if (myWarehouseId) {
+                // Manager/Cashier gets low stock only for their branch
+                allLowStockItems = await inventoryService.getLowStock(myWarehouseId);
+            }
 
             const productAggMap = new Map<string, LowStockItem & { warehouses: string[] }>();
             
-            accessibleWarehouseIds.forEach((wId, i) => {
-                const w = warehouses.find(wh => wh.id === wId);
-                if (!w) return;
-                const invs = allInventories[i] as any[];
-                const invMap = new Map<string, any>(invs.map(inv => [inv.productId, inv]));
-
-                products.forEach(p => {
-                    const inv = invMap.get(p.id);
-                    const qty = inv ? Number(inv.availableQuantity) : 0;
-                    const minQty = inv ? Number(inv.minQuantity) : 0;
-
-                    if (qty <= minQty) {
-                        if (productAggMap.has(p.id)) {
-                            const existing = productAggMap.get(p.id)!;
-                            existing.quantity += qty;
-                            existing.minQuantity += minQty;
-                            existing.reservedQuantity += inv ? Number(inv.reservedQuantity || 0) : 0;
-                            if (!existing.warehouses.includes(w.name)) {
-                                existing.warehouses.push(w.name);
-                                existing.warehouseName = existing.warehouses.join(', ');
-                            }
-                        } else {
-                            productAggMap.set(p.id, {
-                                inventoryId: p.id, // Use productId as unique key for table
-                                productId: p.id,
-                                productName: p.name,
-                                productSku: p.sku,
-                                warehouseId: w.id,
-                                warehouseName: w.name,
-                                quantity: qty,
-                                minQuantity: minQty,
-                                reservedQuantity: inv ? Number(inv.reservedQuantity || 0) : 0,
-                                warehouses: [w.name]
-                            });
-                        }
+            allLowStockItems.forEach(item => {
+                if (productAggMap.has(item.productId)) {
+                    const existing = productAggMap.get(item.productId)!;
+                    existing.quantity += item.quantity;
+                    existing.minQuantity += item.minQuantity;
+                    existing.reservedQuantity += item.reservedQuantity || 0;
+                    if (!existing.warehouses.includes(item.warehouseName)) {
+                        existing.warehouses.push(item.warehouseName);
+                        existing.warehouseName = existing.warehouses.join(', ');
                     }
-                });
+                } else {
+                    productAggMap.set(item.productId, {
+                        ...item,
+                        inventoryId: item.productId, // Use productId as unique key for table
+                        warehouses: [item.warehouseName]
+                    });
+                }
             });
+
             setItems(Array.from(productAggMap.values()));
         } catch {
             setItems([]);
         } finally { setLoading(false); }
-    }, [accessibleWarehouseIds, products, warehouses]);
+    }, [accessibleWarehouseIds, products, isAdmin, myWarehouseId]);
 
     useEffect(() => { load(); }, [load]);
 
@@ -497,8 +486,10 @@ const LowStockTab: React.FC<Props> = ({ warehouses }) => {
                 <FormControl size="small" sx={{ minWidth: 180 }}>
                     <Select value={selectedCategory} onChange={e => { setSelectedCategory(e.target.value); setPage(0); }} displayEmpty>
                         <MenuItem value="">Tất cả danh mục</MenuItem>
-                        {categories.filter(c => c.isActive).map(c => (
-                            <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+                        {buildCategoryTreeFlat(categories.filter((c: any) => c.isActive)).map(c => (
+                            <MenuItem key={c.id} value={c.id} sx={{ pl: c.level * 2 + 2 }}>
+                                {c.level > 0 ? '— ' : ''}{c.name}
+                            </MenuItem>
                         ))}
                     </Select>
                 </FormControl>

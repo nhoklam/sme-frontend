@@ -5,7 +5,7 @@ import {
     TableContainer, TableHead, TableRow, TextField, InputAdornment,
     Chip, IconButton, Select, MenuItem, FormControl, Snackbar, Alert,
     Skeleton, Pagination, Dialog, DialogTitle, DialogContent,
-    DialogActions, Divider, Grid, CircularProgress,
+    DialogActions, Divider, Grid, CircularProgress, Tooltip,
 } from '@mui/material';
 import {
     Search, Add, Refresh, Visibility, Close,
@@ -441,7 +441,16 @@ const CreateTransferDialog: React.FC<{
                                                                 <Box component="img" src={p.imageUrl} alt={p.name}
                                                                     sx={{ width: 32, height: 42, objectFit: 'contain', borderRadius: 0.5, border: '1px solid #e0e0e0' }} />
                                                             )}
-                                                            <Typography variant="body2" fontWeight={600} fontSize={13}>{p.name}</Typography>
+                                                            <Tooltip title={p.name} arrow placement="top">
+                                                                <Typography variant="body2" fontWeight={600} fontSize={13} sx={{
+                                                                    whiteSpace: 'nowrap',
+                                                                    overflow: 'hidden',
+                                                                    textOverflow: 'ellipsis',
+                                                                    maxWidth: 350
+                                                                }}>
+                                                                    {p.name}
+                                                                </Typography>
+                                                            </Tooltip>
                                                         </Box>
                                                     </TableCell>
                                                     <TableCell sx={{ py: 1 }}>
@@ -489,7 +498,16 @@ const CreateTransferDialog: React.FC<{
                                                         <Box component="img" src={item.imageUrl} alt={item.productName}
                                                             sx={{ width: 32, height: 42, objectFit: 'contain', borderRadius: 0.5 }} />
                                                     )}
-                                                    <Typography fontWeight={600} fontSize={13}>{item.productName}</Typography>
+                                                    <Tooltip title={item.productName} arrow placement="top">
+                                                        <Typography fontWeight={600} fontSize={13} sx={{
+                                                            whiteSpace: 'nowrap',
+                                                            overflow: 'hidden',
+                                                            textOverflow: 'ellipsis',
+                                                            maxWidth: 300
+                                                        }}>
+                                                            {item.productName}
+                                                        </Typography>
+                                                    </Tooltip>
                                                 </Box>
                                             </TableCell>
                                             <TableCell>

@@ -68,9 +68,9 @@ const paymentLabel = (method: string) => {
 
 const PrintInvoiceDialog: React.FC<PrintInvoiceDialogProps> = ({
     open, onClose, invoice,
-    storeName = 'CỬA HÀNG CRM SYSTEM',
-    storeAddress = '123 Đường CRM, TP. Hồ Chí Minh',
-    storePhone = '0123 456 789',
+    storeName = 'SME BOOKSTORE',
+    storeAddress = '491 Đỗ Xuân Hợp, Phước Long B, Thủ Đức',
+    storePhone = '0367287044',
     cashierDisplayName,
     warehouseName,
 }) => {
@@ -106,37 +106,7 @@ const PrintInvoiceDialog: React.FC<PrintInvoiceDialogProps> = ({
                         color: #000;
                         margin: auto;
                     }
-                    .center { text-align: center; }
-                    .bold { font-weight: bold; }
-                    .store-name { font-size: 14px; font-weight: bold; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
-                    .store-info { font-size: 11px; margin-bottom: 1px; }
-                    .title { font-size: 14px; font-weight: bold; margin: 10px 0 4px 0; text-transform: uppercase; }
-                    .divider {
-                        border-top: 1px dashed #000;
-                        margin: 6px 0;
-                    }
-                    .row {
-                        display: flex;
-                        justify-content: space-between;
-                        margin-bottom: 2px;
-                    }
-                    .item-name {
-                        margin-top: 4px;
-                        margin-bottom: 1px;
-                        text-transform: uppercase;
-                    }
-                    .item-detail {
-                        display: flex;
-                        justify-content: space-between;
-                        padding-left: 0;
-                    }
-                    .footer { font-size: 11px; font-style: italic; text-align: center; margin-top: 12px; }
-                    .powered { font-size: 10px; text-align: center; margin-top: 2px; font-style: italic; }
-                    table { width: 100%; border-collapse: collapse; margin-top: 4px; }
-                    th { border-bottom: 1px dashed #000; padding-bottom: 4px; text-align: right; font-weight: bold; font-size: 11px; }
-                    th:first-child { text-align: left; }
-                    th:nth-child(2) { text-align: center; }
-                    td { vertical-align: top; padding-top: 4px; }
+                    /* Any additional global styles */
                 </style>
             </head>
             <body>
@@ -164,155 +134,153 @@ const PrintInvoiceDialog: React.FC<PrintInvoiceDialogProps> = ({
                 {/* Preview Container */}
                 <Box sx={{ p: 3, bgcolor: '#e5e7eb', maxHeight: '80vh', overflowY: 'auto', display: 'flex', justifyContent: 'center' }}>
                     {/* Printable Content */}
-                    <Box
+                    <div
                         ref={printRef}
-                        sx={{
-                            bgcolor: '#fff',
-                            p: 3,
+                        style={{
+                            backgroundColor: '#fff',
+                            padding: '16px',
                             width: '300px',
                             minHeight: '400px',
                             boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                             fontFamily: '"Courier New", Courier, monospace',
-                            fontSize: 11,
-                            color: '#000'
+                            fontSize: '12px',
+                            color: '#000',
+                            margin: 'auto'
                         }}
                     >
                         {/* Header */}
-                        <Box sx={{ textAlign: 'center', mb: 1 }}>
-                            <div className="store-name" style={{ fontSize: 14, fontWeight: 800, marginBottom: 2, textTransform: 'uppercase' }}>
+                        <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+                            <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '2px', textTransform: 'uppercase' }}>
                                 {storeName}
                             </div>
-                            <div className="store-info" style={{ fontSize: 11, marginBottom: 1 }}>
-                                Địa chỉ: {storeAddress}
+                            <div style={{ fontSize: '11px', marginBottom: '1px' }}>
+                                {storeAddress}
                             </div>
                             {storePhone && (
-                                <div className="store-info" style={{ fontSize: 11, marginBottom: 1 }}>
-                                    Hotline: {storePhone}
+                                <div style={{ fontSize: '11px', marginBottom: '1px' }}>
+                                    ĐT: {storePhone}
                                 </div>
                             )}
-                        </Box>
+                        </div>
 
-                        <Divider sx={{ borderStyle: 'dashed', borderColor: '#000', my: 1.5, borderWidth: '1px 0 0 0' }} />
+                        <div style={{ borderTop: '1px solid #000', margin: '8px 0' }}></div>
 
                         {/* Invoice Info */}
-                        <Box sx={{ mb: 1.5 }}>
-                            <div className="center title" style={{ textAlign: 'center', fontWeight: 800, fontSize: 14, marginBottom: 4, textTransform: 'uppercase' }}>
-                                {invoice.type === 'RETURN' ? 'PHIẾU TRẢ HÀNG' : 'HÓA ĐƠN THANH TOÁN'}
-                            </div>
-                            <Box sx={{ textAlign: 'center', fontSize: 11, mb: 0.5 }}>
-                                Số: {invoice.code}
-                            </Box>
-                            <Box sx={{ textAlign: 'center', fontSize: 11, mb: 1.5 }}>
-                                Ngày: {createdDate.toLocaleDateString('vi-VN')} {createdDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                            </Box>
-                            
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, mb: 0.5 }}>
-                                <span>Thu ngân:</span>
-                                <span>{cashierDisplayName || invoice.cashierName || '—'}</span>
-                            </Box>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, mb: 0.5 }}>
-                                <span>Khách hàng:</span>
-                                <span>{invoice.customerName || 'Khách lẻ'}</span>
-                            </Box>
-                        </Box>
+                        <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '16px', margin: '4px 0', textTransform: 'uppercase' }}>
+                            {invoice.type === 'RETURN' ? 'PHIẾU TRẢ HÀNG' : 'HÓA ĐƠN'}
+                        </div>
+                        
+                        <div style={{ borderTop: '1px solid #000', margin: '8px 0' }}></div>
 
-                        <Divider sx={{ borderStyle: 'dashed', borderColor: '#000', my: 1.5, borderWidth: '1px 0 0 0' }} />
+                        <div style={{ display: 'flex', marginBottom: '2px' }}>
+                            <span style={{ width: '80px', display: 'inline-block' }}>Số HD:</span>
+                            <span>{invoice.code}</span>
+                        </div>
+                        <div style={{ display: 'flex', marginBottom: '2px' }}>
+                            <span style={{ width: '80px', display: 'inline-block' }}>Ngày giờ:</span>
+                            <span>{createdDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} {createdDate.toLocaleDateString('vi-VN')}</span>
+                        </div>
+                        <div style={{ display: 'flex', marginBottom: '2px' }}>
+                            <span style={{ width: '80px', display: 'inline-block' }}>Thu ngân:</span>
+                            <span>{cashierDisplayName || invoice.cashierName || '—'}</span>
+                        </div>
+                        <div style={{ display: 'flex', marginBottom: '2px' }}>
+                            <span style={{ width: '80px', display: 'inline-block' }}>Khách hàng:</span>
+                            <span>{invoice.customerName || 'Khách lẻ'}</span>
+                        </div>
+
+                        <div style={{ borderTop: '1px solid #000', margin: '8px 0' }}></div>
 
                         {/* Items */}
-                        <Box sx={{ mb: 1 }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
-                                <thead>
-                                    <tr>
-                                        <th style={{ textAlign: 'left', borderBottom: '1px dashed #000', paddingBottom: 4 }}>Tên hàng</th>
-                                        <th style={{ textAlign: 'center', borderBottom: '1px dashed #000', paddingBottom: 4 }}>SL</th>
-                                        <th style={{ textAlign: 'right', borderBottom: '1px dashed #000', paddingBottom: 4 }}>Thành tiền</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {(invoice.items || []).map((item, idx) => (
-                                        <React.Fragment key={idx}>
-                                            <tr>
-                                                <td colSpan={3} style={{ paddingTop: 6, paddingBottom: 2, textTransform: 'uppercase' }}>
-                                                    {item.productName || `SP #${item.productId.slice(0, 8)}`}
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td style={{ paddingBottom: 4 }}>{fmt(item.unitPrice)}</td>
-                                                <td style={{ textAlign: 'center', paddingBottom: 4 }}>x {Math.abs(item.quantity)}</td>
-                                                <td style={{ textAlign: 'right', paddingBottom: 4 }}>{fmt(item.subtotal)}</td>
-                                            </tr>
-                                        </React.Fragment>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </Box>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                            <thead>
+                                <tr>
+                                    <th style={{ textAlign: 'left', paddingBottom: '4px' }}>Sản phẩm</th>
+                                    <th style={{ textAlign: 'right', paddingBottom: '4px' }}>T.Tiền</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {(invoice.items || []).map((item, idx) => (
+                                    <React.Fragment key={idx}>
+                                        <tr>
+                                            <td colSpan={2} style={{ paddingTop: '4px', paddingBottom: '2px' }}>
+                                                {item.productName || `SP #${item.productId.slice(0, 8)}`}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style={{ paddingBottom: '4px', color: '#555', paddingLeft: '8px' }}>
+                                                {Math.abs(item.quantity)} x {fmt(item.unitPrice)}
+                                            </td>
+                                            <td style={{ textAlign: 'right', paddingBottom: '4px' }}>{fmt(item.subtotal)}</td>
+                                        </tr>
+                                    </React.Fragment>
+                                ))}
+                            </tbody>
+                        </table>
 
-                        <Divider sx={{ borderStyle: 'dashed', borderColor: '#000', my: 1.5, borderWidth: '1px 0 0 0' }} />
+                        <div style={{ borderTop: '1px solid #000', margin: '8px 0' }}></div>
 
                         {/* Totals */}
-                        <Box sx={{ mb: 1 }}>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, mb: 0.5 }}>
-                                <span>Tổng tiền hàng:</span>
+                        <div style={{ marginBottom: '8px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                                <span style={{ width: '100px', display: 'inline-block' }}>Tổng cộng:</span>
                                 <span>{fmt(invoice.totalAmount)}</span>
-                            </Box>
+                            </div>
                             {(invoice.discountAmount ?? 0) > 0 && (
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, mb: 0.5 }}>
-                                    <span>Giảm giá:</span>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                                    <span style={{ width: '100px', display: 'inline-block' }}>Giảm giá:</span>
                                     <span>-{fmt(invoice.discountAmount)}</span>
-                                </Box>
+                                </div>
                             )}
                             {(invoice.pointsUsed ?? 0) > 0 && (
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, mb: 0.5 }}>
-                                    <span>Dùng điểm:</span>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                                    <span style={{ width: '100px', display: 'inline-block' }}>Dùng điểm:</span>
                                     <span>-{fmt((invoice.pointsUsed ?? 0) * 100)}</span>
-                                </Box>
+                                </div>
                             )}
-                        </Box>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '14px', marginTop: '4px' }}>
+                                <span style={{ textTransform: 'uppercase' }}>THANH TOÁN:</span>
+                                <span>{fmt(invoice.finalAmount)}</span>
+                            </div>
+                        </div>
 
-                        <Divider sx={{ borderStyle: 'dashed', borderColor: '#000', my: 1.5, borderWidth: '1px 0 0 0' }} />
-
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 800, my: 1.5 }}>
-                            <span>TỔNG CỘNG:</span>
-                            <span>{fmt(invoice.finalAmount)}</span>
-                        </Box>
-
-                        <Divider sx={{ borderStyle: 'dashed', borderColor: '#000', my: 1.5, borderWidth: '1px 0 0 0' }} />
+                        <div style={{ borderTop: '1px solid #000', margin: '8px 0' }}></div>
 
                         {/* Payments */}
                         {invoice.payments && invoice.payments.length > 0 && (
-                            <Box sx={{ mb: 1 }}>
+                            <div style={{ marginBottom: '8px' }}>
                                 {invoice.payments.map((p, i) => (
-                                    <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, mb: 0.5 }}>
-                                        <span>Khách thanh toán:</span>
+                                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                                        <span style={{ width: '100px', display: 'inline-block' }}>Khách đưa:</span>
                                         <span>{fmt(p.amount)}</span>
-                                    </Box>
+                                    </div>
                                 ))}
                                 {changeAmount > 0 && (
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, mt: 0.5 }}>
-                                        <span>Tiền thừa:</span>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2px' }}>
+                                        <span style={{ width: '100px', display: 'inline-block' }}>Tiền trả lại:</span>
                                         <span>{fmt(changeAmount)}</span>
-                                    </Box>
+                                    </div>
                                 )}
-                            </Box>
+                            </div>
                         )}
 
-                        {/* Note */}
-                        {invoice.note && (
-                            <Box sx={{ fontSize: 10, mt: 1.5, fontStyle: 'italic' }}>
-                                Ghi chú: {invoice.note}
-                            </Box>
-                        )}
+                        {/* Payment Method */}
+                        <div style={{ textAlign: 'center', marginTop: '16px', color: '#666', fontSize: '11px' }}>
+                            (Thanh toán qua: {paymentLabel(invoice.payments?.[0]?.method || 'CASH')})
+                        </div>
 
                         {/* Footer */}
-                        <Box sx={{ textAlign: 'center', mt: 3 }}>
-                            <div className="footer" style={{ fontSize: 11, fontStyle: 'italic', marginBottom: 2 }}>
-                                Cảm ơn Quý khách. Hẹn gặp lại!
+                        <div style={{ textAlign: 'center', marginTop: '4px' }}>
+                            Cảm ơn quý khách!
+                        </div>
+                        
+                        {/* Note */}
+                        {invoice.note && (
+                            <div style={{ fontSize: '10px', marginTop: '16px', fontStyle: 'italic', textAlign: 'center' }}>
+                                Ghi chú: {invoice.note}
                             </div>
-                            <div className="powered" style={{ fontSize: 10, fontStyle: 'italic' }}>
-                                Powered by CRM System
-                            </div>
-                        </Box>
-                    </Box>
+                        )}
+                    </div>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, bgcolor: '#fff', borderTop: '1px solid #e5e7eb' }}>
                     <Button onClick={onClose} variant="outlined" sx={{ textTransform: 'none', color: '#555', borderColor: '#ccc', borderRadius: 2 }}>

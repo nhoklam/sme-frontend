@@ -18,9 +18,11 @@ import {
 } from '@mui/icons-material';
 import reportService from '../../../../services/reportService';
 import warehouseService from '../../../../services/warehouseService';
+import userService from '../../../../services/userService';
+import { useAuth } from '../../../../store/hooks/useAuth';
 import type {
     RevenueDataPoint, TopProduct, InventoryValueReport,
-    ReportPeriod, DeadStockItem,
+    ReportPeriod, DeadStockItem, UserResponse
 } from '../../../../types/index';
 import type { Warehouse } from '../../../../types';
 import { formatCurrency } from '../../../../utils/formatters';
@@ -598,9 +600,14 @@ const MerchandiseTab: React.FC<{ warehouseId: string; quickFilter: string; custo
 
 // ─── Main Component ────────────────────────────────────────────
 const RevenueReportPage: React.FC = () => {
+    const { user: currentUser, isAdmin } = useAuth();
+
     const [activeTab, setActiveTab] = useState(0);
     const [warehouseId, setWarehouseId] = useState<string>('');
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+
+    const [cashierId, setCashierId] = useState<string>('');
+    const [cashiers, setCashiers] = useState<UserResponse[]>([]);
 
     const [chartPeriod, setChartPeriod] = useState<'hour' | 'day' | 'dayOfWeek' | 'month' | 'year'>('day');
     const [quickFilter, setQuickFilter] = useState<string>('30days');
@@ -613,8 +620,12 @@ const RevenueReportPage: React.FC = () => {
     const [error, setError] = useState('');
 
     useEffect(() => {
-        warehouseService.getAll().then(setWarehouses).catch(() => { });
-    }, []);
+        if (isAdmin) {
+            warehouseService.getAll().then(setWarehouses).catch(() => { });
+        } else {
+            userService.getAll({ warehouseId: currentUser?.warehouseId }).then(setCashiers).catch(() => {});
+        }
+    }, [isAdmin, currentUser?.warehouseId]);
 
     const fetchRevenue = useCallback(async (filter = quickFilter, forcedPeriod = chartPeriod) => {
         setLoadingRevenue(true);
@@ -633,8 +644,9 @@ const RevenueReportPage: React.FC = () => {
             
             const data = await reportService.getRevenue({
                 from: toISO(from), to: toISO(to), period: apiPeriod as any,
-                ...(warehouseId ? { warehouseId } : {}),
+                ...(warehouseId && isAdmin ? { warehouseId } : {}),
                 ...(paymentMethod ? { paymentMethod } : {}),
+                ...(cashierId && !isAdmin ? { cashierId } : {}),
             });
             setRevenueData(data);
         } catch {
@@ -642,7 +654,7 @@ const RevenueReportPage: React.FC = () => {
         } finally {
             setLoadingRevenue(false);
         }
-    }, [warehouseId, quickFilter, chartPeriod, customFrom, customTo, paymentMethod]);
+    }, [warehouseId, quickFilter, chartPeriod, customFrom, customTo, paymentMethod, cashierId, isAdmin]);
 
     useEffect(() => { fetchRevenue(); }, [fetchRevenue]);
 
@@ -768,15 +780,28 @@ const RevenueReportPage: React.FC = () => {
                         <Paper elevation={0} sx={{ borderRadius: 2, p: 2.5, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
                             <Typography fontWeight={700} fontSize={13} color="#8c8c8c" textTransform="uppercase" mb={2}>Bộ lọc dữ liệu</Typography>
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-                                <Box>
-                                    <Typography variant="body2" color="#8c8c8c" fontSize={12} mb={1}>Chi nhánh / Kho</Typography>
-                                    <FormControl size="small" fullWidth>
-                                        <Select value={warehouseId} onChange={e => setWarehouseId(e.target.value)} displayEmpty sx={{ fontSize: 13 }}>
-                                            <MenuItem value="">Tất cả chi nhánh</MenuItem>
-                                            {warehouses.map(w => <MenuItem key={w.id} value={w.id} sx={{ fontSize: 13 }}>{w.name}</MenuItem>)}
-                                        </Select>
-                                    </FormControl>
-                                </Box>
+                                {isAdmin && (
+                                    <Box>
+                                        <Typography variant="body2" color="#8c8c8c" fontSize={12} mb={1}>Chi nhánh / Kho</Typography>
+                                        <FormControl size="small" fullWidth>
+                                            <Select value={warehouseId} onChange={e => setWarehouseId(e.target.value)} displayEmpty sx={{ fontSize: 13 }}>
+                                                <MenuItem value="">Tất cả chi nhánh</MenuItem>
+                                                {warehouses.map(w => <MenuItem key={w.id} value={w.id} sx={{ fontSize: 13 }}>{w.name}</MenuItem>)}
+                                            </Select>
+                                        </FormControl>
+                                    </Box>
+                                )}
+                                {!isAdmin && (
+                                    <Box>
+                                        <Typography variant="body2" color="#8c8c8c" fontSize={12} mb={1}>Nhân viên</Typography>
+                                        <FormControl size="small" fullWidth>
+                                            <Select value={cashierId} onChange={e => setCashierId(e.target.value)} displayEmpty sx={{ fontSize: 13 }}>
+                                                <MenuItem value="">Tất cả nhân viên</MenuItem>
+                                                {cashiers.map(c => <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>{c.fullName}</MenuItem>)}
+                                            </Select>
+                                        </FormControl>
+                                    </Box>
+                                )}
                                 <Box>
                                     <Typography variant="body2" color="#8c8c8c" fontSize={12} mb={1}>Thời gian báo cáo</Typography>
                                     <FormControl size="small" fullWidth>
