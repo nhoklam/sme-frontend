@@ -822,14 +822,14 @@ const RevenueReportPage: React.FC = () => {
                                                 type="date"
                                                 value={customFrom}
                                                 onChange={e => { setCustomFrom(e.target.value); if (customTo && e.target.value) { setQuickFilter('custom'); fetchRevenue('custom', chartPeriod); } }}
-                                                style={{ flex: 1, padding: '8px 10px', borderRadius: '8px', border: '1px solid #e0e0e0', fontSize: '12px', fontWeight: 600, color: '#333', outline: 'none' }}
+                                                style={{ flex: 1, minWidth: 0, width: '100%', padding: '7.5px 6px', borderRadius: '6px', border: '1px solid #c4c4c4', fontSize: '13px', fontFamily: 'inherit', color: '#333', outline: 'none' }}
                                             />
-                                            <Typography fontSize={12} color="#999">→</Typography>
+                                            <Typography fontSize={13} color="#999" sx={{ flexShrink: 0 }}>→</Typography>
                                             <input
                                                 type="date"
                                                 value={customTo}
                                                 onChange={e => { setCustomTo(e.target.value); if (customFrom && e.target.value) { setQuickFilter('custom'); fetchRevenue('custom', chartPeriod); } }}
-                                                style={{ flex: 1, padding: '8px 10px', borderRadius: '8px', border: '1px solid #e0e0e0', fontSize: '12px', fontWeight: 600, color: '#333', outline: 'none' }}
+                                                style={{ flex: 1, minWidth: 0, width: '100%', padding: '7.5px 6px', borderRadius: '6px', border: '1px solid #c4c4c4', fontSize: '13px', fontFamily: 'inherit', color: '#333', outline: 'none' }}
                                             />
                                         </Box>
                                     ) : (
@@ -893,9 +893,7 @@ const RevenueReportPage: React.FC = () => {
                                     </Box>
                                     <Box sx={{ display: 'flex', gap: 0.5, bgcolor: '#f1f5f9', p: 0.5, borderRadius: 2 }}>
                                         {[
-                                            { id: 'hour', label: 'Theo giờ' },
                                             { id: 'day', label: 'Theo ngày' },
-                                            { id: 'dayOfWeek', label: 'Theo thứ' },
                                             { id: 'month', label: 'Theo tháng' },
                                             { id: 'year', label: 'Theo năm' }
                                         ].map(p => (

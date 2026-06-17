@@ -27,10 +27,14 @@ const fmtPeriod = (period: string, type: string) => {
     if (!period) return '';
     try {
         const d = new Date(period);
-        if (type === 'day' || type === 'dayOfWeek') return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+        if (type === 'day') return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+        if (type === 'dayOfWeek') {
+            const days = ["CN", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
+            return days[d.getDay()];
+        }
         if (type === 'week') return `T${d.getDate()}/${d.getMonth() + 1}`;
         if (type === 'month') return d.toLocaleDateString('vi-VN', { month: '2-digit', year: 'numeric' });
-        if (type === 'hour') return `${d.getHours()}:00`;
+        if (type === 'hour') return period; // Backend now returns 'HH:00'
         return String(d.getFullYear());
     } catch {
         return period;
@@ -121,16 +125,19 @@ const BusinessReportPage: React.FC = () => {
     const [warehouseId, setWarehouseId] = useState<string>('');
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
 
-    const [chartPeriod, setChartPeriod] = useState<'hour' | 'day' | 'dayOfWeek' | 'month' | 'year'>('day');
+    const [chartPeriod, setChartPeriod] = useState<'day' | 'dayOfWeek' | 'month' | 'year'>('day');
     const [quickFilter, setQuickFilter] = useState<'today' | 'yesterday' | 'last7days' | 'thisMonth' | '30days' | '90days' | 'thisYear'>('thisMonth');
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
     const [stats, setStats] = useState({
-        totalRevenue: 0,
-        totalCOGS: 0,
-        operatingExpense: 0,
+        revenue: 0,
+        cogs: 0,
+        grossProfit: 0,
+        otherIncome: 0,
+        otherExpenses: 0,
+        netProfit: 0,
     });
     const [chartData, setChartData] = useState<any[]>([]);
 
@@ -147,90 +154,49 @@ const BusinessReportPage: React.FC = () => {
             const { from, to } = getDateRange(filter);
             const apiPeriod = forcedPeriod === 'dayOfWeek' ? 'day' : forcedPeriod;
 
-            // 1. Lấy dữ liệu doanh thu & giá vốn
-            const revenueRes = await reportService.getRevenue({
+            // Gọi API Business Report mới
+            const businessData = await reportService.getBusinessReport({
                 from: toISO(from), to: toISO(to), period: apiPeriod as any,
                 ...(warehouseId && isAdmin ? { warehouseId } : {}),
             });
 
-            // 2. Lấy dữ liệu chi phí vận hành từ sổ quỹ (Phiếu chi)
-            const cashbookRes = await financeService.searchCashbook({
-                from: toISO(from), to: toISO(to),
-                transactionType: 'OUT',
-                size: 1000,
-                ...(warehouseId && isAdmin ? { warehouseId } : {}),
-            });
-
-            const totalRev = revenueRes.reduce((s, d) => s + (d.revenue ?? 0), 0);
-            const totalCogs = revenueRes.reduce((s, d) => s + (d.cogs ?? 0), 0);
-            const opExpense = cashbookRes.content.reduce((s, tx) => s + tx.amount, 0);
+            const rev = businessData.reduce((s, d) => s + (d.revenue ?? 0), 0);
+            const cogs = businessData.reduce((s, d) => s + (d.cogs ?? 0), 0);
+            const gross = businessData.reduce((s, d) => s + (d.grossProfit ?? 0), 0);
+            const inc = businessData.reduce((s, d) => s + (d.otherIncome ?? 0), 0);
+            const exp = businessData.reduce((s, d) => s + (d.otherExpenses ?? 0), 0);
+            const net = businessData.reduce((s, d) => s + (d.netProfit ?? 0), 0);
 
             setStats({
-                totalRevenue: totalRev,
-                totalCOGS: totalCogs,
-                operatingExpense: opExpense,
+                revenue: rev, cogs, grossProfit: gross,
+                otherIncome: inc, otherExpenses: exp, netProfit: net,
             });
 
-            // Ước tính chi phí vận hành phân bổ đều qua các kỳ (vì sổ quỹ không trả theo kỳ, cách tiếp cận đơn giản: chia đều)
-            const count = revenueRes.length || 1;
-            const avgOpExp = opExpense / count;
+            let cData = businessData.map(d => ({
+                name: fmtPeriod(d.period || '', forcedPeriod),
+                'Doanh thu': d.revenue ?? 0,
+                'Lợi nhuận gộp': d.grossProfit ?? 0,
+                'Lợi nhuận ròng': d.netProfit ?? 0,
+            }));
 
-            const cData = (() => {
-                if (forcedPeriod === 'hour') {
-                    const result = Array.from({ length: 24 }, (_, i) => ({
-                        name: `${i.toString().padStart(2, '0')}:00`,
-                        rev: 0, cogs: 0
-                    }));
-                    revenueRes.forEach(d => {
-                        const date = new Date(d.period || '');
-                        if (!isNaN(date.getTime())) {
-                            const hour = date.getHours();
-                            result[hour].rev += d.revenue ?? 0;
-                            result[hour].cogs += d.cogs ?? 0;
-                        }
-                    });
-                    const avgHourExp = opExpense / 24;
-                    return result.map(r => ({
-                        name: r.name,
-                        'Doanh thu': r.rev,
-                        'Chi phí': r.cogs + avgHourExp,
-                        'Lợi nhuận': r.rev - r.cogs - avgHourExp,
-                    }));
-                }
-                if (forcedPeriod === 'dayOfWeek') {
-                    const days = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "CN"];
-                    const result = days.map(d => ({ name: d, rev: 0, cogs: 0 }));
-                    revenueRes.forEach(d => {
-                        const date = new Date(d.period || '');
-                        if (!isNaN(date.getTime())) {
-                            const dow = date.getDay(); // 0: CN, 1: T2...
-                            const index = dow === 0 ? 6 : dow - 1;
-                            result[index].rev += d.revenue ?? 0;
-                            result[index].cogs += d.cogs ?? 0;
-                        }
-                    });
-                    const avgDayExp = opExpense / 7;
-                    return result.map(r => ({
-                        name: r.name,
-                        'Doanh thu': r.rev,
-                        'Chi phí': r.cogs + avgDayExp,
-                        'Lợi nhuận': r.rev - r.cogs - avgDayExp,
-                    }));
-                }
-
-                const sorted = [...revenueRes].sort((a, b) => new Date(a.period || '').getTime() - new Date(b.period || '').getTime());
-                return sorted.map(d => {
-                    const rev = d.revenue ?? 0;
-                    const cogs = d.cogs ?? 0;
-                    const profit = rev - cogs - avgOpExp;
-                    return {
-                        name: fmtPeriod(d.period || '', forcedPeriod),
-                        'Doanh thu': rev,
-                        'Chi phí': cogs + avgOpExp,
-                        'Lợi nhuận': profit,
-                    };
-                });
-            })();
+            // Nếu là dayOfWeek, gộp các ngày có cùng thứ lại với nhau
+            if (forcedPeriod === 'dayOfWeek') {
+                const grouped = cData.reduce((acc: any, cur: any) => {
+                    const existing = acc.find((x: any) => x.name === cur.name);
+                    if (existing) {
+                        existing['Doanh thu'] += cur['Doanh thu'];
+                        existing['Lợi nhuận gộp'] += cur['Lợi nhuận gộp'];
+                        existing['Lợi nhuận ròng'] += cur['Lợi nhuận ròng'];
+                    } else {
+                        acc.push({ ...cur });
+                    }
+                    return acc;
+                }, []);
+                
+                // Sắp xếp lại theo thứ tự từ T2 đến CN
+                const daysOrder = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "CN"];
+                cData = grouped.sort((a: any, b: any) => daysOrder.indexOf(a.name) - daysOrder.indexOf(b.name));
+            }
 
             setChartData(cData);
 
@@ -256,14 +222,12 @@ const BusinessReportPage: React.FC = () => {
         fetchData(filter, p);
     };
 
-    const { totalRevenue, totalCOGS, operatingExpense } = stats;
-    const totalExpense = totalCOGS + operatingExpense;
-    const netProfit = totalRevenue - totalExpense;
-    const marginPct = totalRevenue > 0 ? ((netProfit / totalRevenue) * 100).toFixed(1) : '0.0';
+    const { revenue, cogs, grossProfit, otherIncome, otherExpenses, netProfit } = stats;
+    const marginPct = revenue > 0 ? ((netProfit / revenue) * 100).toFixed(1) : '0.0';
 
     const costPieData = [
-        { name: 'Giá vốn hàng bán', value: totalCOGS },
-        { name: 'Chi phí vận hành', value: operatingExpense },
+        { name: 'Giá vốn hàng bán (COGS)', value: cogs },
+        { name: 'Chi phí hoạt động (Khác)', value: otherExpenses },
     ].filter(d => d.value > 0);
 
     return (
@@ -290,47 +254,25 @@ const BusinessReportPage: React.FC = () => {
 
             {/* Summary cards */}
             <Grid container spacing={2} sx={{ mb: 3 }}>
-                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                    <SummaryCard
-                        title="Tổng doanh thu"
-                        value={formatCurrency(totalRevenue)}
-                        icon={<AttachMoney />}
-                        color="#1976d2"
-                        loading={loading}
-                    />
+                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                    <SummaryCard title="Doanh thu (Revenue)" value={formatCurrency(revenue)} icon={<AttachMoney />} color="#1976d2" loading={loading} />
                 </Grid>
-                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                    <SummaryCard
-                        title="Tổng chi phí"
-                        value={formatCurrency(totalExpense)}
-                        icon={<ReceiptLong />}
-                        color="#d32f2f"
-                        loading={loading}
-                        sub={
-                            <Typography variant="caption" color="text.secondary" fontSize={11}>
-                                Giá vốn: {formatCurrency(totalCOGS)}<br />
-                                Vận hành: {formatCurrency(operatingExpense)}
-                            </Typography>
-                        }
-                    />
+                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                    <SummaryCard title="Giá vốn hàng bán (COGS)" value={formatCurrency(cogs)} icon={<ReceiptLong />} color="#f57c00" loading={loading} />
                 </Grid>
-                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                    <SummaryCard
-                        title="Lợi nhuận thuần"
-                        value={formatCurrency(netProfit)}
-                        icon={<AccountBalanceWallet />}
-                        color={netProfit >= 0 ? "#2e7d32" : "#d32f2f"}
-                        loading={loading}
-                    />
+                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                    <SummaryCard title="Lợi nhuận gộp (Gross Profit)" value={formatCurrency(grossProfit)} icon={<AccountBalanceWallet />} color="#1976d2" loading={loading} />
                 </Grid>
-                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                    <SummaryCard
-                        title="Tỷ suất lợi nhuận"
-                        value={`${marginPct}%`}
-                        icon={<TrendingUp />}
-                        color="#9c27b0"
-                        loading={loading}
-                    />
+                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                    <SummaryCard title="Thu nhập khác (Other Income)" value={formatCurrency(otherIncome)} icon={<AttachMoney />} color="#388e3c" loading={loading} />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                    <SummaryCard title="Chi phí khác (Other Expenses)" value={formatCurrency(otherExpenses)} icon={<ReceiptLong />} color="#d32f2f" loading={loading} />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                    <SummaryCard title="Lợi nhuận ròng (Net Profit)" value={formatCurrency(netProfit)} icon={<TrendingUp />} color={netProfit >= 0 ? "#2e7d32" : "#d32f2f"} loading={loading} sub={
+                        <Typography variant="caption" color="text.secondary" fontSize={12} fontWeight={600}>Biên LN: <span style={{color: '#9c27b0'}}>{marginPct}%</span></Typography>
+                    } />
                 </Grid>
             </Grid>
 
@@ -346,7 +288,6 @@ const BusinessReportPage: React.FC = () => {
                     <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
                         <Box sx={{ display: 'flex', gap: 0.5, bgcolor: '#f1f5f9', p: 0.5, borderRadius: 2 }}>
                             {[
-                                { id: 'hour', label: 'Theo giờ' },
                                 { id: 'day', label: 'Theo ngày' },
                                 { id: 'dayOfWeek', label: 'Theo thứ' },
                                 { id: 'month', label: 'Theo tháng' },
@@ -423,8 +364,8 @@ const BusinessReportPage: React.FC = () => {
                                             />
                                             <Legend align="center" verticalAlign="bottom" iconType="circle" wrapperStyle={{ paddingTop: 20, fontSize: 13, fontWeight: 700 }} />
                                             <Bar dataKey="Doanh thu" fill="#1976d2" radius={[4, 4, 0, 0]} maxBarSize={50} />
-                                            <Bar dataKey="Chi phí" fill="#d32f2f" radius={[4, 4, 0, 0]} maxBarSize={50} />
-                                            <Line type="monotone" dataKey="Lợi nhuận" stroke="#2e7d32" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} />
+                                            <Bar dataKey="Lợi nhuận gộp" fill="#f57c00" radius={[4, 4, 0, 0]} maxBarSize={50} />
+                                            <Line type="monotone" dataKey="Lợi nhuận ròng" stroke="#2e7d32" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} />
                                         </ComposedChart>
                                     </ResponsiveContainer>
                                 </>

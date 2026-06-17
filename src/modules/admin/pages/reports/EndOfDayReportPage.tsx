@@ -5,33 +5,37 @@ import {
     Select, MenuItem, FormControl, Skeleton, Paper,
     CircularProgress, Alert, Table, TableBody, TableCell,
     TableContainer, TableHead, TableRow, SelectChangeEvent,
-    TablePagination
+    TablePagination, TextField
 } from '@mui/material';
-import {
-    Refresh
-} from '@mui/icons-material';
+import { Refresh } from '@mui/icons-material';
+import { useQuery } from '@tanstack/react-query';
 
 import reportService from '../../../../services/reportService';
 import warehouseService from '../../../../services/warehouseService';
 import userService from '../../../../services/userService';
 import { useAuth } from '../../../../store/hooks/useAuth';
-import type { Warehouse, InvoiceResponse, UserResponse } from '../../../../types';
+import type { Warehouse, UserResponse } from '../../../../types';
 import { formatCurrency } from '../../../../utils/formatters';
 import {
-    PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend,
-    BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, Legend
 } from 'recharts';
-
-const PIE_COLORS = ['#2196f3', '#4caf50', '#9c27b0', '#ffc107'];
 
 // ─── Helpers ──────────────────────────────────────────────────
 const toISO = (d: Date) => d.toISOString();
 
-const getDateRange = (filter: string) => {
+const getDateRange = (filter: string, customStart?: string, customEnd?: string) => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     let from: Date;
     let to = new Date();
+
+    if (filter === 'custom' && customStart && customEnd) {
+        from = new Date(customStart);
+        to = new Date(customEnd);
+        to.setHours(23, 59, 59, 999);
+        return { from, to };
+    }
+
     switch (filter) {
         case 'today':
             from = today; break;
@@ -61,20 +65,13 @@ const MetricCard = ({ title, value, valueColor = '#333', loading }: any) => (
             <Typography variant="body2" color="#8c8c8c" fontWeight={600} mb={1}>
                 {title}
             </Typography>
-            {loading ? <Skeleton width="60%" height={32} sx={{ mx: 'auto' }} /> : (
-                <Typography variant="h6" fontWeight={800} color={valueColor}>
+            {loading ? <Skeleton width="60%" height={28} sx={{ mx: 'auto' }} /> : (
+                <Typography variant="subtitle1" fontSize={18} fontWeight={800} color={valueColor}>
                     {value}
                 </Typography>
             )}
         </CardContent>
     </Card>
-);
-
-const PaymentBlock = ({ title, value, bgColor, loading }: any) => (
-    <Box sx={{ bgcolor: bgColor, borderRadius: 2, p: 2, flex: 1, minWidth: 150 }}>
-        <Typography variant="body2" color="#666" fontWeight={600} mb={0.5}>{title}</Typography>
-        {loading ? <Skeleton width="80%" /> : <Typography variant="subtitle1" fontWeight={800} color="#111">{value}</Typography>}
-    </Box>
 );
 
 const getPaymentMethodLabel = (method: string) => {
@@ -87,23 +84,6 @@ const getPaymentMethodLabel = (method: string) => {
     return method || 'Tiền mặt';
 };
 
-const isPaymentCash = (method: string) => {
-    const m = (method || '').toLowerCase();
-    return m === 'cash' || m.includes('tiền mặt');
-};
-const isPaymentTransfer = (method: string) => {
-    const m = (method || '').toLowerCase();
-    return m === 'bank_transfer' || m.includes('chuyển khoản');
-};
-const isPaymentCard = (method: string) => {
-    const m = (method || '').toLowerCase();
-    return m === 'card' || m.includes('thẻ');
-};
-const isPaymentEwallet = (method: string) => {
-    const m = (method || '').toLowerCase();
-    return m === 'e_wallet' || m === 'momo' || m === 'vnpay' || m.includes('ví');
-};
-
 // ─── Main Component ────────────────────────────────────────────
 const EndOfDayReportPage: React.FC = () => {
     const { user: currentUser, isAdmin } = useAuth();
@@ -114,13 +94,10 @@ const EndOfDayReportPage: React.FC = () => {
     const [cashierId, setCashierId] = useState<string>('');
     const [cashiers, setCashiers] = useState<UserResponse[]>([]);
 
-    const [quickFilter, setQuickFilter] = useState<string>('yesterday'); // default to yesterday to match screenshot example
+    const [quickFilter, setQuickFilter] = useState<string>('yesterday'); 
+    const [customStartDate, setCustomStartDate] = useState<string>('');
+    const [customEndDate, setCustomEndDate] = useState<string>('');
 
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-
-    const [invoices, setInvoices] = useState<InvoiceResponse[]>([]);
-    
     // Pagination states
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -133,33 +110,9 @@ const EndOfDayReportPage: React.FC = () => {
         }
     }, [isAdmin, currentUser?.warehouseId]);
 
-    const fetchData = useCallback(async (filter = quickFilter) => {
-        setLoading(true);
-        setError('');
-        try {
-            const { from, to } = getDateRange(filter);
-            // Lấy nhiều invoices để tổng hợp (size=200)
-            const invoiceRes = await reportService.getInvoices({
-                from: toISO(from), to: toISO(to),
-                size: 200,
-                ...(warehouseId && isAdmin ? { warehouseId } : {}),
-                ...(cashierId && !isAdmin ? { cashierId } : {}),
-            });
-            setInvoices(invoiceRes.content || []);
-        } catch (e) {
-            console.error(e);
-            setError('Không thể tải báo cáo cuối ngày');
-        } finally {
-            setLoading(false);
-        }
-    }, [warehouseId, quickFilter, cashierId, isAdmin]);
-
-    useEffect(() => { fetchData(); }, [fetchData]);
-
     const handleQuickFilterChange = (e: SelectChangeEvent) => {
         setQuickFilter(e.target.value);
         setPage(0);
-        fetchData(e.target.value);
     };
 
     const handleChangePage = (event: unknown, newPage: number) => {
@@ -171,89 +124,77 @@ const EndOfDayReportPage: React.FC = () => {
         setPage(0);
     };
 
-    // Calculate metrics
-    const validInvoices = invoices.filter(inv => inv.type === 'SALE');
-    const returnInvoices = invoices.filter(inv => inv.type === 'RETURN');
-    const voidInvoices = invoices.filter(inv => inv.type === 'VOIDED');
-
-    const totalRevenue = validInvoices.reduce((sum, inv) => sum + inv.finalAmount, 0);
-    // Tính giá vốn = sum(macPrice * quantity) từ items của mỗi hóa đơn
-    const totalCOGS = validInvoices.reduce((sum, inv) => {
-        const invCogs = inv.items?.reduce((s, item) => s + ((item.macPrice ?? 0) * Math.abs(item.quantity)), 0) || 0;
-        return sum + invCogs;
-    }, 0);
-    const profit = totalRevenue - totalCOGS;
-    const profitMargin = totalRevenue > 0 ? (profit / totalRevenue) * 100 : 0;
-
-    // Payment breakdown
-    let cashTotal = 0;
-    let transferTotal = 0;
-    let posTotal = 0;
-    let ewalletTotal = 0;
-
-    validInvoices.forEach(inv => {
-        if (inv.payments && inv.payments.length > 0) {
-            inv.payments.forEach(payment => {
-                const m = String(payment.method || '');
-                if (isPaymentCash(m)) cashTotal += payment.amount;
-                else if (isPaymentTransfer(m)) transferTotal += payment.amount;
-                else if (isPaymentCard(m)) posTotal += payment.amount;
-                else if (isPaymentEwallet(m)) ewalletTotal += payment.amount;
-                else cashTotal += payment.amount; // fallback
-            });
-        }
-    });
-
-    const { from, to } = getDateRange(quickFilter);
+    const { from, to } = React.useMemo(() => getDateRange(quickFilter, customStartDate, customEndDate), [quickFilter, customStartDate, customEndDate]);
     const dateRangeStr = `${from.toLocaleDateString('vi-VN')} - ${to.toLocaleDateString('vi-VN')}`;
 
-    // ─── Chart Data Preparation ────────────────────────────────────
-    const pieData = [
-        { name: 'Tiền mặt', value: cashTotal, fill: PIE_COLORS[0] },
-        { name: 'Chuyển khoản', value: transferTotal, fill: PIE_COLORS[1] },
-        { name: 'Thẻ POS', value: posTotal, fill: PIE_COLORS[2] },
-        { name: 'Ví điện tử', value: ewalletTotal, fill: PIE_COLORS[3] }
-    ].filter(item => item.value > 0);
+    const queryParams = React.useMemo(() => ({
+        from: toISO(from),
+        to: toISO(to),
+        warehouseId: warehouseId && isAdmin ? warehouseId : undefined,
+        cashierId: cashierId && !isAdmin ? cashierId : undefined,
+    }), [from, to, warehouseId, isAdmin, cashierId]);
 
-    const isHourly = ['today', 'yesterday'].includes(quickFilter);
-    const chartDataMap = new Map<string, number>();
-
-    validInvoices.forEach(inv => {
-        const d = new Date(inv.createdAt);
-        let key = '';
-        if (isHourly) {
-            key = `${d.getHours()}h`;
-        } else {
-            const day = String(d.getDate()).padStart(2, '0');
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            key = `${day}/${month}`;
-        }
-        const current = chartDataMap.get(key) || 0;
-        chartDataMap.set(key, current + inv.finalAmount);
+    // ── 1. Fetch Revenue Summary (Parallel) ──
+    const { data: revenueData = [], isFetching: loadingRevenue, refetch: refetchRevenue, error: errorRevenue } = useQuery({
+        queryKey: ['report-revenue', queryParams, quickFilter],
+        queryFn: () => reportService.getRevenue({
+            ...queryParams,
+            period: ['thisYear', '1year'].includes(quickFilter) ? 'month' : 'day'
+        }),
     });
 
-    const barData = Array.from(chartDataMap.entries())
-        .map(([name, revenue]) => {
-            let sortVal = 0;
-            if (isHourly) {
-                sortVal = parseInt(name.replace('h', ''));
-            } else {
-                const [d, m] = name.split('/');
-                sortVal = parseInt(m) * 100 + parseInt(d);
-            }
-            return { name, revenue, sortVal };
-        })
-        .sort((a, b) => a.sortVal - b.sortVal);
+    // ── 2. Fetch Invoices List (Parallel, Server-side pagination) ──
+    // Đã bỏ hardcode size=200, chuyển sang phân trang thực sự
+    const { data: invoicesData, isFetching: loadingInvoices, refetch: refetchInvoices, error: errorInvoices } = useQuery({
+        queryKey: ['report-invoices', queryParams, page, rowsPerPage],
+        queryFn: () => reportService.getInvoices({
+            ...queryParams,
+            page,
+            size: rowsPerPage,
+        }),
+    });
+
+    const loading = loadingRevenue || loadingInvoices;
+    const error = errorRevenue || errorInvoices ? 'Không thể tải báo cáo' : '';
+
+    // ── LÝ DO XÓA .reduce(): 
+    // Trước đây data bị cắt ở 200 records do hardcode size=200, 
+    // làm cho sum bằng JS bị sai hoàn toàn với dữ liệu lớn.
+    // Hiện tại lấy đúng dữ liệu aggregate từ backend API.
+    const totalRevenue = revenueData.reduce((sum, item: any) => sum + (item.revenue || 0), 0);
+    const totalCOGS = revenueData.reduce((sum, item: any) => sum + (item.cogs || 0), 0);
+    const profit = revenueData.reduce((sum, item: any) => sum + (item.gross_profit || 0), 0);
+    const profitMargin = totalRevenue > 0 ? (profit / totalRevenue) * 100 : 0;
+    const totalInvoicesCount = revenueData.reduce((sum, item: any) => sum + (item.invoice_count || 0), 0);
+
+    // ── Chart Data Preparation ──
+    const barData = revenueData.map((item: any) => {
+        const d = new Date(item.period);
+        let name = '';
+        if (['thisYear', '1year'].includes(quickFilter)) {
+            name = `T${d.getMonth() + 1}`;
+        } else {
+            name = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+        }
+        return {
+            name,
+            revenue: item.revenue || 0,
+            gross_profit: item.gross_profit || 0,
+        };
+    });
+
+    const invoices = invoicesData?.content || [];
+    const totalElements = invoicesData?.totalElements || 0;
 
     return (
         <Box sx={{ bgcolor: '#f8f9fa', minHeight: '100vh', p: '20px 24px' }}>
-            {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
+            {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error as string}</Alert>}
 
             <Grid container spacing={3}>
                 {/* Left Column */}
-                <Grid size={{ xs: 12, md: 3 }}>
-                    <Paper elevation={0} sx={{ borderRadius: 2, p: 2.5, mb: 3, border: '1px solid #f0f0f0' }}>
-                        <Typography fontWeight={700} fontSize={14} color="#111" mb={2}>Thời gian báo cáo</Typography>
+                <Grid size={{ xs: 12, md: 3 }} sx={{ position: 'sticky', top: 100, alignSelf: 'flex-start', zIndex: 10 }}>
+                        <Paper elevation={0} sx={{ borderRadius: 2, p: 2.5, mb: 3, border: '1px solid #f0f0f0' }}>
+                            <Typography fontWeight={700} fontSize={14} color="#111" mb={2}>Thời gian báo cáo</Typography>
 
                         <FormControl size="small" fullWidth sx={{ mb: 2 }}>
                             <Select value={quickFilter} onChange={handleQuickFilterChange} sx={{ fontSize: 14, borderRadius: 1.5, bgcolor: '#f8f9fa' }}>
@@ -262,8 +203,28 @@ const EndOfDayReportPage: React.FC = () => {
                                 <MenuItem value="last7days">7 ngày qua</MenuItem>
                                 <MenuItem value="30days">30 ngày qua</MenuItem>
                                 <MenuItem value="thisMonth">Tháng này</MenuItem>
+                                <MenuItem value="thisYear">Năm nay</MenuItem>
+                                <MenuItem value="custom">Tùy chọn</MenuItem>
                             </Select>
                         </FormControl>
+
+                        {quickFilter === 'custom' && (
+                            <Box sx={{ display: 'flex', gap: 1, mb: 2, alignItems: 'center' }}>
+                                <input
+                                    type="date"
+                                    value={customStartDate}
+                                    onChange={e => { setCustomStartDate(e.target.value); setPage(0); }}
+                                    style={{ flex: 1, minWidth: 0, width: '100%', padding: '7.5px 6px', borderRadius: '6px', border: '1px solid #c4c4c4', fontSize: '13px', fontFamily: 'inherit', color: '#333', outline: 'none' }}
+                                />
+                                <Typography fontSize={13} color="#999" sx={{ flexShrink: 0 }}>→</Typography>
+                                <input
+                                    type="date"
+                                    value={customEndDate}
+                                    onChange={e => { setCustomEndDate(e.target.value); setPage(0); }}
+                                    style={{ flex: 1, minWidth: 0, width: '100%', padding: '7.5px 6px', borderRadius: '6px', border: '1px solid #c4c4c4', fontSize: '13px', fontFamily: 'inherit', color: '#333', outline: 'none' }}
+                                />
+                            </Box>
+                        )}
 
                         <Box sx={{ border: '1px solid #e0e0e0', borderRadius: 1.5, p: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#fff', mb: 2 }}>
                             <Typography variant="body2" color="#666" fontSize={13}>{dateRangeStr}</Typography>
@@ -296,7 +257,7 @@ const EndOfDayReportPage: React.FC = () => {
                             variant="outlined"
                             fullWidth
                             startIcon={<Refresh />}
-                            onClick={() => { setQuickFilter('yesterday'); setWarehouseId(''); }}
+                            onClick={() => { setQuickFilter('yesterday'); setWarehouseId(''); setPage(0); }}
                             sx={{ color: '#666', borderColor: '#e0e0e0', textTransform: 'none', borderRadius: 1.5 }}
                         >
                             Xóa bộ lọc
@@ -309,15 +270,15 @@ const EndOfDayReportPage: React.FC = () => {
                     <Paper elevation={0} sx={{ p: 3, borderRadius: 2, border: '1px solid #f0f0f0', bgcolor: '#fff' }}>
 
                         {/* Header */}
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
                             <Box>
-                                <Typography variant="h5" fontWeight={800} mb={0.5}>Chốt ca cuối ngày</Typography>
-                                <Typography variant="body2" color="#8c8c8c">Tổng hợp doanh thu, đối soát tiền mặt và hình thức thanh toán theo ngày</Typography>
+                                <Typography variant="h6" fontWeight={800} mb={0.25} color="#1e293b">Chốt ca cuối ngày</Typography>
+                                <Typography variant="body2" color="#64748b">Tổng hợp doanh thu, đối soát tiền mặt và hình thức thanh toán</Typography>
                             </Box>
                             <Button
                                 variant="outlined"
                                 startIcon={<Refresh />}
-                                onClick={() => fetchData()}
+                                onClick={() => { refetchRevenue(); refetchInvoices(); }}
                                 sx={{ borderRadius: 2, textTransform: 'none', color: '#333', borderColor: '#d9d9d9' }}
                             >
                                 Làm mới
@@ -326,92 +287,50 @@ const EndOfDayReportPage: React.FC = () => {
 
                         {/* Top Metrics Grid */}
                         <Grid container spacing={2} sx={{ mb: 4 }}>
-                            <Grid size={{ xs: 6, sm: 4, lg: 2 }}>
-                                <MetricCard title="Đơn hoàn tất" value={validInvoices.length} loading={loading} />
+                            <Grid size={{ xs: 6, sm: 4, lg: 3 }}>
+                                <MetricCard title="Tổng số đơn" value={totalInvoicesCount} loading={loading} />
                             </Grid>
-                            <Grid size={{ xs: 6, sm: 4, lg: 2 }}>
-                                <MetricCard title="Đơn hủy" value={voidInvoices.length} valueColor="#d32f2f" loading={loading} />
-                            </Grid>
-                            <Grid size={{ xs: 6, sm: 4, lg: 2 }}>
-                                <MetricCard title="Trả hàng" value={returnInvoices.length} valueColor="#ed6c02" loading={loading} />
-                            </Grid>
-                            <Grid size={{ xs: 6, sm: 4, lg: 2 }}>
-                                <MetricCard title="Tổng số đơn" value={invoices.length} loading={loading} />
-                            </Grid>
-                            <Grid size={{ xs: 6, sm: 4, lg: 2 }}>
+                            <Grid size={{ xs: 6, sm: 4, lg: 3 }}>
                                 <MetricCard title="Doanh thu" value={formatCurrency(totalRevenue)} valueColor="#1976d2" loading={loading} />
                             </Grid>
-                            <Grid size={{ xs: 6, sm: 4, lg: 2 }}>
+                            <Grid size={{ xs: 6, sm: 4, lg: 3 }}>
                                 <MetricCard title="Vốn hàng" value={formatCurrency(totalCOGS)} valueColor="#ed6c02" loading={loading} />
                             </Grid>
-                            <Grid size={{ xs: 6, sm: 4, lg: 2 }}>
-                                <MetricCard title="Lợi nhuận" value={formatCurrency(profit)} valueColor="#2e7d32" loading={loading} />
+                            <Grid size={{ xs: 6, sm: 4, lg: 3 }}>
+                                {/* Đã sửa label Lợi nhuận -> Lợi nhuận gộp */}
+                                <MetricCard title="Lợi nhuận gộp" value={formatCurrency(profit)} valueColor="#2e7d32" loading={loading} />
                             </Grid>
-                            <Grid size={{ xs: 6, sm: 4, lg: 2 }}>
-                                <MetricCard title="Tỷ suất LN" value={`${profitMargin.toFixed(1)}%`} valueColor="#9c27b0" loading={loading} />
+                            <Grid size={{ xs: 12 }}>
+                                <Typography variant="caption" color="#9c27b0" display="block" textAlign="right">Tỷ suất lợi nhuận gộp: {profitMargin.toFixed(1)}%</Typography>
                             </Grid>
                         </Grid>
 
                         {/* Payment Details */}
-                        <Typography variant="subtitle2" fontWeight={700} mb={2}>Chi tiết thanh toán</Typography>
-                        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 4 }}>
-                            <PaymentBlock title="Tiền mặt" value={formatCurrency(cashTotal)} bgColor="#e3f2fd" loading={loading} />
-                            <PaymentBlock title="Chuyển khoản" value={formatCurrency(transferTotal)} bgColor="#e8f5e9" loading={loading} />
-                            <PaymentBlock title="Thẻ POS" value={formatCurrency(posTotal)} bgColor="#f3e5f5" loading={loading} />
-                            <PaymentBlock title="Ví điện tử" value={formatCurrency(ewalletTotal)} bgColor="#fff8e1" loading={loading} />
-                        </Box>
+                        {/* TODO: Cần API aggregate payment breakdown từ Backend vì lấy client-side chỉ tính được trên 1 page, dẫn đến sai số liệu */}
+                        {/* <Typography variant="subtitle2" fontWeight={700} mb={2}>Chi tiết thanh toán</Typography> ... */}
 
                         {/* Charts Section */}
-                        {validInvoices.length > 0 && !loading && (
-                            <Grid container spacing={3} sx={{ mb: 4 }}>
-                                <Grid size={{ xs: 12, md: 5 }}>
-                                    <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #f0f0f0', height: '100%' }}>
-                                        <Typography variant="subtitle2" fontWeight={700} mb={2}>Cơ cấu thanh toán</Typography>
-                                        <Box sx={{ width: '100%', height: 250 }}>
-                                            <ResponsiveContainer>
-                                                <PieChart>
-                                                    <Pie
-                                                        data={pieData}
-                                                        dataKey="value"
-                                                        nameKey="name"
-                                                        cx="50%"
-                                                        cy="50%"
-                                                        innerRadius={60}
-                                                        outerRadius={80}
-                                                        paddingAngle={5}
-                                                    >
-                                                        {pieData.map((entry, index) => (
-                                                            <Cell key={`cell-${index}`} fill={entry.fill} />
-                                                        ))}
-                                                    </Pie>
-                                                    <RechartsTooltip formatter={(value: number) => formatCurrency(value)} />
-                                                    <Legend />
-                                                </PieChart>
-                                            </ResponsiveContainer>
-                                        </Box>
-                                    </Paper>
-                                </Grid>
-                                <Grid size={{ xs: 12, md: 7 }}>
-                                    <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #f0f0f0', height: '100%' }}>
-                                        <Typography variant="subtitle2" fontWeight={700} mb={2}>Doanh thu theo {isHourly ? 'giờ' : 'ngày'}</Typography>
-                                        <Box sx={{ width: '100%', height: 250 }}>
-                                            <ResponsiveContainer>
-                                                <BarChart data={barData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#888' }} />
-                                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#888' }} tickFormatter={(value) => `${value / 1000}k`} />
-                                                    <RechartsTooltip cursor={{ fill: '#f5f5f5' }} formatter={(value: number) => [formatCurrency(value), 'Doanh thu']} />
-                                                    <Bar dataKey="revenue" fill="#1976d2" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                                                </BarChart>
-                                            </ResponsiveContainer>
-                                        </Box>
-                                    </Paper>
-                                </Grid>
-                            </Grid>
+                        {!loading && barData.length > 0 && (
+                            <Paper elevation={0} sx={{ p: 2, mb: 4, borderRadius: 2, border: '1px solid #f0f0f0' }}>
+                                <Typography variant="subtitle2" fontWeight={700} mb={2}>Biểu đồ doanh thu</Typography>
+                                <Box sx={{ width: '100%', height: 300 }}>
+                                    <ResponsiveContainer>
+                                        <BarChart data={barData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#888' }} />
+                                            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#888' }} tickFormatter={(value) => `${value / 1000}k`} />
+                                            <RechartsTooltip cursor={{ fill: '#f5f5f5' }} formatter={(value: number, name: string) => [formatCurrency(value), name === 'revenue' ? 'Doanh thu' : 'Lợi nhuận gộp']} />
+                                            <Legend verticalAlign="top" height={36} />
+                                            <Bar dataKey="revenue" name="Doanh thu" fill="#1976d2" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                                            <Bar dataKey="gross_profit" name="Lợi nhuận gộp" fill="#2e7d32" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </Box>
+                            </Paper>
                         )}
 
                         {/* Invoice List */}
-                        <Typography variant="subtitle2" fontWeight={700} mb={2}>Danh sách đơn hàng trong ngày</Typography>
+                        <Typography variant="subtitle2" fontWeight={700} mb={2}>Danh sách đơn hàng</Typography>
                         <TableContainer sx={{ border: '1px solid #f0f0f0', borderRadius: 2 }}>
                             <Table size="small">
                                 <TableHead>
@@ -422,7 +341,7 @@ const EndOfDayReportPage: React.FC = () => {
                                         <TableCell sx={{ fontWeight: 600, fontSize: 13 }}>Thanh toán</TableCell>
                                         <TableCell sx={{ fontWeight: 600, fontSize: 13 }}>Trạng thái</TableCell>
                                         <TableCell sx={{ fontWeight: 600, fontSize: 13 }} align="right">Tổng tiền</TableCell>
-                                        <TableCell sx={{ fontWeight: 600, fontSize: 13 }} align="right">Lợi nhuận</TableCell>
+                                        <TableCell sx={{ fontWeight: 600, fontSize: 13 }} align="right">Lợi nhuận gộp</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
@@ -431,9 +350,8 @@ const EndOfDayReportPage: React.FC = () => {
                                     ) : invoices.length === 0 ? (
                                         <TableRow><TableCell colSpan={7} align="center" sx={{ py: 3, color: '#888' }}>Không có giao dịch nào</TableCell></TableRow>
                                     ) : (
-                                        invoices.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map(inv => {
-                                            // Tính giá vốn từ items (macPrice * quantity)
-                                            const invCogs = inv.items?.reduce((s, item) => s + ((item.macPrice ?? 0) * Math.abs(item.quantity)), 0) || 0;
+                                        invoices.map((inv: any) => {
+                                            const invCogs = inv.items?.reduce((s: number, item: any) => s + ((item.macPrice ?? 0) * Math.abs(item.quantity)), 0) || 0;
                                             const invProfit = inv.type === 'SALE' ? inv.finalAmount - invCogs : 0;
                                             const primaryPayment = String(inv.payments?.[0]?.method || 'Tiền mặt');
 
@@ -470,7 +388,7 @@ const EndOfDayReportPage: React.FC = () => {
                         <TablePagination
                             rowsPerPageOptions={[5, 10, 25, 50]}
                             component="div"
-                            count={invoices.length}
+                            count={totalElements}
                             rowsPerPage={rowsPerPage}
                             page={page}
                             onPageChange={handleChangePage}

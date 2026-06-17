@@ -14,7 +14,6 @@ export function useDashboardWebSocket({ warehouseId, enabled = true }: Options) 
     const handleMessage = useCallback((payload: WsPayload) => {
         switch (payload.type) {
             case 'LOW_STOCK':
-                // Làm mới cache tồn kho thấp
                 qc.invalidateQueries({ queryKey: ['low-stock-dashboard'] });
                 qc.invalidateQueries({ queryKey: ['report-summary'] });
                 toast(`⚠️ ${payload.productName || 'Sản phẩm'} sắp hết hàng! (Còn ${payload.quantity} SP)`, {

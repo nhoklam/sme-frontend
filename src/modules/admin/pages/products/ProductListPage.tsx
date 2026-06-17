@@ -19,6 +19,7 @@ import ProductFormDialog from './ProductFormDialog';
 import ProductImportDialog from './ProductImportDialog';
 import authService from '../../../../services/authService';
 import { buildCategoryTreeFlat } from '../../../../utils/categoryUtils';
+import inventoryService from '../../../../services/inventoryService';
 
 // ── Helpers ──────────────────────────────────────────────────
 const fmtCurrency = (n) =>
@@ -65,6 +66,7 @@ const ProductListPage = () => {
     const [minPrice, setMinPrice] = useState('');
     const [maxPrice, setMaxPrice] = useState('');
     const [isActive, setIsActive] = useState('');
+    const [sortBy, setSortBy] = useState('');
     const currentUser = authService.getCurrentUser()?.user;
     const isManager = currentUser?.role === 'ROLE_MANAGER';
 
@@ -97,28 +99,15 @@ const ProductListPage = () => {
         setPopoverLoading(true);
         setPopoverInventories([]);
         try {
-            const warehouseRes = await axiosInstance.get('/warehouses');
-            let activeWarehouses = (warehouseRes.data?.data ?? []).filter((w: any) => w.isActive);
+            // Gọi 1 API duy nhất thay vì N API
+            const allResults = await inventoryService.getAllWarehousesInventory(product.id);
+            
+            // Lọc ra kho của cửa hàng trưởng nếu user là MANAGER
+            let filteredResults = allResults;
             if (isManager && currentUser?.warehouseId) {
-                activeWarehouses = activeWarehouses.filter((w: any) => w.id === currentUser.warehouseId);
+                filteredResults = allResults.filter(r => r.warehouseId === currentUser.warehouseId);
             }
-
-            const invPromises = activeWarehouses.map((w: any) =>
-                axiosInstance
-                    .get(`/inventory/${product.id}/warehouse/${w.id}`)
-                    .then((r) => ({
-                        warehouseName: w.name,
-                        quantity: r.data?.data?.availableQuantity ?? r.data?.data?.quantity ?? 0,
-                        minQuantity: r.data?.data?.minQuantity ?? 10
-                    }))
-                    .catch(() => ({
-                        warehouseName: w.name,
-                        quantity: 0,
-                        minQuantity: 10
-                    }))
-            );
-            const results = await Promise.all(invPromises);
-            setPopoverInventories(results);
+            setPopoverInventories(filteredResults);
         } catch (err) {
             toast.error('Không thể tải chi tiết tồn kho');
         } finally {
@@ -172,6 +161,7 @@ const ProductListPage = () => {
             if (maxPrice) params.set('maxPrice', maxPrice);
             if (isActive !== '') params.set('isActive', isActive);
             if (filterWarehouseId) params.set('warehouseId', filterWarehouseId);
+            if (sortBy) params.set('sortBy', sortBy);
 
             const res = await axiosInstance.get(`/products?${params}`);
             const data = res.data?.data;
@@ -183,7 +173,7 @@ const ProductListPage = () => {
         } finally {
             setLoading(false);
         }
-    }, [search, categoryId, supplierId, minPrice, maxPrice, isActive, filterWarehouseId, page]);
+    }, [search, categoryId, supplierId, minPrice, maxPrice, isActive, filterWarehouseId, sortBy, page]);
 
     useEffect(() => {
         loadCategories();
@@ -368,6 +358,15 @@ const ProductListPage = () => {
                             )
                         }}
                     />
+                    <FormControl size="small" sx={{ minWidth: 160 }}>
+                        <Select value={sortBy} onChange={e => { setSortBy(e.target.value); setPage(0); }} displayEmpty sx={{ borderRadius: 2, height: 40, bgcolor: '#fff' }}>
+                            <MenuItem value="">Sắp xếp: Tên A-Z</MenuItem>
+                            <MenuItem value="newest">Sắp xếp: Mới nhất</MenuItem>
+                            <MenuItem value="priceAsc">Giá tăng dần</MenuItem>
+                            <MenuItem value="priceDesc">Giá giảm dần</MenuItem>
+                            <MenuItem value="soldDesc">Bán chạy nhất</MenuItem>
+                        </Select>
+                    </FormControl>
                     <Button
                         variant={showFilters ? 'contained' : 'outlined'}
                         size="small"
@@ -449,6 +448,7 @@ const ProductListPage = () => {
                                         if (!isManager) setFilterWarehouseId('');
                                         setMinPrice('');
                                         setMaxPrice('');
+                                        setSortBy('');
                                         setPage(0);
                                     }}
                                     sx={{ textTransform: 'none', fontWeight: 700, color: '#ef4444' }}
@@ -666,28 +666,36 @@ const ProductListPage = () => {
                         <TableBody>
                             {popoverInventories.map((inv, idx) => {
                                 const qty = inv.quantity;
-                                const isOut = qty === 0;
-                                const isLow = !isOut && qty < inv.minQuantity;
+                                const availableQty = inv.availableQuantity;
+                                const isOut = availableQty <= 0;
+                                const isLow = inv.isLowStock;
+                                const hasConflict = availableQty < 0;
+
                                 return (
                                     <TableRow key={idx} sx={{ '&:last-child td': { border: 0 } }}>
                                         <TableCell sx={{ p: 0.75, fontSize: 12, color: '#475569', fontWeight: 500, borderBottom: '1px solid #f1f5f9' }}>
                                             {inv.warehouseName}
+                                            {hasConflict && (
+                                                <Typography variant="caption" color="error" display="block" sx={{ fontSize: 10, mt: 0.5 }}>
+                                                    Có xung đột tồn kho
+                                                </Typography>
+                                            )}
                                         </TableCell>
                                         <TableCell align="right" sx={{ p: 0.75, borderBottom: '1px solid #f1f5f9' }}>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
-                                                <Typography variant="body2" fontWeight={700} fontSize={12} color={isOut ? '#ef4444' : isLow ? '#f59e0b' : '#10b981'}>
-                                                    {qty.toLocaleString()}
+                                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5 }}>
+                                                <Typography variant="body2" fontWeight={700} fontSize={12} color={hasConflict ? '#ef4444' : isOut ? '#f59e0b' : '#10b981'}>
+                                                    Tồn: {qty.toLocaleString()} | Khả dụng: {availableQty.toLocaleString()}
                                                 </Typography>
                                                 <Chip
-                                                    label={isOut ? 'Hết' : isLow ? 'Sắp hết' : 'Còn'}
+                                                    label={hasConflict ? 'Lỗi' : isOut ? 'Hết' : isLow ? 'Sắp hết' : 'Còn'}
                                                     size="small"
                                                     sx={{
                                                         height: 16,
                                                         fontSize: 9,
                                                         fontWeight: 700,
                                                         px: 0.5,
-                                                        bgcolor: isOut ? '#fef2f2' : isLow ? '#fef9c3' : '#ecfdf5',
-                                                        color: isOut ? '#ef4444' : isLow ? '#ca8a04' : '#10b981',
+                                                        bgcolor: hasConflict || isOut ? '#fef2f2' : isLow ? '#fef9c3' : '#ecfdf5',
+                                                        color: hasConflict || isOut ? '#ef4444' : isLow ? '#ca8a04' : '#10b981',
                                                         '& .MuiChip-label': { px: 0.5 }
                                                     }}
                                                 />

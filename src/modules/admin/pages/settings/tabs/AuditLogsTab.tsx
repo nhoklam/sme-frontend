@@ -1,26 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
     Box, Typography, Paper, Table, TableBody, TableCell, TableContainer,
     TableHead, TableRow, TextField, IconButton, Chip, Select,
     MenuItem, FormControl, InputAdornment, CircularProgress, Pagination
 } from '@mui/material';
 import { Search, Refresh, Add, Edit, Delete } from '@mui/icons-material';
+import { useQuery } from '@tanstack/react-query';
 import { auditLogService, AuditLog } from '../../../../../services/auditLogService';
 
 export default function AuditLogsTab() {
-    const [allLogs, setAllLogs] = useState<AuditLog[]>([]);
-    const [loading, setLoading] = useState(true);
     const [keyword, setKeyword] = useState('');
     const [actionFilter, setActionFilter] = useState('');
     const [page, setPage] = useState(0);
     const PAGE_SIZE = 15;
 
-    const loadData = async () => {
-        setLoading(true);
-        try {
-            const res = await auditLogService.getLogs({ size: 200 });
-            const data = res.data?.data;
-            const logs: AuditLog[] = (Array.isArray(data) ? data : []).map((item: any) => ({
+    const query = useQuery({
+        queryKey: ['audit-logs', page, PAGE_SIZE, keyword, actionFilter],
+        queryFn: async () => {
+            const res = await auditLogService.getLogs({
+                page, size: PAGE_SIZE, 
+                keyword: keyword.trim() || undefined, 
+                actionFilter: actionFilter || undefined
+            });
+            const data = res.data?.data?.content || [];
+            const logs: AuditLog[] = data.map((item: any) => ({
                 entityName: item.entityName || '',
                 entityId: item.entityId || '',
                 targetName: item.targetName || '',
@@ -29,25 +32,18 @@ export default function AuditLogsTab() {
                 performedAt: item.changedAt || item.performedAt || '',
                 revision: item.revision,
             }));
-            setAllLogs(logs);
-        } catch {
-            setAllLogs([]);
-        } finally { setLoading(false); }
-    };
-
-    useEffect(() => { loadData(); }, []);
-
-    const filtered = allLogs.filter(log => {
-        if (actionFilter && log.action !== actionFilter) return false;
-        if (keyword) {
-            const kw = keyword.toLowerCase();
-            return log.performedBy.toLowerCase().includes(kw) || log.entityName.toLowerCase().includes(kw) || log.entityId.toLowerCase().includes(kw) || (log.targetName && log.targetName.toLowerCase().includes(kw));
+            return {
+                content: logs,
+                totalElements: res.data?.data?.totalElements || 0,
+                totalPages: res.data?.data?.totalPages || 0
+            };
         }
-        return true;
     });
 
-    const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-    const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+    const loading = query.isFetching;
+    const paged = query.data?.content || [];
+    const totalElements = query.data?.totalElements || 0;
+    const totalPages = query.data?.totalPages || 0;
 
     const getActionStyle = (action: string) => {
         switch (action) {
@@ -79,7 +75,7 @@ export default function AuditLogsTab() {
                         <MenuItem value="DELETE">Xóa</MenuItem>
                     </Select>
                 </FormControl>
-                <IconButton onClick={loadData} sx={{ border: '1px solid #e2e8f0', borderRadius: 1.5 }}><Refresh /></IconButton>
+                <IconButton onClick={() => query.refetch()} sx={{ border: '1px solid #e2e8f0', borderRadius: 1.5 }}><Refresh /></IconButton>
             </Paper>
 
             <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
@@ -149,7 +145,7 @@ export default function AuditLogsTab() {
                 {totalPages > 1 && (
                     <Box sx={{ p: 2, borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: '#f8fafc' }}>
                         <Typography variant="caption" color="#64748b">
-                            Hiển thị <strong>{paged.length}</strong> / <strong>{filtered.length}</strong> kết quả
+                            Hiển thị <strong>{paged.length}</strong> / <strong>{totalElements}</strong> kết quả
                         </Typography>
                         <Pagination count={totalPages} page={page + 1} onChange={(_, v) => setPage(v - 1)} color="primary" shape="rounded" />
                     </Box>

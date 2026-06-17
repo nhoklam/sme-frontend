@@ -1,5 +1,5 @@
 // src/modules/admin/pages/DashboardPage.tsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Box, Grid, Typography, Paper, Chip, Avatar,
@@ -20,7 +20,7 @@ import {
     Legend,
     LabelList,
 } from 'recharts';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 
 import dashboardService, { DashboardStats, RevenueTrendPoint } from '../../../services/dashboardService';
@@ -97,7 +97,7 @@ const DashboardPage: React.FC = () => {
     const isStaff = currentUser?.role === 'ROLE_CASHIER';
 
     // UI state
-    const [chartPeriod, setChartPeriod] = useState<'hour' | 'day' | 'dayOfWeek' | 'month' | 'year'>('day');
+    const [chartPeriod, setChartPeriod] = useState<'day' | 'dayOfWeek' | 'month' | 'year'>('day');
 
     // Data state
     const [stats, setStats] = useState<any>(null);
@@ -107,7 +107,17 @@ const DashboardPage: React.FC = () => {
     const [lowStockItems, setLowStockItems] = useState<any[]>([]);
     const [allLowStockItems, setAllLowStockItems] = useState<any[]>([]);
     const [uniqueLowStockCount, setUniqueLowStockCount] = useState(0);
-    const [pendingShiftsCount, setPendingShiftsCount] = useState(0);
+    
+    const pendingShiftsQuery = useQuery({
+        queryKey: ['pending-shifts', currentUser?.warehouseId],
+        queryFn: async () => {
+            const { default: axiosInstance } = await import('../../../services/axiosConfig');
+            const res = await axiosInstance.get('/pos/shifts/pending');
+            return Array.isArray(res.data?.data) ? res.data.data.length : 0;
+        },
+        enabled: !isStaff
+    });
+    const pendingShiftsCount = pendingShiftsQuery.data || 0;
     
     // Pagination state for low stock items
     const [lowStockPage, setLowStockPage] = useState(0);
@@ -124,15 +134,30 @@ const DashboardPage: React.FC = () => {
     const [loadingChart, setLoadingChart] = useState(false);
 
     // ── WebSocket handler ──────────────────────────────────────
+    const wsDebounceTimer = useRef<NodeJS.Timeout | null>(null);
+
     const handleWsMessage = useCallback((payload: any) => {
-        if (payload.type === 'LOW_STOCK') {
-            qc.invalidateQueries({ queryKey: ['low-stock-dashboard'] });
-            toast(`⚠️ ${payload.productName || 'Sản phẩm'} sắp hết hàng!`, {
-                icon: '📦', duration: 5000,
-                style: { background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca' },
-            });
+        if (wsDebounceTimer.current) {
+            clearTimeout(wsDebounceTimer.current);
         }
-    }, [qc]);
+
+        wsDebounceTimer.current = setTimeout(() => {
+            if (payload.type === 'LOW_STOCK') {
+                qc.invalidateQueries({ queryKey: ['low-stock-dashboard'] });
+                toast(`⚠️ ${payload.productName || 'Sản phẩm'} sắp hết hàng!`, {
+                    icon: '📦', duration: 5000,
+                    style: { background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca' },
+                });
+            } else if (payload.type === 'NEW_ORDER') {
+                qc.invalidateQueries({ queryKey: ['orders'] });
+            } else if (payload.type === 'SHIFT_PENDING_APPROVAL') {
+                qc.invalidateQueries({ queryKey: ['pending-shifts', currentUser?.warehouseId] });
+            } else {
+                // Invalidate chung nếu có event khác chưa define rõ
+                qc.invalidateQueries();
+            }
+        }, 300);
+    }, [qc, currentUser?.warehouseId]);
 
     const { isConnected } = useWebSocket({
         warehouseId: currentUser?.warehouseId,
@@ -223,8 +248,7 @@ const DashboardPage: React.FC = () => {
         let period: typeof chartPeriod = forcedPeriod || 'day';
 
         if (!forcedPeriod) {
-            if (filter === 'today' || filter === 'yesterday') period = 'hour';
-            else if (filter === 'thisYear' || filter === '90days') period = 'month';
+            if (filter === 'thisYear' || filter === '90days') period = 'month';
             else period = 'day';
         }
 
@@ -405,7 +429,7 @@ const DashboardPage: React.FC = () => {
             <Grid container spacing={2} sx={{ mb: 3 }}>
                 {[
                     { title: 'Đơn hàng hôm nay', value: stats?.todayOrders ?? 0, icon: <ShoppingCart />, iconBg: '#eff6ff', iconColor: '#3b82f6' },
-                    { title: 'Khách hàng mới', value: topData.topCustomers.length, icon: <People />, iconBg: '#faf5ff', iconColor: '#8b5cf6' },
+                    { title: 'Khách hàng mới', value: stats?.newCustomersCount ?? 0, icon: <People />, iconBg: '#faf5ff', iconColor: '#8b5cf6', sub: 'Trong tháng này' },
                     { title: 'Sản phẩm sắp hết hàng', value: uniqueLowStockCount, icon: <Warning />, iconBg: '#fffbeb', iconColor: '#f59e0b', color: '#f59e0b', onClick: () => navigate('/admin/inventory/alerts') },
                     { title: 'Ca chờ duyệt', value: pendingShiftsCount, icon: <Schedule />, iconBg: '#ede9fe', iconColor: '#7c3aed' },
                 ].map((card, i) => (
@@ -432,7 +456,6 @@ const DashboardPage: React.FC = () => {
                         <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
                             <Box sx={{ display: 'flex', gap: 0.5, bgcolor: '#f1f5f9', p: 0.5, borderRadius: 2 }}>
                                 {[
-                                    { id: 'hour', label: 'Theo giờ' },
                                     { id: 'day', label: 'Theo ngày' },
                                     { id: 'dayOfWeek', label: 'Theo thứ' },
                                     { id: 'month', label: 'Theo tháng' },
@@ -489,25 +512,10 @@ const DashboardPage: React.FC = () => {
                     {loading ? <Skeleton variant="rectangular" height="100%" sx={{ borderRadius: 2 }} /> :
                         (() => {
                             const data = (() => {
-                                if (chartPeriod === 'hour') {
-                                    const result = Array.from({ length: 24 }, (_, i) => ({
-                                        date: `${i.toString().padStart(2, '0')}:00`,
-                                        revenue: 0,
-                                        orders: 0
-                                    }));
-                                    revenueTrend.forEach(item => {
-                                        const d = new Date(item.date);
-                                        if (!isNaN(d.getTime())) {
-                                            const hour = d.getHours();
-                                            result[hour].revenue += item.revenue;
-                                            result[hour].orders += item.orders;
-                                        }
-                                    });
-                                    return result;
-                                }
+
                                 if (chartPeriod === 'dayOfWeek') {
                                     const days = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "CN"];
-                                    const result = days.map(d => ({ date: d, revenue: 0, orders: 0 }));
+                                    const result = days.map(d => ({ date: d, revenue: 0, orders: 0, grossProfit: 0 }));
                                     revenueTrend.forEach(item => {
                                         const d = new Date(item.date);
                                         if (!isNaN(d.getTime())) {
@@ -515,6 +523,7 @@ const DashboardPage: React.FC = () => {
                                             const index = dow === 0 ? 6 : dow - 1;
                                             result[index].revenue += item.revenue;
                                             result[index].orders += item.orders;
+                                            result[index].grossProfit += (item.grossProfit || 0);
                                         }
                                     });
                                     return result;
@@ -533,7 +542,7 @@ const DashboardPage: React.FC = () => {
                                             tickLine={false}
                                             tick={{ fontSize: 10, fill: '#64748b', fontWeight: 600 }}
                                             tickFormatter={(val) => {
-                                                if (chartPeriod === 'dayOfWeek' || chartPeriod === 'hour') return val;
+                                                if (chartPeriod === 'dayOfWeek') return val;
                                                 try {
                                                     const d = new Date(val);
                                                     if (isNaN(d.getTime())) return val;
@@ -560,11 +569,11 @@ const DashboardPage: React.FC = () => {
                                             cursor={{ fill: '#f1f5f9' }}
                                             contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)', padding: '12px 16px' }}
                                             formatter={(val: number, name: string) => [
-                                                name === 'Doanh thu' ? fmtCurrency(val) : val,
+                                                (name === 'Doanh thu' || name === 'Lợi nhuận gộp') ? fmtCurrency(val) : val,
                                                 name
                                             ]}
                                             labelFormatter={(label) => {
-                                                if (chartPeriod === 'dayOfWeek' || chartPeriod === 'hour') return label;
+                                                if (chartPeriod === 'dayOfWeek') return label;
                                                 try {
                                                     const d = new Date(label);
                                                     if (isNaN(d.getTime())) return label;
@@ -577,6 +586,7 @@ const DashboardPage: React.FC = () => {
                                         />
                                         <Legend align="center" verticalAlign="bottom" iconType="rect" wrapperStyle={{ paddingTop: 20, fontSize: 13, fontWeight: 700 }} />
                                         <Bar yAxisId="left" name="Doanh thu" dataKey="revenue" fill="#16a34a" radius={[4, 4, 0, 0]} maxBarSize={80} />
+                                        <Bar yAxisId="left" name="Lợi nhuận gộp" dataKey="grossProfit" fill="#8b5cf6" radius={[4, 4, 0, 0]} maxBarSize={80} />
                                         <Bar yAxisId="right" name="Số đơn" dataKey="orders" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={80} />
                                     </BarChart>
                                 </ResponsiveContainer>

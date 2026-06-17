@@ -30,7 +30,7 @@ export default function AIDocumentsTab() {
         setLoading(true);
         try {
             const res = await aiService.getDocuments();
-            setDocs(res.data.data);
+            setDocs(res.data?.data || []);
         } catch (err) {
             console.error('Load docs failed:', err);
             toast.error('Không thể tải danh sách tài liệu tri thức');
@@ -80,7 +80,7 @@ export default function AIDocumentsTab() {
         try {
             const res = await aiService.searchSemantic(searchQuery);
             setSearchResults(res.data.data);
-            if (res.data.data.length === 0) {
+            if ((res.data?.data?.length ?? 0) === 0) {
                 toast.error('Không tìm thấy thông tin liên quan trong kho tri thức');
             }
         } catch (err) {

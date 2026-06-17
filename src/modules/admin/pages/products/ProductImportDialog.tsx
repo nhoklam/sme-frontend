@@ -55,50 +55,54 @@ export default function ProductImportDialog({ open, onClose, onSuccess, categori
         }
 
         setImporting(true);
-        let success = 0;
-        let error = 0;
-        const details: string[] = [];
+        let totalSuccess = 0;
+        let totalError = 0;
+        let allDetails: string[] = [];
 
-        for (let i = 0; i < previewData.length; i++) {
-            const row = previewData[i];
+        // Chuyển toàn bộ dữ liệu thành requests
+        const allRequests = previewData.map((row, index) => {
+            return {
+                name: String(row['Tên sản phẩm'] || row['Name'] || ''),
+                isbnBarcode: String(row['Mã vạch/ISBN'] || row['Barcode'] || row['ISBN'] || ''),
+                sku: row['SKU'] ? String(row['SKU']) : undefined,
+                retailPrice: Number(row['Giá bán lẻ'] || row['Retail Price'] || 0),
+                wholesalePrice: row['Giá sỉ'] ? Number(row['Giá sỉ']) : undefined,
+                unit: row['Đơn vị tính'] || row['Unit'] || 'Cuốn',
+                weight: row['Trọng lượng (g)'] ? Number(row['Trọng lượng (g)']) : undefined,
+                author: row['Tác giả'] ? String(row['Tác giả']) : undefined,
+                publisher: row['Nhà xuất bản'] ? String(row['Nhà xuất bản']) : undefined,
+                publishYear: row['Năm xuất bản'] ? Number(row['Năm xuất bản']) : undefined,
+                numberOfPages: row['Số trang'] ? Number(row['Số trang']) : undefined,
+                description: row['Mô tả'] || row['Description'] || '',
+                categoryId: defaultCategory,
+                supplierId: defaultSupplier || undefined,
+                importRowIndex: index + 2 // Lưu lại dòng gốc trong Excel
+            };
+        });
+
+        const BATCH_SIZE = 500;
+        
+        // Gửi tuần tự từng chunk để bảo vệ DB connection pool
+        for (let i = 0; i < allRequests.length; i += BATCH_SIZE) {
+            const chunk = allRequests.slice(i, i + BATCH_SIZE);
             try {
-                // Map columns - adjust these based on expected Excel template
-                const name = row['Tên sản phẩm'] || row['Name'] || '';
-                const barcode = row['Mã vạch/ISBN'] || row['Barcode'] || row['ISBN'] || '';
-                
-                if (!name || !barcode) {
-                    throw new Error('Thiếu Tên sản phẩm hoặc Mã vạch');
+                // startIndex truyền i + 2 để fallback nếu importRowIndex không được sử dụng
+                const res = await productService.bulkCreate(chunk as any, i + 2);
+                totalSuccess += res.successCount;
+                totalError += res.errorCount;
+                if (res.errors && res.errors.length > 0) {
+                    allDetails = [...allDetails, ...res.errors];
                 }
-
-                const req: CreateProductRequest = {
-                    name: String(name),
-                    isbnBarcode: String(barcode),
-                    sku: row['SKU'] ? String(row['SKU']) : undefined,
-                    retailPrice: Number(row['Giá bán lẻ'] || row['Retail Price'] || 0),
-                    wholesalePrice: row['Giá sỉ'] ? Number(row['Giá sỉ']) : undefined,
-                    unit: row['Đơn vị tính'] || row['Unit'] || 'Cuốn',
-                    weight: row['Trọng lượng (g)'] ? Number(row['Trọng lượng (g)']) : undefined,
-                    author: row['Tác giả'] ? String(row['Tác giả']) : undefined,
-                    publisher: row['Nhà xuất bản'] ? String(row['Nhà xuất bản']) : undefined,
-                    publishYear: row['Năm xuất bản'] ? Number(row['Năm xuất bản']) : undefined,
-                    numberOfPages: row['Số trang'] ? Number(row['Số trang']) : undefined,
-                    description: row['Mô tả'] || row['Description'] || '',
-                    categoryId: defaultCategory,
-                    supplierId: defaultSupplier || undefined
-                };
-
-                await productService.create(req);
-                success++;
             } catch (err: any) {
-                error++;
-                details.push(`Dòng ${i + 2}: ${err.response?.data?.message || err.message}`);
+                totalError += chunk.length;
+                allDetails.push(`Lỗi nghiêm trọng khối từ dòng ${i + 2}: ${err.response?.data?.message || err.message}`);
             }
-            setProgress(Math.round(((i + 1) / previewData.length) * 100));
+            setProgress(Math.round((Math.min(i + BATCH_SIZE, allRequests.length) / allRequests.length) * 100));
         }
 
-        setResults({ success, error, details });
+        setResults({ success: totalSuccess, error: totalError, details: allDetails });
         setImporting(false);
-        if (success > 0) {
+        if (totalSuccess > 0) {
             onSuccess();
         }
     };

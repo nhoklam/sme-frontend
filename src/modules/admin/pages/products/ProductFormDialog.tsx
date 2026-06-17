@@ -24,6 +24,7 @@ const fmt = (n?: number) =>
     n == null ? '—' : new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n);
 
 const UNIT_OPTIONS = ['Cuốn', 'Bộ', 'Tập', 'Hộp', 'Gói'];
+const COVER_TYPE_OPTIONS = ['Bìa cứng', 'Bìa mềm', 'Bìa gập'];
 
 const FieldLabel = ({ label, required, hint }: { label: string; required?: boolean; hint?: string }) => (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.75, minHeight: 22 }}>
@@ -146,6 +147,7 @@ const INITIAL_FORM = {
     description: '', retailPrice: '' as string | number, wholesalePrice: '' as string | number,
     imageUrls: [] as string[], unit: 'Cuốn', weight: '' as string | number, isActive: true,
     author: '', publisher: '', publishYear: '' as string | number, numberOfPages: '' as string | number,
+    dimensions: '', coverType: '', language: 'Tiếng Việt',
 };
 
 const ProductFormDialog: React.FC<Props> = ({ open, onClose, onSuccess, productId }) => {
@@ -199,6 +201,7 @@ const ProductFormDialog: React.FC<Props> = ({ open, onClose, onSuccess, productI
                 unit: p.unit ?? 'Cuốn', weight: p.weight ?? '', isActive: p.isActive ?? true,
                 author: p.author ?? '', publisher: p.publisher ?? '', 
                 publishYear: p.publishYear ?? '', numberOfPages: p.numberOfPages ?? '',
+                dimensions: (p as any).dimensions ?? '', coverType: (p as any).coverType ?? '', language: (p as any).language ?? 'Tiếng Việt',
             });
         } catch { setErrorMsg('Không thể tải dữ liệu sản phẩm'); }
         finally { setLoading(false); }
@@ -238,22 +241,29 @@ const ProductFormDialog: React.FC<Props> = ({ open, onClose, onSuccess, productI
             const weight = form.weight !== '' ? Number(form.weight) : undefined;
             const publishYear = form.publishYear !== '' ? Number(form.publishYear) : undefined;
             const numberOfPages = form.numberOfPages !== '' ? Number(form.numberOfPages) : undefined;
+            const extraBookFields = {
+                dimensions: form.dimensions?.trim() || undefined,
+                coverType: form.coverType || undefined,
+                language: form.language?.trim() || undefined,
+            };
             if (productId) {
-                const payload: UpdateProductRequest = {
+                const payload: UpdateProductRequest & Record<string, any> = {
                     name: form.name.trim(), categoryId: form.categoryId, supplierId: form.supplierId || null, hasSupplierId: true,
                     isbnBarcode: form.isbnBarcode.trim(), sku: form.sku?.trim() || undefined,
                     description: form.description?.trim() || undefined,
                     retailPrice, wholesalePrice, imageUrls: form.imageUrls, unit: form.unit, weight, isActive: form.isActive,
-                    author: form.author?.trim() || undefined, publisher: form.publisher?.trim() || undefined, publishYear, numberOfPages
+                    author: form.author?.trim() || undefined, publisher: form.publisher?.trim() || undefined, publishYear, numberOfPages,
+                    ...extraBookFields,
                 };
                 await productService.update(productId, payload);
                 toast.success('Cập nhật thành công');
             } else {
-                const payload: CreateProductRequest = {
+                const payload: CreateProductRequest & Record<string, any> = {
                     name: form.name.trim(), categoryId: form.categoryId, supplierId: form.supplierId || undefined,
                     isbnBarcode: form.isbnBarcode.trim(), sku: form.sku?.trim() || undefined, description: form.description?.trim() || undefined,
                     retailPrice, wholesalePrice, imageUrls: form.imageUrls, unit: form.unit, weight,
-                    author: form.author?.trim() || undefined, publisher: form.publisher?.trim() || undefined, publishYear, numberOfPages
+                    author: form.author?.trim() || undefined, publisher: form.publisher?.trim() || undefined, publishYear, numberOfPages,
+                    ...extraBookFields,
                 };
                 await productService.create(payload);
                 toast.success('Thêm sản phẩm thành công');
@@ -383,6 +393,23 @@ const ProductFormDialog: React.FC<Props> = ({ open, onClose, onSuccess, productI
                                             <Grid size={{ xs: 12, sm: 4 }}>
                                                 <FieldLabel label="Trọng lượng (g)" />
                                                 <TextField fullWidth size="small" type="number" placeholder="VD: 200" value={form.weight} onChange={set('weight')} sx={inputStyles} />
+                                            </Grid>
+                                            <Grid size={{ xs: 12, sm: 4 }}>
+                                                <FieldLabel label="Kích thước" hint="VD: 20x14cm" />
+                                                <TextField fullWidth size="small" placeholder="VD: 20x14cm" value={form.dimensions} onChange={set('dimensions')} sx={inputStyles} />
+                                            </Grid>
+                                            <Grid size={{ xs: 12, sm: 4 }}>
+                                                <FieldLabel label="Loại bìa" />
+                                                <FormControl fullWidth size="small" sx={inputStyles}>
+                                                    <Select value={form.coverType} onChange={set('coverType')} displayEmpty>
+                                                        <MenuItem value="">— Chọn loại bìa —</MenuItem>
+                                                        {COVER_TYPE_OPTIONS.map(c => <MenuItem key={c} value={c} sx={{ fontSize: 13 }}>{c}</MenuItem>)}
+                                                    </Select>
+                                                </FormControl>
+                                            </Grid>
+                                            <Grid size={{ xs: 12, sm: 4 }}>
+                                                <FieldLabel label="Ngôn ngữ" />
+                                                <TextField fullWidth size="small" placeholder="VD: Tiếng Việt" value={form.language} onChange={set('language')} sx={inputStyles} />
                                             </Grid>
                                         </Grid>
                                     </Box>

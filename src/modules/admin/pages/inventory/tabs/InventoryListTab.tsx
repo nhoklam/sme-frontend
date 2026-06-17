@@ -5,7 +5,7 @@ import {
     TableRow, TextField, InputAdornment, Chip, IconButton, Select, MenuItem,
     FormControl, Tooltip, Skeleton, Alert, Button, Grid, Card, CardContent,
     Snackbar, Typography, Pagination, Dialog, DialogTitle, DialogContent, DialogActions,
-    TablePagination,
+    TablePagination, Popover, CircularProgress,
 } from '@mui/material';
 import {
     Search, Edit, History, Refresh, FilterList,
@@ -88,6 +88,12 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
     const [historyOpen, setHistoryOpen] = useState(false);
     const [snack, setSnack] = useState<{ msg: string; sev: 'success' | 'error' } | null>(null);
 
+    // ── Min Quantity Edit state ─────────────────────────────────
+    const [minQtyAnchor, setMinQtyAnchor] = useState<HTMLElement | null>(null);
+    const [minQtyTarget, setMinQtyTarget] = useState<InventoryWithMeta | null>(null);
+    const [minQtyValue, setMinQtyValue] = useState('');
+    const [minQtySaving, setMinQtySaving] = useState(false);
+
     // ── Debounce search ───────────────────────────────────────
     React.useEffect(() => {
         const t = setTimeout(() => { setDebouncedSearch(search); setPage(0); }, 400);
@@ -124,90 +130,70 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
 
     // ── Fetch tồn kho — server-side, refetch tự động mỗi 30s ──
     const {
-        data: allInventories,
+        data: inventoryPageData,
         isLoading,
         refetch,
     } = useQuery({
-        queryKey: ['inventory-all', accessibleWarehouses.map(w => w.id), debouncedSearch, selectedCategory, stockStatus, page],
+        queryKey: ['inventory-all', effectiveWarehouseId, debouncedSearch, selectedCategory, stockStatus, page, pageSize],
         queryFn: async () => {
-            if (!accessibleWarehouses.length) return [] as InventoryWithMeta[];
+            if (!accessibleWarehouses.length) return null;
 
-            // Nếu đã chọn 1 kho cụ thể (admin filter) → chỉ fetch kho đó
-            const warehousesToFetch = effectiveWarehouseId
-                ? accessibleWarehouses.filter(w => w.id === effectiveWarehouseId)
-                : accessibleWarehouses;
-
-            const results = await Promise.all(
-                warehousesToFetch.map(wh =>
-                    inventoryService.getByWarehouse(wh.id, {
-                        keyword: debouncedSearch || undefined,
-                        stockStatus: stockStatus !== 'all' ? stockStatus : undefined,
-                        categoryId: selectedCategory || undefined,
-                        size: 500,
-                    }).then(data => ({ wh, data }))
-                )
-            );
-
-            const enriched: InventoryWithMeta[] = [];
-            results.forEach(({ wh, data }) => {
-                data.forEach(inv => {
-                    const p = productMap.get(inv.productId);
-                    enriched.push({
-                        ...inv,
-                        productName: p?.name ?? inv.productId,
-                        productSku: p?.sku,
-                        isbnBarcode: p?.isbnBarcode,
-                        warehouseName: wh.name,
-                        categoryId: p?.categoryId,
-                        categoryName: p?.categoryName,
-                        imageUrl: p?.imageUrl,
-                        retailPrice: p?.retailPrice,
-                        macPrice: p?.macPrice,
-                        location: inv.location,
-                        inTransit: inv.inTransit || 0,
-                    });
-                });
+            const res = await inventoryService.getByWarehousePaged(effectiveWarehouseId || null, {
+                keyword: debouncedSearch || undefined,
+                stockStatus: stockStatus !== 'all' ? stockStatus : undefined,
+                categoryId: selectedCategory || undefined,
+                page,
+                size: pageSize,
             });
-            return enriched;
+
+            // Enriched
+            const enriched = res.content.map(inv => {
+                const p = productMap.get(inv.productId);
+                return {
+                    ...inv,
+                    productName: p?.name ?? inv.productName ?? inv.productId,
+                    productSku: p?.sku ?? inv.productSku,
+                    isbnBarcode: p?.isbnBarcode ?? inv.isbnBarcode,
+                    // warehouseName is already in inv because of new backend DTO
+                    categoryId: p?.categoryId ?? inv.categoryId,
+                    categoryName: p?.categoryName ?? inv.categoryName,
+                    imageUrl: p?.imageUrl ?? inv.productImageUrl,
+                    retailPrice: p?.retailPrice,
+                    macPrice: p?.macPrice,
+                    location: (inv as any).location,
+                    inTransit: inv.inTransit || 0,
+                } as InventoryWithMeta;
+            });
+
+            return {
+                ...res,
+                content: enriched
+            };
         },
         enabled: !loadingProducts && accessibleWarehouses.length > 0,
         refetchInterval: 30_000,
         refetchOnWindowFocus: true,
     });
 
-    const inventories = allInventories ?? [];
-
-    // ── Client-side filter + pagination sau khi nhận data ────
-    const filtered = React.useMemo(() => {
-        return inventories.filter(inv => {
-            if (selectedCategory && inv.categoryId !== selectedCategory) return false;
-            // stockStatus đã được gửi lên server, nhưng fallback client-side
-            if (stockStatus !== 'all') {
-                const qty = inv.quantity;
-                const minQty = inv.minQuantity;
-                if (stockStatus === 'in_stock' && (qty === 0 || (minQty > 0 && qty <= minQty))) return false;
-                if (stockStatus === 'low_stock' && !(qty > 0 && minQty > 0 && qty <= minQty)) return false;
-                if (stockStatus === 'out_of_stock' && qty !== 0) return false;
-            }
-            return true;
-        });
-    }, [inventories, selectedCategory, stockStatus]);
-
-    const totalPages = Math.ceil(filtered.length / pageSize);
-    const paged = filtered.slice(page * pageSize, (page + 1) * pageSize);
+    const paged = inventoryPageData?.content ?? [];
+    const totalPages = inventoryPageData?.totalPages ?? 0;
+    const totalElements = inventoryPageData?.totalElements ?? 0;
 
     // ── Stats ─────────────────────────────────────────────────
+    // Stats is now limited since we don't have all data client-side. We show what we can or wait for backend global stats API.
+    // For now, we calculate stats based on current page just to have something, or hide it if it's misleading.
+    // Since backend does not return stats, we'll just show total elements.
     const stats = {
-        total: filtered.length,
-        totalQty: filtered.reduce((s, i) => s + (i.quantity || 0), 0),
-        lowStock: filtered.filter(i => i.quantity > 0 && i.minQuantity > 0 && i.quantity <= i.minQuantity).length,
-        value: filtered.reduce((s, i) => s + (i.quantity || 0) * (i.retailPrice || 0), 0),
+        total: totalElements,
+        totalQty: 0, // Backend needs to provide this
+        lowStock: 0, // Backend needs to provide this
+        value: 0, // Backend needs to provide this
     };
 
-    // ── Excel export — xuất tất cả (không bị giới hạn trang) ─
+    // ── Excel export — xuất trang hiện tại (tạm thời) ─
     const handleExport = () => {
         exportToExcel(
-            filtered,
+            paged,
             [
                 { header: 'Tên sản phẩm', key: 'productName', width: 40 },
                 { header: 'SKU', key: 'productSku', width: 15 },
@@ -274,6 +260,27 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
         setPage(0);
     };
 
+    const handleMinQtyClick = (e: React.MouseEvent<HTMLElement>, inv: InventoryWithMeta) => {
+        setMinQtyAnchor(e.currentTarget);
+        setMinQtyTarget(inv);
+        setMinQtyValue(String(inv.minQuantity ?? 0));
+    };
+
+    const handleMinQtySave = async () => {
+        if (!minQtyTarget) return;
+        setMinQtySaving(true);
+        try {
+            await inventoryService.updateMinQuantity(minQtyTarget.id, Number(minQtyValue) || 0);
+            setSnack({ msg: `✅ Cập nhật định mức tối thiểu thành công`, sev: 'success' });
+            setMinQtyAnchor(null);
+            qc.invalidateQueries({ queryKey: ['inventory-all'] });
+        } catch (e: any) {
+            setSnack({ msg: e.response?.data?.message || 'Cập nhật thất bại', sev: 'error' });
+        } finally {
+            setMinQtySaving(false);
+        }
+    };
+
     const activeCount = [debouncedSearch, selectedCategory, stockStatus !== 'all', selectedWarehouse].filter(Boolean).length;
 
     // ── Kiểm kho dialog state ──
@@ -333,7 +340,6 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
         }
     });
 
-    console.log("StockCountTab component:", StockCountTab);
 
     // ── Render ────────────────────────────────────────────────
     return (
@@ -422,7 +428,7 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
                     <Button size="small" variant="outlined" startIcon={<FileDownloadOutlined sx={{ fontSize: 15 }} />}
                         onClick={handleExport}
                         sx={{ textTransform: 'none', borderColor: '#16a34a', color: '#16a34a', borderRadius: 1.5, height: 36, '&:hover': { bgcolor: '#f0fdf4', borderColor: '#15803d' } }}>
-                        Excel ({filtered.length})
+                        Excel
                     </Button>
                     <Button size="small" variant="contained" startIcon={<Assignment sx={{ fontSize: 15 }} />}
                         onClick={() => setStockCountOpen(true)}
@@ -497,7 +503,13 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
                                                 </Typography>
                                             </TableCell>
                                             <TableCell sx={{ py: 1.5 }}>
-                                                <Typography variant="caption" color="#888">{(inv.minQuantity ?? 0).toLocaleString()}</Typography>
+                                                <Tooltip title="Nhấn để chỉnh định mức tối thiểu" arrow>
+                                                    <Typography variant="caption" color="#888"
+                                                        onClick={(e) => handleMinQtyClick(e, inv)}
+                                                        sx={{ cursor: 'pointer', '&:hover': { color: '#2563eb', textDecoration: 'underline' } }}>
+                                                        {(inv.minQuantity ?? 0).toLocaleString()}
+                                                    </Typography>
+                                                </Tooltip>
                                             </TableCell>
                                             <TableCell sx={{ py: 1.5 }}>
                                                 <Chip icon={ss.icon} label={ss.label} size="small"
@@ -526,7 +538,7 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
                                 })
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
+                                    <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
                                         <Typography fontSize={36} mb={1}>📦</Typography>
                                         <Typography variant="body2" color="text.secondary">Không tìm thấy sản phẩm nào</Typography>
                                         {activeCount > 0 && (
@@ -544,7 +556,7 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
                 {/* Footer: count + pagination */}
                 <TablePagination
                     component="div"
-                    count={filtered.length}
+                    count={totalElements}
                     page={page}
                     onPageChange={(_, newPage) => setPage(newPage)}
                     rowsPerPage={pageSize}
@@ -701,6 +713,39 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
                     <Alert severity={snack.sev} onClose={() => setSnack(null)} sx={{ borderRadius: 2 }}>{snack.msg}</Alert>
                 ) : <div />}
             </Snackbar>
+
+            {/* Popover chỉnh minQuantity */}
+            <Popover
+                open={Boolean(minQtyAnchor)}
+                anchorEl={minQtyAnchor}
+                onClose={() => setMinQtyAnchor(null)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+                transformOrigin={{ vertical: 'top', horizontal: 'center' }}
+                PaperProps={{ sx: { p: 2, borderRadius: 2, boxShadow: '0 8px 30px rgba(0,0,0,0.12)', minWidth: 240 } }}
+            >
+                <Typography variant="caption" fontWeight={700} color="#555" display="block" mb={0.5}>
+                    Định mức tối thiểu
+                </Typography>
+                <Typography variant="caption" color="text.secondary" display="block" mb={1.5}>
+                    {minQtyTarget?.productName} · {minQtyTarget?.warehouseName}
+                </Typography>
+                <TextField
+                    fullWidth size="small" type="number" label="Số lượng tối thiểu"
+                    value={minQtyValue}
+                    onChange={e => setMinQtyValue(e.target.value)}
+                    inputProps={{ min: 0 }}
+                    autoFocus
+                    onKeyDown={e => { if (e.key === 'Enter') handleMinQtySave(); }}
+                    sx={{ mb: 1.5 }}
+                />
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                    <Button size="small" onClick={() => setMinQtyAnchor(null)} sx={{ textTransform: 'none', color: '#888' }}>Hủy</Button>
+                    <Button size="small" variant="contained" onClick={handleMinQtySave} disabled={minQtySaving}
+                        sx={{ textTransform: 'none', fontWeight: 700, bgcolor: '#2563eb', borderRadius: 1.5, '&:hover': { bgcolor: '#1d4ed8' } }}>
+                        {minQtySaving ? <CircularProgress size={16} color="inherit" /> : 'Lưu'}
+                    </Button>
+                </Box>
+            </Popover>
 
             {/* Kiểm kho Dialog */}
             {stockCountOpen && (

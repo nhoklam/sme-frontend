@@ -246,28 +246,6 @@ const TransactionDetailDialog: React.FC<{
     );
 };
 
-// ── Backend missing endpoint notice ──────────────────────────────
-const BackendMissingNotice: React.FC<{ onRetry: () => void }> = ({ onRetry }) => (
-    <Alert
-        severity="warning"
-        icon={<WarningIcon />}
-        sx={{ mb: 2, borderRadius: 2 }}
-        action={
-            <Button size="small" variant="outlined" color="warning" onClick={onRetry}
-                sx={{ textTransform: 'none', fontSize: 11 }}>
-                Thử lại
-            </Button>
-        }
-    >
-        <Typography variant="body2" fontWeight={700}>Backend chưa có endpoint lịch sử giao dịch tổng hợp</Typography>
-        <Typography variant="caption" display="block" mt={0.5}>
-            API <code>/api/inventory/transactions</code> trả về lỗi 500.{' '}
-            Cần thêm endpoint này vào <code>InventoryController.java</code>.{' '}
-            Tạm thời bạn có thể xem lịch sử theo từng sản phẩm trong trang <strong>Tồn kho → biểu tượng đồng hồ</strong>.
-        </Typography>
-    </Alert>
-);
-
 // ── Main Component ──────────────────────────────────────────────
 const InventoryHistoryPage: React.FC = () => {
     const navigate = useNavigate();
@@ -347,12 +325,7 @@ const InventoryHistoryPage: React.FC = () => {
             toDate: toDate || undefined,
         }),
         placeholderData: (prev) => prev,
-        retry: 0, // Không retry để tránh spam log khi backend chưa có endpoint
     });
-
-    const errorCode = getErrorCode(error);
-    // Phân biệt lỗi 500 "endpoint chưa tồn tại" vs lỗi khác
-    const isMissingEndpoint = isError && (errorCode === 500 || errorCode === 404);
 
     const transactions = historyData?.content ?? [];
     const totalPages = historyData?.totalPages ?? 0;
@@ -492,7 +465,7 @@ const InventoryHistoryPage: React.FC = () => {
                 </Box>
                 <Box sx={{ display: 'flex', gap: 1 }}>
                     <Button variant="outlined" startIcon={<FileDownloadOutlined sx={{ fontSize: 15 }} />}
-                        onClick={handleExportAll} disabled={exporting || isMissingEndpoint}
+                        onClick={handleExportAll} disabled={exporting}
                         sx={{ textTransform: 'none', borderColor: '#2e7d32', color: '#2e7d32', fontSize: 12 }}>
                         {exporting ? 'Đang xuất...' : 'Excel (tất cả)'}
                     </Button>
@@ -502,8 +475,7 @@ const InventoryHistoryPage: React.FC = () => {
                 </Box>
             </Box>
 
-            {/* Stats Cards — chỉ hiển thị khi không lỗi */}
-            {!isMissingEndpoint && (
+            {/* Stats Cards */}
                 <Grid container spacing={1.5} sx={{ mb: 2 }}>
                     {[
                         { label: 'Tổng giao dịch', value: stats.total, color: '#1a1a2e' },
@@ -525,7 +497,6 @@ const InventoryHistoryPage: React.FC = () => {
                         </Grid>
                     ))}
                 </Grid>
-            )}
 
             {/* Filters Bar */}
             <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #f0f0f0', mb: 2 }}>
@@ -630,12 +601,7 @@ const InventoryHistoryPage: React.FC = () => {
                 </Box>
             </Paper>
 
-            {/* ── Error Banner — phân biệt loại lỗi ── */}
-            {isMissingEndpoint && (
-                <BackendMissingNotice onRetry={() => refetch()} />
-            )}
-
-            {isError && !isMissingEndpoint && (
+            {isError && (
                 <Alert severity="error" icon={<ErrorOutline />} sx={{ mb: 2, borderRadius: 2 }}
                     action={
                         <Box sx={{ display: 'flex', gap: 1 }}>
@@ -674,30 +640,6 @@ const InventoryHistoryPage: React.FC = () => {
                                         {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(j => <TableCell key={j}><Skeleton height={20} /></TableCell>)}
                                     </TableRow>
                                 ))
-                            ) : isMissingEndpoint ? (
-                                // Khi backend chưa có endpoint — hiển thị empty state rõ ràng
-                                <TableRow>
-                                    <TableCell colSpan={9} align="center" sx={{ py: 8 }}>
-                                        <WarningIcon sx={{ fontSize: 48, color: '#f59e0b', mb: 1, display: 'block', mx: 'auto' }} />
-                                        <Typography variant="body1" fontWeight={700} color="#555" mb={1}>
-                                            Chức năng chưa sẵn sàng
-                                        </Typography>
-                                        <Typography variant="body2" color="text.secondary" mb={2} maxWidth={500} mx="auto">
-                                            Backend cần thêm endpoint <code>/api/inventory/transactions</code> để hiển thị lịch sử tổng hợp.
-                                            Trong khi chờ, bạn có thể xem lịch sử từng sản phẩm trong trang <strong>Tồn kho</strong>.
-                                        </Typography>
-                                        <Button variant="outlined" size="small"
-                                            onClick={() => navigate('/admin/inventory')}
-                                            sx={{ textTransform: 'none', mr: 1 }}>
-                                            Về trang Tồn kho
-                                        </Button>
-                                        <Button variant="outlined" size="small" color="warning"
-                                            onClick={() => refetch()}
-                                            sx={{ textTransform: 'none' }}>
-                                            Thử lại
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
                             ) : enrichedTransactions.length > 0 ? (
                                 enrichedTransactions.map((tx, idx) => {
                                     const typeInfo = TX_TYPE_MAP[tx.transactionType] ?? {

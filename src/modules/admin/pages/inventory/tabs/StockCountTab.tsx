@@ -51,6 +51,7 @@ export const StockCountTab: React.FC<Props> = ({ warehouses, onClose, initialRec
     const [note, setNote] = useState('');
     const [recentChecks, setRecentChecks] = useState<{ name: string; qty: number }[]>([]);
     const [detailReceipt, setDetailReceipt] = useState<SavedReceipt | null>(null);
+    const [adjustErrors, setAdjustErrors] = useState<any[]>([]);
 
     // Search dropdown state
     const [searchResults, setSearchResults] = useState<{ productId: string; sku: string; barcode: string; name: string; unit: string; qty: number }[]>([]);
@@ -160,40 +161,76 @@ export const StockCountTab: React.FC<Props> = ({ warehouses, onClose, initialRec
         }));
     };
 
-    const handleSave = async () => {
+    const handleSave = async (retryItems?: StockCountItem[]) => {
         if (!selectedWarehouse) return;
-        const adjusted = items.filter(it => it.actualQty !== '' && it.diff !== 0);
-        if (!adjusted.length) { setSnack('⚠️ Không có chênh lệch nào cần điều chỉnh'); return; }
+        const itemsToAdjust = retryItems || items.filter(it => it.actualQty !== '' && it.diff !== 0);
+        if (!itemsToAdjust.length) { setSnack('⚠️ Không có chênh lệch nào cần điều chỉnh'); return; }
+        
         setSaving(true);
+        setAdjustErrors([]);
         try {
             const code = `PKK-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${String(Math.floor(Math.random() * 9999) + 1).padStart(4, '0')}`;
-            await Promise.all(adjusted.map(it =>
-                axiosInstance.post('/inventory/adjust', {
-                    productId: it.productId, warehouseId: selectedWarehouse.id,
+            
+            // Chunking to 500 items per request
+            const chunks = [];
+            for (let i = 0; i < itemsToAdjust.length; i += 500) {
+                chunks.push(itemsToAdjust.slice(i, i + 500));
+            }
+
+            let totalSuccess = 0;
+            let totalErrorsCount = 0;
+            let allErrors: any[] = [];
+
+            for (const chunk of chunks) {
+                const payload = chunk.map(it => ({
+                    productId: it.productId, 
+                    warehouseId: selectedWarehouse.id,
                     actualQuantity: Number(it.actualQty),
                     reason: `[${code}] Kiểm kê: HT ${it.systemQty}, TT ${it.actualQty} (lệch ${it.diff > 0 ? '+' : ''}${it.diff})${note ? `. ${note}` : ''}`,
-                })
-            ));
-            setSnack(`✅ Hoàn thành! ${adjusted.length} sản phẩm đã điều chỉnh`);
-            setFilterTab(2);
-            const receipt: SavedReceipt = {
-                code,
-                time: new Date().toLocaleString('vi-VN'),
-                items: adjusted,
-                warehouseName: selectedWarehouse.name,
-            };
-            setDetailReceipt(receipt);
+                }));
 
-            // Lưu vào localStorage
-            try {
-                const history = JSON.parse(localStorage.getItem('stockCountHistory') || '[]');
-                localStorage.setItem('stockCountHistory', JSON.stringify([receipt, ...history]));
-            } catch (err) {
-                console.warn("Không thể lưu lịch sử kiểm kho vào localStorage do trình duyệt chặn:", err);
+                try {
+                    const res = await inventoryService.adjustBulk(payload);
+                    totalSuccess += res.successCount || 0;
+                    totalErrorsCount += res.errorCount || 0;
+                    if (res.errors && res.errors.length > 0) {
+                        // Map index back to original item index or just store the reason + retriable
+                        allErrors = [...allErrors, ...res.errors.map((err: any) => ({
+                            ...err,
+                            item: chunk[err.line - 1] // line in backend is 1-indexed based on the payload chunk
+                        }))];
+                    }
+                } catch (e: any) {
+                    throw e; // Fail entirely if network error or 500
+                }
+            }
+
+            if (totalErrorsCount > 0) {
+                setAdjustErrors(allErrors);
+                setSnack(`⚠️ Thành công ${totalSuccess}, thất bại ${totalErrorsCount} sản phẩm.`);
+            } else {
+                setSnack(`✅ Hoàn thành! ${totalSuccess} sản phẩm đã điều chỉnh`);
+                setFilterTab(2);
+                const receipt: SavedReceipt = {
+                    code,
+                    time: new Date().toLocaleString('vi-VN'),
+                    items: itemsToAdjust, // Ideally only successful ones, but let's keep it simple
+                    warehouseName: selectedWarehouse.name,
+                };
+                setDetailReceipt(receipt);
+
+
             }
         } catch (e: any) {
             setSnack(`❌ ${e.response?.data?.message ?? 'Lưu thất bại'}`);
         } finally { setSaving(false); }
+    };
+
+    const handleRetry = () => {
+        const retriableItems = adjustErrors.filter(e => e.retriable).map(e => e.item);
+        if (retriableItems.length > 0) {
+            handleSave(retriableItems);
+        }
     };
 
     const handleExport = () => {
@@ -432,6 +469,30 @@ export const StockCountTab: React.FC<Props> = ({ warehouses, onClose, initialRec
                                     <Typography variant="caption" color="#6b7280" fontWeight={700} fontSize={10}>({rc.qty})</Typography>
                                 </Box>
                             ))}
+                            
+                            {adjustErrors.length > 0 && (
+                                <Box sx={{ mt: 2, p: 1.5, bgcolor: '#fef2f2', borderRadius: 2, border: '1px solid #fca5a5' }}>
+                                    <Typography variant="caption" fontWeight={800} color="#dc2626" display="block" mb={1}>
+                                        ⚠️ Lỗi kiểm kê ({adjustErrors.length})
+                                    </Typography>
+                                    <List dense disablePadding sx={{ maxHeight: 150, overflow: 'auto' }}>
+                                        {adjustErrors.map((err, i) => (
+                                            <ListItemText 
+                                                key={i}
+                                                primary={<Typography fontSize={11} fontWeight={600} noWrap>{err.item?.productName || `Dòng ${err.line}`}</Typography>}
+                                                secondary={<Typography fontSize={10} color="#b91c1c">{err.reason}</Typography>}
+                                                sx={{ m: 0, mb: 1 }}
+                                            />
+                                        ))}
+                                    </List>
+                                    {adjustErrors.some(e => e.retriable) && (
+                                        <Button size="small" variant="contained" fullWidth onClick={handleRetry}
+                                            sx={{ mt: 1, textTransform: 'none', bgcolor: '#dc2626', '&:hover': { bgcolor: '#b91c1c' }, fontSize: 11, borderRadius: 1.5 }}>
+                                            Thử lại dòng lỗi
+                                        </Button>
+                                    )}
+                                </Box>
+                            )}
                         </Box>
                     </Box>
                 </DialogContent>
@@ -442,7 +503,7 @@ export const StockCountTab: React.FC<Props> = ({ warehouses, onClose, initialRec
                     <Button size="small" variant="outlined" startIcon={<FileDownloadOutlined sx={{ fontSize: 14 }} />} onClick={handleExport}
                         sx={{ textTransform: 'none', fontWeight: 700, fontSize: 12, borderColor: '#16a34a', color: '#16a34a', borderRadius: 2, height: 36, '&:hover': { bgcolor: '#f0fdf4' } }}>Excel</Button>
                     <Button variant="contained" startIcon={saving ? <CircularProgress size={14} sx={{ color: '#fff' }} /> : <Save />}
-                        onClick={handleSave} disabled={saving || diffCount === 0}
+                        onClick={() => handleSave()} disabled={saving || diffCount === 0}
                         sx={{ textTransform: 'none', fontWeight: 800, bgcolor: '#16a34a', '&:hover': { bgcolor: '#15803d' }, fontSize: 12, borderRadius: 2, height: 36, px: 3 }}>
                         {saving ? 'Đang lưu...' : 'Hoàn thành'}
                     </Button>

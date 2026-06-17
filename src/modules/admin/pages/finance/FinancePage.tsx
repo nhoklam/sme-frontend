@@ -522,34 +522,56 @@ const CashbookTab: React.FC<{ warehouses: Warehouse[] }> = ({ warehouses }) => {
     const [balance, setBalance] = useState<Record<string, number>>({});
     const [loadingBalance, setLoadingBalance] = useState(false);
 
+    const [systemTotal, setSystemTotal] = useState<number | null>(null);
+
     const loadBalance = useCallback(async () => {
         setLoadingBalance(true);
-        try { const res = await financeService.getBalance(params.warehouseId || undefined); setBalance(res); }
+        try { 
+            const res = await financeService.getBalance(params.warehouseId || undefined); 
+            setBalance(res); 
+            if (isAdmin && !params.warehouseId) {
+                const total = await financeService.getTotalBalance();
+                setSystemTotal(total);
+            } else {
+                setSystemTotal(null);
+            }
+        }
         catch { /* silent */ }
         finally { setLoadingBalance(false); }
-    }, [params.warehouseId]);
+    }, [params.warehouseId, isAdmin]);
 
     useEffect(() => { loadBalance(); }, [loadBalance]);
+
+    const queryParams = {
+        from: new Date(params.from).toISOString(),
+        to: new Date(params.to + 'T23:59:59').toISOString(),
+        warehouseId: params.warehouseId || undefined,
+        fundType: params.fundType || undefined,
+        transactionType: params.transactionType || undefined,
+        // Khi chọn loại nguồn → dùng làm keyword; ngược lại dùng keyword tự nhập
+        keyword: params.referenceType ? params.referenceType : (params.keyword || undefined),
+    };
 
     const { data: cashbookData, isLoading, refetch } = useQuery({
         queryKey: ['cashbook', params],
         queryFn: () => financeService.searchCashbook({
-            from: new Date(params.from).toISOString(),
-            to: new Date(params.to + 'T23:59:59').toISOString(),
-            warehouseId: params.warehouseId || undefined,
-            fundType: params.fundType || undefined,
-            transactionType: params.transactionType || undefined,
-            // Khi chọn loại nguồn → dùng làm keyword; ngược lại dùng keyword tự nhập
-            keyword: params.referenceType ? params.referenceType : (params.keyword || undefined),
+            ...queryParams,
             page: params.page, size: params.size,
         }),
     });
 
+    // ── Summary — SUM tại DB level, gọi SONG SONG với search (Promise.all pattern) ──
+    // (Lý do xóa .reduce(): chỉ tính trên 1 trang data — sai hoàn toàn khi có phân trang)
+    const { data: summaryData } = useQuery({
+        queryKey: ['cashbook-summary', params.from, params.to, params.warehouseId, params.fundType, params.transactionType, params.referenceType, params.keyword],
+        queryFn: () => financeService.getCashbookSummary(queryParams),
+    });
+    const totalIn = summaryData?.totalIn ?? 0;
+    const totalOut = summaryData?.totalOut ?? 0;
+
     const transactions = cashbookData?.content ?? [];
     const totalPages = cashbookData?.totalPages ?? 0;
     const totalElements = cashbookData?.totalElements ?? 0;
-    const totalIn = transactions.filter((t: any) => t.transactionType === 'IN').reduce((s: number, t: any) => s + t.amount, 0);
-    const totalOut = transactions.filter((t: any) => t.transactionType === 'OUT').reduce((s: number, t: any) => s + t.amount, 0);
 
     const handleExport = () => {
         exportToExcel(transactions, [
@@ -568,6 +590,7 @@ const CashbookTab: React.FC<{ warehouses: Warehouse[] }> = ({ warehouses }) => {
     const set = (k: string) => (v: any) => setParams(p => ({ ...p, [k]: v, page: 0 }));
 
     const balanceCards = [
+        ...(isAdmin && !params.warehouseId ? [{ label: 'Tổng quỹ hệ thống', key: '_systemTotal', color: '#7c3aed', bg: 'linear-gradient(135deg,#faf5ff,#e9d5ff)', border: '#c084fc', icon: '🌍', tag: 'TỔNG' }] : []),
         { label: 'Tiền mặt (TK 111)', key: 'CASH_111', color: '#16a34a', bg: 'linear-gradient(135deg,#f0fdf4,#dcfce7)', border: '#86efac', icon: '💵', tag: 'SỐ DƯ' },
         { label: 'Ngân hàng (TK 112)', key: 'BANK_112', color: '#2563eb', bg: 'linear-gradient(135deg,#eff6ff,#dbeafe)', border: '#93c5fd', icon: '🏦', tag: 'SỐ DƯ' },
         { label: 'Tổng thu kỳ này', key: '_totalIn', color: '#0891b2', bg: 'linear-gradient(135deg,#f0fdfa,#ccfbf1)', border: '#67e8f9', icon: '⬆️', tag: 'THU' },
@@ -577,9 +600,9 @@ const CashbookTab: React.FC<{ warehouses: Warehouse[] }> = ({ warehouses }) => {
     return (
         <Box>
             {/* Balance Cards */}
-            <Grid container spacing={2} sx={{ mb: 2.5 }}>
+            <Box sx={{ mb: 2.5, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                 {balanceCards.map(c => (
-                    <Grid size={{ xs: 6, sm: 3 }} key={c.key}>
+                    <Box key={c.key} sx={{ flex: '1 1 18%' }}>
                         <Paper elevation={0} sx={{ p: 2.5, borderRadius: 2.5, border: `1.5px solid ${c.border}`, background: c.bg, boxShadow: `0 4px 12px ${c.border}50`, transition: 'transform 0.15s,box-shadow 0.15s', '&:hover': { transform: 'translateY(-3px)', boxShadow: `0 8px 20px ${c.border}70` } }}>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.25 }}>
                                 <Typography fontSize={26} lineHeight={1}>{c.icon}</Typography>
@@ -589,14 +612,17 @@ const CashbookTab: React.FC<{ warehouses: Warehouse[] }> = ({ warehouses }) => {
                             </Box>
                             {loadingBalance || isLoading ? <Skeleton height={30} sx={{ borderRadius: 1 }} /> : (
                                 <Typography fontWeight={800} color={c.color} fontSize={17} letterSpacing="-0.5px" lineHeight={1.2}>
-                                    {c.key === '_totalIn' ? fmtCurrency(totalIn) : c.key === '_totalOut' ? fmtCurrency(totalOut) : fmtCurrency(balance[c.key] ?? 0)}
+                                    {c.key === '_totalIn' ? fmtCurrency(totalIn) : 
+                                     c.key === '_totalOut' ? fmtCurrency(totalOut) : 
+                                     c.key === '_systemTotal' ? fmtCurrency(systemTotal ?? 0) :
+                                     fmtCurrency(balance[c.key] ?? 0)}
                                 </Typography>
                             )}
                             <Typography variant="caption" color="#6b7280" fontSize={11} mt={0.75} display="block">{c.label}</Typography>
                         </Paper>
-                    </Grid>
+                    </Box>
                 ))}
-            </Grid>
+            </Box>
 
             {/* Filters */}
             <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #e5e7eb', mb: 2 }}>
@@ -792,34 +818,65 @@ const CashbookTab: React.FC<{ warehouses: Warehouse[] }> = ({ warehouses }) => {
 // ─────────────────────────────────────────────────────────────
 // ── TAB 2: CÔNG NỢ NCC
 // ─────────────────────────────────────────────────────────────
+const SupplierTotalDebtLabel: React.FC<{ supplierId: string }> = ({ supplierId }) => {
+    const { data } = useQuery({
+        queryKey: ['supplier-total-debt', supplierId],
+        queryFn: () => financeService.getTotalOutstandingBySupplier(supplierId),
+        staleTime: 300000,
+    });
+    if (data === undefined || data === 0) return null;
+    return (
+        <Typography variant="caption" color="#dc2626" fontWeight={700} sx={{ display: 'block', mt: 0.5 }}>
+            Tổng nợ NCC: {fmtCurrency(data)}
+        </Typography>
+    );
+};
+
 const SupplierDebtTab: React.FC<{ warehouses: Warehouse[] }> = ({ warehouses }) => {
     const [payTarget, setPayTarget] = useState<SupplierDebt | null>(null);
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [warehouseId, setWarehouseId] = useState('');
     const [search, setSearch] = useState('');
     const [snack, setSnack] = useState('');
+    const [page, setPage] = useState(0);
+    const pageSize = 20;
 
     useEffect(() => { supplierService.getAllSimple().then(setSuppliers).catch(() => { }); }, []);
 
-    const { data: debts = [], isLoading, refetch } = useQuery({
-        queryKey: ['supplier-debts', warehouseId],
-        queryFn: () => financeService.getSupplierDebts(warehouseId || undefined),
-    });
-
     const supplierMap = React.useMemo(() => { const m = new Map<string, Supplier>(); suppliers.forEach(s => m.set(s.id, s)); return m; }, [suppliers]);
 
-    const filtered = debts.filter((d: any) => {
-        if (!search) return true;
-        const s = supplierMap.get(d.supplierId);
-        return s?.name?.toLowerCase().includes(search.toLowerCase()) || d.purchaseOrderCode?.toLowerCase().includes(search.toLowerCase());
+    // ── Server-side pagination — thay thế fetch-all cũ gây memory issue ──
+    const { data: debtsData, isLoading, refetch } = useQuery({
+        queryKey: ['supplier-debts-paged', warehouseId, search, page],
+        queryFn: () => financeService.getSupplierDebtsPaged({
+            warehouseId: warehouseId || undefined,
+            search: search || undefined,
+            page,
+            size: pageSize,
+        }),
     });
 
-    const totalRemaining = filtered.reduce((s: number, d: any) => s + (d.remainingAmount || 0), 0);
-    const totalPaid = filtered.reduce((s: number, d: any) => s + (d.paidAmount || 0), 0);
-    const totalDebt = filtered.reduce((s: number, d: any) => s + (d.totalDebt || 0), 0);
+    // ── Summary — SUM tại DB level, gọi SONG SONG với search ──
+    // (Lý do xóa .reduce(): frontend cũ fetch toàn bộ list rồi tính, gây memory issue và sai khi data lớn)
+    const { data: summaryData } = useQuery({
+        queryKey: ['supplier-debts-summary', warehouseId, search],
+        queryFn: () => financeService.getSupplierDebtSummary({
+            warehouseId: warehouseId || undefined,
+            search: search || undefined,
+        }),
+    });
+
+    const debts = debtsData?.content ?? [];
+    const totalPages = debtsData?.totalPages ?? 0;
+    const totalElements = debtsData?.totalElements ?? 0;
+
+    const totalRemaining = summaryData?.totalRemaining ?? 0;
+    const totalPaid = summaryData?.totalPaid ?? 0;
+    const totalDebt = summaryData?.totalDebt ?? 0;
+    const suppliersWithDebtCount = summaryData?.suppliersWithDebtCount ?? 0;
 
     const handleExport = () => {
-        exportToExcel(filtered.map((d: any) => ({ ...d, supplierName: supplierMap.get(d.supplierId)?.name ?? d.supplierId })), [
+        exportToExcel(debts.map((d: any) => ({ ...d, supplierName: supplierMap.get(d.supplierId)?.name ?? d.supplierId })), [
             { header: 'Nhà cung cấp', key: 'supplierName', width: 30 },
             { header: 'Mã đơn nhập', key: 'purchaseOrderCode', width: 20 },
             { header: 'Tổng nợ', key: 'totalDebt', width: 18, formatter: fmtVnd },
@@ -838,7 +895,7 @@ const SupplierDebtTab: React.FC<{ warehouses: Warehouse[] }> = ({ warehouses }) 
                     { label: 'Tổng nợ', value: fmtCurrency(totalDebt), color: '#dc2626', bg: 'linear-gradient(135deg,#fef2f2,#fee2e2)', border: '#fca5a5', icon: '📋' },
                     { label: 'Đã thanh toán', value: fmtCurrency(totalPaid), color: '#16a34a', bg: 'linear-gradient(135deg,#f0fdf4,#dcfce7)', border: '#86efac', icon: '✅' },
                     { label: 'Còn phải trả', value: fmtCurrency(totalRemaining), color: '#d97706', bg: 'linear-gradient(135deg,#fffbeb,#fef3c7)', border: '#fde68a', icon: '⏳' },
-                    { label: 'NCC có nợ', value: new Set(filtered.filter((d: any) => d.remainingAmount > 0).map((d: any) => d.supplierId)).size, color: '#7c3aed', bg: 'linear-gradient(135deg,#faf5ff,#ede9fe)', border: '#c4b5fd', icon: '🏢' },
+                    { label: 'NCC có nợ', value: suppliersWithDebtCount, color: '#7c3aed', bg: 'linear-gradient(135deg,#faf5ff,#ede9fe)', border: '#c4b5fd', icon: '🏢' },
                 ].map(c => (
                     <Grid size={{ xs: 6, sm: 3 }} key={c.label}>
                         <Paper elevation={0} sx={{ p: 2.5, borderRadius: 2.5, border: `1.5px solid ${c.border}`, background: c.bg, boxShadow: `0 4px 12px ${c.border}50`, transition: 'transform 0.15s', '&:hover': { transform: 'translateY(-2px)' } }}>
@@ -852,11 +909,12 @@ const SupplierDebtTab: React.FC<{ warehouses: Warehouse[] }> = ({ warehouses }) 
 
             {/* Filters */}
             <Box sx={{ display: 'flex', gap: 1.5, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-                <TextField size="small" placeholder="Tìm nhà cung cấp, mã đơn..." value={search} onChange={e => setSearch(e.target.value)}
+                <TextField size="small" placeholder="Tìm nhà cung cấp, mã đơn..." value={search}
+                    onChange={e => { setSearch(e.target.value); setPage(0); }}
                     InputProps={{ startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 16, color: '#9ca3af' }} /></InputAdornment> }}
                     sx={{ flex: 1, minWidth: 200 }} />
                 <FormControl size="small" sx={{ minWidth: 200 }}>
-                    <Select value={warehouseId} onChange={e => setWarehouseId(e.target.value)} displayEmpty>
+                    <Select value={warehouseId} onChange={e => { setWarehouseId(e.target.value); setPage(0); }} displayEmpty>
                         <MenuItem value="">Tất cả chi nhánh</MenuItem>
                         {warehouses.filter(w => w.isActive).map(w => <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>)}
                     </Select>
@@ -879,8 +937,8 @@ const SupplierDebtTab: React.FC<{ warehouses: Warehouse[] }> = ({ warehouses }) 
                         <TableBody>
                             {isLoading ? (
                                 [1, 2, 3].map(i => <TableRow key={i}>{[1, 2, 3, 4, 5, 6, 7, 8, 9].map(j => <TableCell key={j}><Skeleton height={20} /></TableCell>)}</TableRow>)
-                            ) : filtered.length > 0 ? (
-                                filtered.map((d: any, idx: number) => {
+                            ) : debts.length > 0 ? (
+                                debts.map((d: any, idx: number) => {
                                     const supplier = supplierMap.get(d.supplierId);
                                     const st = DEBT_STATUS_MAP[d.status] ?? { label: d.status, color: '#666', bg: '#f3f4f6' };
                                     const pct = d.totalDebt > 0 ? Math.round((d.paidAmount / d.totalDebt) * 100) : 0;
@@ -892,7 +950,8 @@ const SupplierDebtTab: React.FC<{ warehouses: Warehouse[] }> = ({ warehouses }) 
                                                     <Avatar sx={{ width: 32, height: 32, bgcolor: '#f3e8ff', color: '#7c3aed', fontSize: 13, fontWeight: 800 }}>{supplier?.name?.charAt(0) ?? 'N'}</Avatar>
                                                     <Box>
                                                         <Typography fontSize={13} fontWeight={600}>{supplier?.name ?? d.supplierId.slice(0, 8)}</Typography>
-                                                        {supplier?.phone && <Typography variant="caption" color="#9ca3af">{supplier.phone}</Typography>}
+                                                        {supplier?.phone && <Typography variant="caption" color="#9ca3af" display="block">{supplier.phone}</Typography>}
+                                                        <SupplierTotalDebtLabel supplierId={d.supplierId} />
                                                     </Box>
                                                 </Box>
                                             </TableCell>
@@ -936,6 +995,14 @@ const SupplierDebtTab: React.FC<{ warehouses: Warehouse[] }> = ({ warehouses }) 
                         </TableBody>
                     </Table>
                 </TableContainer>
+
+                {/* Footer: count + pagination */}
+                <Box sx={{ px: 2.5, py: 1.5, borderTop: '1px solid #e5e7eb', bgcolor: '#f9fafb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="caption" color="#6b7280">Hiển thị <strong>{debts.length}</strong> / <strong>{totalElements}</strong> công nợ</Typography>
+                    {totalPages > 1 && (
+                        <Pagination count={totalPages} page={page + 1} onChange={(_, v) => setPage(v - 1)} size="small" color="primary" shape="rounded" />
+                    )}
+                </Box>
             </Paper>
 
             <PayDebtDialog open={!!payTarget} debt={payTarget} supplierName={supplierMap.get(payTarget?.supplierId ?? '')?.name ?? ''} onClose={() => setPayTarget(null)} onPaid={() => { refetch(); setSnack('Thanh toán công nợ thành công!'); }} />

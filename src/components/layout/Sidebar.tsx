@@ -68,7 +68,6 @@ const menuSections = [
                 { text: 'Quản lý nhân viên', path: '/admin/users' },
                 { text: 'Ca làm việc', path: '/admin/shifts' },
                 { text: 'Phân ca', path: '/admin/shift-assignments' },
-                { text: 'Phân quyền', path: '/admin/users/roles' },
             ]},
             { text: 'Quản lý kho/Chi nhánh', icon: <Warehouse />, path: '/admin/warehouses' },
             { text: 'Thông báo', icon: <Notifications />, path: '/admin/notifications' },

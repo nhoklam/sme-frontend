@@ -36,7 +36,7 @@ const inventoryService = {
 
     // Lấy tồn kho có phân trang — dùng cho InventoryListTab (server-side pagination)
     getByWarehousePaged: async (
-        warehouseId: string,
+        warehouseId: string | null | undefined,
         params?: {
             keyword?: string;
             stockStatus?: string;
@@ -44,7 +44,7 @@ const inventoryService = {
             page?: number;
             size?: number;
         }
-    ): Promise<PageResponse<Inventory>> => {
+    ): Promise<PageResponse<any>> => {
         const query = new URLSearchParams();
         if (params?.keyword?.trim()) query.set('keyword', params.keyword.trim());
         if (params?.stockStatus && params.stockStatus !== 'all') query.set('stockStatus', params.stockStatus);
@@ -52,10 +52,8 @@ const inventoryService = {
         query.set('page', String(params?.page ?? 0));
         query.set('size', String(params?.size ?? 30));
 
-        // Đúng endpoint: /inventory/warehouse/{id}/search
-        const res = await axiosInstance.get<ApiResponse<PageResponse<Inventory>>>(
-            `/inventory/warehouse/${warehouseId}/search?${query}`
-        );
+        const url = warehouseId ? `/inventory/warehouse/${warehouseId}/search?${query}` : `/inventory/search?${query}`;
+        const res = await axiosInstance.get<ApiResponse<PageResponse<any>>>(url);
         const data = res.data.data;
         // Nếu backend trả array, wrap thành PageResponse
         if (Array.isArray(data)) {
@@ -68,13 +66,21 @@ const inventoryService = {
                 last: true,
             };
         }
-        return data as PageResponse<Inventory>;
+        return data as PageResponse<any>;
     },
 
     // Lấy tồn kho theo sản phẩm + kho
     getOne: async (productId: string, warehouseId: string): Promise<Inventory> => {
         const res = await axiosInstance.get<ApiResponse<Inventory>>(
             `/inventory/${productId}/warehouse/${warehouseId}`
+        );
+        return res.data.data;
+    },
+
+    // Lấy tồn kho tổng hợp tất cả chi nhánh cho 1 sản phẩm
+    getAllWarehousesInventory: async (productId: string): Promise<any[]> => {
+        const res = await axiosInstance.get<ApiResponse<any[]>>(
+            `/inventory/product/${productId}/all-warehouses`
         );
         return res.data.data;
     },
@@ -120,6 +126,12 @@ const inventoryService = {
     // Điều chỉnh tồn kho
     adjust: async (data: AdjustInventoryRequest): Promise<void> => {
         await axiosInstance.post('/inventory/adjust', data);
+    },
+
+    // Điều chỉnh tồn kho hàng loạt
+    adjustBulk: async (data: AdjustInventoryRequest[]): Promise<any> => {
+        const res = await axiosInstance.post('/inventory/adjust/bulk', data);
+        return res.data.data;
     },
 
     // Cập nhật mức tồn kho tối thiểu

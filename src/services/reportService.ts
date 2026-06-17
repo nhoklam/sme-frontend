@@ -21,7 +21,22 @@ const reportService = {
         return res.data.data;
     },
 
-    // ── Báo cáo doanh thu ────────────────────────────────────────
+    // ── Báo cáo kinh doanh (Doanh thu, Lợi nhuận) ────────────────────────
+    getBusinessReport: async (params: RevenueReportParams): Promise<any[]> => {
+        const query = new URLSearchParams({
+            from: params.from,
+            to: params.to,
+            period: params.period ?? 'day',
+        });
+        if (params.warehouseId) query.set('warehouseId', params.warehouseId);
+
+        const res = await axiosInstance.get<ApiResponse<any[]>>(
+            `/reports/business?${query}`
+        );
+        return res.data.data ?? [];
+    },
+
+    // ── Báo cáo doanh thu (Legacy) ────────────────────────────────────────
     getRevenue: async (params: RevenueReportParams): Promise<RevenueDataPoint[]> => {
         const query = new URLSearchParams({
             from: params.from,

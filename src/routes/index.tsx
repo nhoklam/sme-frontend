@@ -40,7 +40,7 @@ const PaymentSettingsPage = lazy(() => import('../modules/admin/pages/settings/P
 const UserListPage = lazy(() => import('../modules/admin/pages/users/UserListPage'));
 const UserCreatePage = lazy(() => import('../modules/admin/pages/users/UserCreatePage'));
 const ProfilePage = lazy(() => import('../modules/admin/pages/users/ProfilePage'));
-const RolePermissionPage = lazy(() => import('../modules/admin/pages/users/RolePermissionPage'));
+
 const FinancePage = lazy(() => import('../modules/admin/pages/finance/FinancePage'));
 const WarehousePage = lazy(() => import('../modules/admin/pages/warehouses/WarehousePage'));
 const CodReconciliationPage = lazy(() => import('../modules/admin/pages/orders/CodReconciliationPage'));
@@ -257,7 +257,7 @@ const AppRoutes: React.FC = () => (
             <Route path="profile" element={withSuspense(ProfilePage)} />
             <Route path="users" element={<AdminGuard>{withSuspense(UserListPage)}</AdminGuard>} />
             <Route path="users/create" element={<AdminGuard>{withSuspense(UserCreatePage)}</AdminGuard>} />
-            <Route path="users/roles" element={<AdminOnlyGuard>{withSuspense(RolePermissionPage)}</AdminOnlyGuard>} />
+
             <Route path="warehouses" element={<AdminOnlyGuard>{withSuspense(WarehousePage)}</AdminOnlyGuard>} />
 
             <Route path="settings" element={<AdminGuard>{withSuspense(SystemSettingsPage)}</AdminGuard>} />

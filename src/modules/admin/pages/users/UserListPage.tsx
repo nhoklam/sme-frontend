@@ -7,7 +7,7 @@ import {
     TextField, InputAdornment, Chip, IconButton, Menu,
     MenuItem, Divider, Select, FormControl, Snackbar, Alert,
     Avatar, Tooltip, Skeleton, Dialog, DialogTitle,
-    DialogContent, DialogActions
+    DialogContent, DialogActions, Pagination
 } from '@mui/material';
 import {
     Search, Add, MoreVert, LockOpen, Lock as LockIcon,
@@ -73,6 +73,8 @@ const UserListPage: React.FC = () => {
     const [error, setError] = useState('');
     const [search, setSearch] = useState('');
     const [roleFilter, setRoleFilter] = useState('all');
+    const [page, setPage] = useState(1);
+    const rowsPerPage = 10;
     const [snack, setSnack] = useState('');
     const [openCreate, setOpenCreate] = useState(false);
     const [openUnlock, setOpenUnlock] = useState(false);
@@ -156,6 +158,9 @@ const UserListPage: React.FC = () => {
         return matchSearch && matchRole;
     });
 
+    const totalPages = Math.ceil(filtered.length / rowsPerPage);
+    const paginatedUsers = filtered.slice((page - 1) * rowsPerPage, page * rowsPerPage);
+
     const stats = isManager
         ? [
             { label: 'Tổng nhân sự', value: users.length, color: '#1a1a2e' },
@@ -223,7 +228,7 @@ const UserListPage: React.FC = () => {
             {/* Filters */}
             <Box sx={{ display: 'flex', gap: 1.5, mb: 2 }}>
                 <TextField size="small" placeholder="Tìm theo tên, username, email..."
-                    value={search} onChange={e => setSearch(e.target.value)}
+                    value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
                     sx={{ flex: 1 }}
                     InputProps={{
                         startAdornment: <InputAdornment position="start">
@@ -233,7 +238,7 @@ const UserListPage: React.FC = () => {
                 />
                 {!isManager && (
                     <FormControl size="small" sx={{ minWidth: 160 }}>
-                        <Select value={roleFilter} onChange={e => setRoleFilter(e.target.value)} sx={{ fontSize: 13 }}>
+                        <Select value={roleFilter} onChange={e => { setRoleFilter(e.target.value); setPage(1); }} sx={{ fontSize: 13 }}>
                             {ROLE_OPTIONS.map(o => (
                                 <MenuItem key={o.value} value={o.value} sx={{ fontSize: 13 }}>{o.label}</MenuItem>
                             ))}
@@ -264,7 +269,7 @@ const UserListPage: React.FC = () => {
                                         ))}
                                     </TableRow>
                                 ))
-                            ) : filtered.map((user, idx) => {
+                            ) : paginatedUsers.map((user, idx) => {
                                 const roleInfo = ROLE_MAP[user.role as UserRole] ?? { label: user.role, color: '#666', bg: '#f3f4f6' };
                                 return (
                                     <TableRow key={user.id} hover
@@ -338,10 +343,20 @@ const UserListPage: React.FC = () => {
                         </TableBody>
                     </Table>
                 </TableContainer>
-                <Box sx={{ px: 2.5, py: 1.25, borderTop: '1px solid #f0f0f0', bgcolor: '#fafafa' }}>
+                <Box sx={{ px: 2.5, py: 1.25, borderTop: '1px solid #f0f0f0', bgcolor: '#fafafa', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography variant="caption" color="text.secondary">
-                        Hiển thị <strong>{filtered.length}</strong> / <strong>{users.length}</strong> tài khoản
+                        Hiển thị <strong>{paginatedUsers.length}</strong> / <strong>{filtered.length}</strong> tài khoản
                     </Typography>
+                    {totalPages > 1 && (
+                        <Pagination 
+                            count={totalPages} 
+                            page={page} 
+                            onChange={(_, v) => setPage(v)} 
+                            color="primary" 
+                            size="small" 
+                            shape="rounded"
+                        />
+                    )}
                 </Box>
             </Paper>
 

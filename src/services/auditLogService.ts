@@ -15,8 +15,8 @@ export interface AuditLog {
 }
 
 export const auditLogService = {
-    getLogs: (params?: any) =>
-        axiosInstance.get<ApiResponse<AuditLog[]>>('/admin/audit-logs', {
-            params: { limit: params?.size || 100 },
+    getLogs: (params?: { page?: number, size?: number, keyword?: string, actionFilter?: string }) =>
+        axiosInstance.get<ApiResponse<any>>('/admin/audit-logs', {
+            params,
         }),
 };

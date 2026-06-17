@@ -13,6 +13,7 @@ const orderService = {
         keyword?: string;
         status?: string;
         paymentStatus?: string;
+        paymentMethod?: string;
         page?: number;
         size?: number;
         warehouseId?: string;
@@ -24,6 +25,7 @@ const orderService = {
         if (params.keyword?.trim()) query.set('keyword', params.keyword.trim());
         if (params.status) query.set('status', params.status);
         if (params.paymentStatus) query.set('paymentStatus', params.paymentStatus);
+        if (params.paymentMethod) query.set('paymentMethod', params.paymentMethod);
         if (params.warehouseId) query.set('warehouseId', params.warehouseId);
         if (params.provinceCode) query.set('provinceCode', params.provinceCode);
         if (params.fromDate) query.set('fromDate', params.fromDate);
@@ -42,6 +44,7 @@ const orderService = {
         keyword?: string;
         status?: string;
         paymentStatus?: string;
+        paymentMethod?: string;
         warehouseId?: string;
         source?: string;
         fromDate?: string;
@@ -57,6 +60,7 @@ const orderService = {
         if (params.keyword?.trim()) query.set('keyword', params.keyword.trim());
         if (params.status) query.set('status', params.status);
         if (params.paymentStatus) query.set('paymentStatus', params.paymentStatus);
+        if (params.paymentMethod) query.set('paymentMethod', params.paymentMethod);
         if (params.warehouseId) query.set('warehouseId', params.warehouseId);
         if (params.provinceCode) query.set('provinceCode', params.provinceCode);
         if (params.source) query.set('source', params.source);

@@ -4,6 +4,7 @@ import type { ApiResponse } from '../types';
 import reportService from './reportService';
 import customerService from './customerService';
 import inventoryService from './inventoryService';
+import orderService from './orderService';
 
 export interface DashboardStats {
     todayRevenue: number;
@@ -24,6 +25,7 @@ export interface RevenueTrendPoint {
     date: string;
     revenue: number;
     orders: number;
+    grossProfit: number;
 }
 
 const dashboardService = {
@@ -39,14 +41,16 @@ const dashboardService = {
         const todayGrossProfit = revenueToday.reduce((s, d) => s + Number(d.gross_profit ?? 0), 0);
         const todayInvoiceCount = revenueToday.reduce((s, d) => s + Number(d.invoice_count ?? 0), 0);
 
-        // Lấy thêm tồn kho thấp từ inventoryService để đồng bộ
-        const lowStock = await inventoryService.getLowStock(warehouseId);
+        const [lowStock, orderStats] = await Promise.all([
+            inventoryService.getLowStock(warehouseId),
+            orderService.getStats({ status: 'PENDING', warehouseId })
+        ]);
 
         return {
             todayRevenue,
             todayGrossProfit,
             todayInvoiceCount,
-            pendingOrdersCount: 0, 
+            pendingOrdersCount: orderStats.pendingCount || 0, 
             lowStockCount: lowStock.length,
             pendingShiftsCount: 0,
         };
@@ -61,6 +65,7 @@ const dashboardService = {
             date: String(d.period ?? ''),
             revenue: Number(d.revenue ?? 0),
             orders: Number(d.invoice_count ?? 0),
+            grossProfit: Number(d.gross_profit ?? 0),
         }));
     },
 
@@ -76,11 +81,12 @@ const dashboardService = {
         const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString();
 
         // Gọi song song các mốc doanh thu
-        const [todayData, weekData, monthData, yearData] = await Promise.all([
+        const [todayData, weekData, monthData, yearData, newCustomersRes] = await Promise.all([
             reportService.getRevenue({ from: startOfDay, to: endOfDay, warehouseId }),
             reportService.getRevenue({ from: startOfWeek, to: endOfDay, warehouseId }),
             reportService.getRevenue({ from: startOfMonth, to: endOfDay, warehouseId }),
             reportService.getRevenue({ from: startOfYear, to: endOfDay, warehouseId }),
+            axiosInstance.get(`/reports/new-customers?from=${startOfMonth}&to=${endOfDay}`)
         ]);
 
         const sum = (arr: any[]) => arr.reduce((s, d) => s + Number(d.revenue ?? 0), 0);
@@ -92,6 +98,7 @@ const dashboardService = {
             weekRevenue: sum(weekData),
             monthRevenue: sum(monthData),
             yearRevenue: sum(yearData),
+            newCustomersCount: newCustomersRes.data.data || 0,
         };
     },
 

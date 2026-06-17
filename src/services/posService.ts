@@ -26,6 +26,11 @@ const posService = {
         return res.data.data;
     },
 
+    getCurrentShift: async (): Promise<any> => {
+        const res = await axiosInstance.get<ApiResponse<any>>('/pos/shifts/current');
+        return res.data.data;
+    },
+
     // Thực hiện trả hàng
     refund: async (originalInvoiceId: string, payload: Omit<RefundRequest, 'originalInvoiceId'>): Promise<any> => {
         const res = await axiosInstance.post<ApiResponse<any>>(

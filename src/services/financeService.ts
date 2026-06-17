@@ -18,6 +18,11 @@ const financeService = {
         return res.data.data;
     },
 
+    getTotalBalance: async (): Promise<number> => {
+        const res = await axiosInstance.get<ApiResponse<number>>('/finance/cashbook/balance/total');
+        return res.data.data;
+    },
+
     getCashbook: async (from: string, to: string, warehouseId?: string): Promise<CashbookTransaction[]> => {
         const params = new URLSearchParams({ from, to });
         if (warehouseId) params.set('warehouseId', warehouseId);
@@ -74,6 +79,56 @@ const financeService = {
             `/finance/cod-reconciliation?warehouseId=${warehouseId}`,
             items
         );
+        return res.data.data;
+    },
+
+    // ── Cashbook Summary — SUM tại DB level, thay thế .reduce() sai ở frontend ──
+    // (Lý do xóa .reduce(): chỉ tính trên 1 trang data, không phải toàn bộ kỳ)
+    getCashbookSummary: async (params: {
+        from: string;
+        to: string;
+        warehouseId?: string;
+        fundType?: string;
+        transactionType?: string;
+        keyword?: string;
+    }): Promise<{ totalIn: number; totalOut: number }> => {
+        const query = new URLSearchParams();
+        query.set('from', params.from);
+        query.set('to', params.to);
+        if (params.warehouseId) query.set('warehouseId', params.warehouseId);
+        if (params.fundType) query.set('fundType', params.fundType);
+        if (params.transactionType) query.set('transactionType', params.transactionType);
+        if (params.keyword) query.set('keyword', params.keyword);
+        const res = await axiosInstance.get<ApiResponse<{ totalIn: number; totalOut: number }>>(`/finance/cashbook/search/summary?${query}`);
+        return res.data.data;
+    },
+
+    // ── Supplier Debts Paged — thay thế fetch-all gây memory issue ──
+    getSupplierDebtsPaged: async (params: {
+        warehouseId?: string;
+        search?: string;
+        page?: number;
+        size?: number;
+    }): Promise<PageResponse<SupplierDebt>> => {
+        const query = new URLSearchParams();
+        if (params.warehouseId) query.set('warehouseId', params.warehouseId);
+        if (params.search) query.set('search', params.search);
+        query.set('page', String(params.page ?? 0));
+        query.set('size', String(params.size ?? 20));
+        const res = await axiosInstance.get<ApiResponse<PageResponse<SupplierDebt>>>(`/finance/supplier-debts/search?${query}`);
+        return res.data.data;
+    },
+
+    // ── Supplier Debts Summary — SUM tại DB level, thay thế .reduce() sai ──
+    // (Lý do xóa .reduce(): frontend cũ fetch toàn bộ list rồi tính, gây memory issue)
+    getSupplierDebtSummary: async (params: {
+        warehouseId?: string;
+        search?: string;
+    }): Promise<{ totalDebt: number; totalPaid: number; totalRemaining: number; suppliersWithDebtCount: number }> => {
+        const query = new URLSearchParams();
+        if (params.warehouseId) query.set('warehouseId', params.warehouseId);
+        if (params.search) query.set('search', params.search);
+        const res = await axiosInstance.get<ApiResponse<{ totalDebt: number; totalPaid: number; totalRemaining: number; suppliersWithDebtCount: number }>>(`/finance/supplier-debts/search/summary?${query}`);
         return res.data.data;
     },
 };

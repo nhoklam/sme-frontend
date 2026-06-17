@@ -441,7 +441,6 @@ const AdminLayout = () => {
                     width: `calc(100% - ${open ? DRAWER_WIDTH : 64}px)`,
                     minHeight: '100vh',
                     bgcolor: '#f8f9fb',
-                    overflowX: 'hidden',
                     transition: theme.transitions.create('width', {
                         easing: theme.transitions.easing.sharp,
                         duration: theme.transitions.duration.enteringScreen,

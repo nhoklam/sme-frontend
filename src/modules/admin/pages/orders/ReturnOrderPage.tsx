@@ -5,6 +5,7 @@ import {
     Alert, CircularProgress, Select, MenuItem, FormControl, InputLabel
 } from '@mui/material';
 import { Search, AssignmentReturn } from '@mui/icons-material';
+import { useQuery } from '@tanstack/react-query';
 import posService from '../../../../services/posService';
 import toast from 'react-hot-toast';
 import useAuth from '../../../../store/hooks/useAuth';
@@ -23,6 +24,12 @@ export default function ReturnOrderPage() {
     const [returnDestination, setReturnDestination] = useState('STOCK');
     const [note, setNote] = useState('');
     const [processing, setProcessing] = useState(false);
+
+    // Lấy ca làm việc hiện tại
+    const { data: currentShift } = useQuery({
+        queryKey: ['current-shift'],
+        queryFn: () => posService.getCurrentShift()
+    });
 
     const handleSearch = async () => {
         if (!searchCode.trim()) return;
@@ -70,7 +77,7 @@ export default function ReturnOrderPage() {
         setProcessing(true);
         try {
             await posService.refund(invoice.id, {
-                shiftId: "DUMMY_SHIFT_ID", // TODO: Lấy shift đang mở từ store
+                shiftId: currentShift?.id || "", 
                 items: itemsToReturn.map(i => ({ productId: i.productId, quantity: i.quantity })),
                 returnDestination,
                 cashierId: user?.id || 'SYSTEM',
@@ -190,11 +197,16 @@ export default function ReturnOrderPage() {
                                         <Typography variant="h4" color="#d32f2f" fontWeight={800} mb={2}>
                                             {fmt(totalRefund)}
                                         </Typography>
+                                        {(user?.role === 'ROLE_CASHIER' && !currentShift) && (
+                                            <Alert severity="error" sx={{ mb: 2, textAlign: 'left' }}>
+                                                Cần mở ca trước khi thực hiện trả hàng
+                                            </Alert>
+                                        )}
                                         <Button
                                             variant="contained" color="error" size="large"
                                             startIcon={<AssignmentReturn />}
                                             onClick={handleSubmit}
-                                            disabled={processing || totalRefund === 0}
+                                            disabled={processing || totalRefund === 0 || (user?.role === 'ROLE_CASHIER' && !currentShift)}
                                         >
                                             {processing ? 'Đang xử lý...' : 'Xác nhận Trả Hàng & Hoàn Tiền'}
                                         </Button>

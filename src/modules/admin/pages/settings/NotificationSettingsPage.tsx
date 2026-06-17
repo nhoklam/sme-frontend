@@ -86,8 +86,9 @@ export default function NotificationSettingsPage() {
                 </Typography>
             </Box>
 
-            <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
-                Thông báo In-app hiển thị ngay trong hệ thống. Thông báo Email gửi đến địa chỉ đã đăng ký của tài khoản.
+            <Alert severity="warning" sx={{ mb: 3, borderRadius: 2, bgcolor: '#fffbeb', color: '#b45309', border: '1px solid #fef3c7' }}>
+                <Typography fontWeight={700} fontSize={13}>Cài đặt này chưa được lưu vào hệ thống. Tính năng đang hoàn thiện.</Typography>
+                <Typography fontSize={12} mt={0.5}>Thông báo In-app hiển thị ngay trong hệ thống. Thông báo Email gửi đến địa chỉ đã đăng ký của tài khoản.</Typography>
             </Alert>
 
             <Paper sx={{ borderRadius: 3, overflow: 'hidden' }}>
@@ -167,7 +168,7 @@ export default function NotificationSettingsPage() {
             <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
                 <Button
                     variant="contained" startIcon={<Save />}
-                    onClick={() => toast.success('Đã lưu cài đặt thông báo!')}
+                    disabled
                     sx={{ textTransform: 'none', fontWeight: 700, px: 4, borderRadius: 2 }}
                 >
                     Lưu cài đặt

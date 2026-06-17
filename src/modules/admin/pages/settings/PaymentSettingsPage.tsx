@@ -52,8 +52,9 @@ export default function PaymentSettingsPage() {
                 </Typography>
             </Box>
 
-            <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
-                Phương thức bị tắt sẽ không hiển thị trong màn hình thanh toán POS và trang Checkout.
+            <Alert severity="warning" sx={{ mb: 3, borderRadius: 2, bgcolor: '#fffbeb', color: '#b45309', border: '1px solid #fef3c7' }}>
+                <Typography fontWeight={700} fontSize={13}>Cài đặt này chưa được lưu vào hệ thống. Tính năng đang hoàn thiện.</Typography>
+                <Typography fontSize={12} mt={0.5}>Phương thức bị tắt sẽ không hiển thị trong màn hình thanh toán POS và trang Checkout.</Typography>
             </Alert>
 
             <Paper sx={{ borderRadius: 3, overflow: 'hidden', mb: 3 }}>
@@ -138,7 +139,7 @@ export default function PaymentSettingsPage() {
             <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <Button
                     variant="contained" startIcon={<Save />}
-                    onClick={() => toast.success('Đã lưu cài đặt thanh toán!')}
+                    disabled
                     sx={{ textTransform: 'none', fontWeight: 700, px: 4, borderRadius: 2 }}
                 >
                     Lưu cài đặt

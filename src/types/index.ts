@@ -529,8 +529,9 @@ export interface CreateOrderRequest {
   type?: string;
   note?: string;
   shippingFee?: number;
-  couponCode?: string;
+  couponCodes?: string[];
   discountAmount?: number;
+  pointsToUse?: number;
   assignedWarehouseId?: string;
   shippingLatitude?: number;
   shippingLongitude?: number;

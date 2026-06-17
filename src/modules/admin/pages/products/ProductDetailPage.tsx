@@ -320,17 +320,8 @@ const ProductDetailPage = () => {
             }
 
             try {
-                const warehouseRes = await axiosInstance.get('/warehouses');
-                const warehouses = warehouseRes.data?.data ?? [];
-
-                const invPromises = warehouses.map((w: any) =>
-                    axiosInstance
-                        .get(`/inventory/${id}/warehouse/${w.id}`)
-                        .then((r) => ({ ...r.data?.data, warehouseName: w.name }))
-                        .catch(() => null)
-                );
-                const results = await Promise.all(invPromises);
-                setInventories(results.filter(Boolean));
+                const invRes = await axiosInstance.get(`/inventory/product/${id}/all-warehouses`);
+                setInventories(invRes.data?.data || []);
             } catch { }
 
             try {
@@ -648,49 +639,58 @@ const ProductDetailPage = () => {
                                         noPad
                                     >
                                         {inventories.length > 0 ? (
-                                            <Table size="small">
-                                                <TableBody>
-                                                    {inventories.map((inv: any, idx: number) => {
-                                                        const qty = inv.availableQuantity ?? inv.quantity ?? 0;
-                                                        const isOut = qty === 0;
-                                                        const isLow = !isOut && qty < (inv.minQuantity ?? 10);
-                                                        return (
-                                                            <TableRow
-                                                                key={inv.id ?? idx}
-                                                                sx={{
-                                                                    '&:last-child td': { border: 0 },
-                                                                    bgcolor: idx % 2 === 0 ? '#fff' : '#fafafa',
-                                                                }}
-                                                            >
-                                                                <TableCell sx={{ py: 1.1, px: 2.5, fontSize: 12, color: '#555', fontWeight: 500 }}>
-                                                                    {inv.warehouseName || inv.warehouseId}
-                                                                </TableCell>
-                                                                <TableCell align="right" sx={{ py: 1.1, px: 2.5 }}>
-                                                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
-                                                                        <Typography
-                                                                            variant="body2"
-                                                                            fontWeight={700}
-                                                                            fontSize={13}
-                                                                            color={isOut ? '#d32f2f' : isLow ? '#f57c00' : '#2e7d32'}
-                                                                        >
-                                                                            {qty.toLocaleString()}
-                                                                        </Typography>
-                                                                        <Chip
-                                                                            label={isOut ? 'Hết' : isLow ? 'Sắp hết' : 'Còn hàng'}
-                                                                            size="small"
-                                                                            sx={{
-                                                                                height: 18, fontSize: 10, fontWeight: 700,
-                                                                                bgcolor: isOut ? '#ffebee' : isLow ? '#fff3e0' : '#e8f5e9',
-                                                                                color: isOut ? '#d32f2f' : isLow ? '#e65100' : '#2e7d32',
-                                                                            }}
-                                                                        />
-                                                                    </Box>
-                                                                </TableCell>
-                                                            </TableRow>
-                                                        );
-                                                    })}
-                                                </TableBody>
-                                            </Table>
+                                            <TableContainer sx={{ maxHeight: 300 }}>
+                                                <Table size="small" stickyHeader>
+                                                    <TableHead>
+                                                        <TableRow>
+                                                            <TableCell sx={{ fontSize: 11, fontWeight: 700, color: '#888' }}>KHO</TableCell>
+                                                            <TableCell align="right" sx={{ fontSize: 11, fontWeight: 700, color: '#888' }}>TỒN KHO</TableCell>
+                                                            <TableCell align="right" sx={{ fontSize: 11, fontWeight: 700, color: '#888' }}>ĐÃ ĐẶT</TableCell>
+                                                            <TableCell align="right" sx={{ fontSize: 11, fontWeight: 700, color: '#888' }}>ĐANG VẬN CHUYỂN</TableCell>
+                                                            <TableCell align="right" sx={{ fontSize: 11, fontWeight: 700, color: '#888' }}>KHẢ DỤNG</TableCell>
+                                                        </TableRow>
+                                                    </TableHead>
+                                                    <TableBody>
+                                                        {inventories.map((inv: any, idx: number) => {
+                                                            const qty = inv.availableQuantity ?? 0;
+                                                            const isOut = qty <= 0;
+                                                            const isLow = !isOut && qty < (inv.minQuantity ?? 10);
+                                                            return (
+                                                                <TableRow key={idx} sx={{ bgcolor: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
+                                                                    <TableCell sx={{ py: 1.1, fontSize: 12, fontWeight: 500, color: '#444' }}>
+                                                                        {inv.warehouseName || inv.warehouseId}
+                                                                    </TableCell>
+                                                                    <TableCell align="right" sx={{ py: 1.1, fontSize: 12, fontWeight: 600 }}>
+                                                                        {inv.quantity ?? 0}
+                                                                    </TableCell>
+                                                                    <TableCell align="right" sx={{ py: 1.1, fontSize: 12, color: '#f57c00' }}>
+                                                                        {inv.reservedQuantity ?? 0}
+                                                                    </TableCell>
+                                                                    <TableCell align="right" sx={{ py: 1.1, fontSize: 12, color: '#1976d2' }}>
+                                                                        {inv.inTransit ?? 0}
+                                                                    </TableCell>
+                                                                    <TableCell align="right" sx={{ py: 1.1 }}>
+                                                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
+                                                                            <Typography variant="body2" fontWeight={700} fontSize={13} color={isOut ? '#d32f2f' : isLow ? '#f57c00' : '#2e7d32'}>
+                                                                                {qty.toLocaleString()}
+                                                                            </Typography>
+                                                                            <Chip
+                                                                                label={isOut ? 'Hết' : isLow ? 'Sắp hết' : 'Còn hàng'}
+                                                                                size="small"
+                                                                                sx={{
+                                                                                    height: 18, fontSize: 10, fontWeight: 700,
+                                                                                    bgcolor: isOut ? '#ffebee' : isLow ? '#fff3e0' : '#e8f5e9',
+                                                                                    color: isOut ? '#d32f2f' : isLow ? '#e65100' : '#2e7d32',
+                                                                                }}
+                                                                            />
+                                                                        </Box>
+                                                                    </TableCell>
+                                                                </TableRow>
+                                                            );
+                                                        })}
+                                                    </TableBody>
+                                                </Table>
+                                            </TableContainer>
                                         ) : (
                                             <Box sx={{ px: 2.5, py: 2 }}>
                                                 <Typography variant="body2" color="text.secondary" fontSize={13}>

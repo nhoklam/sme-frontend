@@ -60,6 +60,12 @@ const productService = {
         return res.data.data;
     },
 
+    // Import nhiều sản phẩm
+    bulkCreate: async (data: CreateProductRequest[], startIndex: number = 0): Promise<{ successCount: number; errorCount: number; errors: string[] }> => {
+        const res = await axiosInstance.post<ApiResponse<{ successCount: number; errorCount: number; errors: string[] }>>(`/products/bulk?startIndex=${startIndex}`, data);
+        return res.data.data;
+    },
+
     // Cập nhật sản phẩm
     update: async (id: string, data: UpdateProductRequest): Promise<ProductResponse> => {
         const res = await axiosInstance.put<ApiResponse<ProductResponse>>(`/products/${id}`, data);
