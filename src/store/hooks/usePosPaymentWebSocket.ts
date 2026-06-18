@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Client, IMessage } from '@stomp/stompjs';
+import SockJS from 'sockjs-client';
 
-const getWsUrl = (): string => {
+const getSockJsUrl = (): string => {
     const apiBase = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
-    return apiBase
-        .replace(/^http:/, 'ws:')
-        .replace(/^https:/, 'wss:')
-        .replace(/\/api$/, '/ws');
+    return `${apiBase}/ws`;
 };
 
 export function usePosPaymentWebSocket(orderCode: string, onPaymentSuccess: (invoice: any) => void) {
@@ -16,12 +14,12 @@ export function usePosPaymentWebSocket(orderCode: string, onPaymentSuccess: (inv
     useEffect(() => {
         if (!orderCode) return;
 
-        const userStr = localStorage.getItem('user');
+        const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
         const userData = userStr ? JSON.parse(userStr) : null;
-        const accessToken = localStorage.getItem('access_token') || userData?.accessToken;
+        const accessToken = localStorage.getItem('access_token') || sessionStorage.getItem('access_token') || userData?.accessToken;
 
         const client = new Client({
-            brokerURL: getWsUrl(),
+            webSocketFactory: () => new SockJS(getSockJsUrl()),
             connectHeaders: {
                 Authorization: accessToken ? `Bearer ${accessToken}` : '',
             },

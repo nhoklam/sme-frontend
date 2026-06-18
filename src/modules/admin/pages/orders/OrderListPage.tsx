@@ -1089,6 +1089,19 @@ const OrderListPage: React.FC = () => {
         enabled: tabIndex === 0
     });
 
+    // Tự động đồng bộ hóa đơn đang mở chi tiết nếu có cập nhật realtime
+    useEffect(() => {
+        if (detailOpen && detailOrder && onlineQuery.data?.content) {
+            const updated = onlineQuery.data.content.find((o: any) => o.id === detailOrder.id);
+            if (updated && (updated.status !== detailOrder.status || updated.paymentStatus !== detailOrder.paymentStatus)) {
+                // Tải lại full chi tiết để đảm bảo có đầy đủ statusHistory và items mới nhất
+                orderService.getById(detailOrder.id).then(full => {
+                    setDetailOrder({ ...full, _source: 'ONLINE' });
+                }).catch(() => {});
+            }
+        }
+    }, [onlineQuery.data, detailOrder, detailOpen]);
+
     // 2. OFFLINE QUERY
     const offlineQuery = useQuery({
         queryKey: ["orders-offline", pageOffline, PAGE_SIZE, search, statusFilter, paymentStatusFilter, paymentMethodFilter, provinceFilter, employeeFilter, warehouseFilter, fromDate, toDate],

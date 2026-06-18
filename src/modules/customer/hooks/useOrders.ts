@@ -63,7 +63,7 @@ export const useCreateOrder = () => {
     return useMutation({
         mutationFn: (data: CreateOrderRequest) => orderService.create(data),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['myOrders'] });
+            queryClient.invalidateQueries({ queryKey: ['myHistory'] });
         },
     });
 };

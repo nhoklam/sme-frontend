@@ -16,12 +16,13 @@ const fmt = (n?: number) =>
 
 interface Props {
     onAdd: (p: ProductResponse) => void;
+    onError?: (msg: string) => void;
     onScanCoupon?: (code: string) => void;
     disabled?: boolean;
     warehouseId?: string;
 }
 
-const POSProductSearchBar: React.FC<Props> = ({ onAdd, onScanCoupon, disabled, warehouseId }) => {
+const POSProductSearchBar: React.FC<Props> = ({ onAdd, onError, onScanCoupon, disabled, warehouseId }) => {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<ProductResponse[]>([]);
     const [loading, setLoading] = useState(false);
@@ -84,9 +85,14 @@ const POSProductSearchBar: React.FC<Props> = ({ onAdd, onScanCoupon, disabled, w
                 try {
                     const r = await productService.search({ keyword: q, page: 0, size: 10, isActive: true, warehouseId });
                     if (r.content.length === 1) { onAdd(r.content[0]); setQuery(''); setResults([]); }
-                    else if (r.content.length > 1) setResults(r.content);
-                    else setBarcodeErr(`Không tìm thấy: ${q}`);
-                } catch { setBarcodeErr(`Không tìm thấy: ${q}`); }
+                    else {
+                        setBarcodeErr(`Không tìm thấy: ${q}`);
+                        if (onError) onError(`Không tìm thấy sản phẩm có mã: ${q}`);
+                    }
+                } catch {
+                    setBarcodeErr(`Không tìm thấy: ${q}`);
+                    if (onError) onError(`Không tìm thấy sản phẩm có mã: ${q}`);
+                }
             } finally { setLoading(false); }
         } else if (results.length === 1) {
             onAdd(results[0]); setQuery(''); setResults([]);
@@ -196,7 +202,6 @@ const POSProductSearchBar: React.FC<Props> = ({ onAdd, onScanCoupon, disabled, w
                 onClose={() => setScannerOpen(false)} 
                 onScan={async (code) => {
                     setScannerOpen(false);
-                    setQuery(code);
                     setBarcodeErr('');
                     setLoading(true);
                     try {
@@ -208,9 +213,12 @@ const POSProductSearchBar: React.FC<Props> = ({ onAdd, onScanCoupon, disabled, w
                         try {
                             const r = await productService.search({ keyword: code, page: 0, size: 10, isActive: true, warehouseId });
                             if (r.content.length === 1) { onAdd(r.content[0]); setQuery(''); setResults([]); }
-                            else if (r.content.length > 1) setResults(r.content);
-                            else setBarcodeErr(`Không tìm thấy sản phẩm có mã: ${code}`);
-                        } catch { setBarcodeErr(`Không tìm thấy sản phẩm có mã: ${code}`); }
+                            else {
+                                if (onError) onError(`Không tìm thấy sản phẩm có mã: ${code}`);
+                            }
+                        } catch {
+                            if (onError) onError(`Không tìm thấy sản phẩm có mã: ${code}`);
+                        }
                     } finally { setLoading(false); }
                     inputRef.current?.focus();
                 }}

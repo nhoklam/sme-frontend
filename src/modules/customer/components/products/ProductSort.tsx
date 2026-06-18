@@ -8,9 +8,9 @@ const ProductSort = ({ sort, setSort }) => {
                 <InputLabel>Sắp xếp</InputLabel>
                 <Select value={sort} label="Sắp xếp" onChange={(e) => setSort(e.target.value)}>
                     <MenuItem value="newest">Mới nhất</MenuItem>
-                    <MenuItem value="price-asc">Giá tăng dần</MenuItem>
-                    <MenuItem value="price-desc">Giá giảm dần</MenuItem>
-                    <MenuItem value="best-seller">Bán chạy</MenuItem>
+                    <MenuItem value="priceAsc">Giá tăng dần</MenuItem>
+                    <MenuItem value="priceDesc">Giá giảm dần</MenuItem>
+                    <MenuItem value="soldDesc">Bán chạy</MenuItem>
                 </Select>
             </FormControl>
         </Paper>

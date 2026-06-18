@@ -10,6 +10,7 @@ import * as XLSX from 'xlsx';
 import productService from '../../../../services/productService';
 import { CreateProductRequest } from '../../../../types';
 import { buildCategoryTreeFlat } from '../../../../utils/categoryUtils';
+import toast from 'react-hot-toast';
 
 interface ProductImportDialogProps {
     open: boolean;
@@ -50,7 +51,7 @@ export default function ProductImportDialog({ open, onClose, onSuccess, categori
 
     const handleImport = async () => {
         if (!defaultCategory) {
-            alert('Vui lòng chọn danh mục mặc định cho các sản phẩm import.');
+            toast.error('Vui lòng chọn danh mục mặc định cho các sản phẩm import.');
             return;
         }
 

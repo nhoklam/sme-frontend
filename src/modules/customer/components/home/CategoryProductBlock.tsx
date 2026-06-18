@@ -122,7 +122,7 @@ const CategoryProductBlock: React.FC<CategoryProductBlockProps> = ({ parentCateg
                 }}>
                     <Button
                         endIcon={<ArrowForwardIos sx={{ fontSize: '10px !important' }} />}
-                        onClick={() => navigate(`/shop?category=${parentCategory.id}`)}
+                        onClick={() => navigate(`/shop?category=${encodeURIComponent(parentCategory.name)}`)}
                         sx={{
                             color: '#1a1a2e', fontWeight: 600, textTransform: 'none',
                             fontSize: '0.78rem', whiteSpace: 'nowrap',
@@ -168,12 +168,12 @@ const CategoryProductBlock: React.FC<CategoryProductBlockProps> = ({ parentCateg
                                     author={product.author}
                                     coverImage={product.img}
                                     price={product.price}
-                                    originalPrice={product.price * 1.2}
-                                    discountPercent={20}
+                                    originalPrice={product.oldPrice || undefined}
+                                    sold={product.sold || 0}
                                     onAddToCart={() => {
                                         addToCart({
                                             ...product,
-                                            oldPrice: product.price * 1.2,
+                                            oldPrice: product.oldPrice || undefined,
                                             images: [product.img],
                                             stock: 50,
                                             category: activeTabName,

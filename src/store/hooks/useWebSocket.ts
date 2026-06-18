@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
+import SockJS from 'sockjs-client';
 
 export type WsEventType =
     | 'LOW_STOCK'
@@ -43,13 +44,11 @@ interface UseWebSocketOptions {
 // Số lần retry tối đa trước khi dừng hẳn
 const MAX_RETRIES = 3;
 
-// Lấy WebSocket URL từ biến môi trường hoặc mặc định
-const getWsUrl = (): string => {
+// Lấy WebSocket URL (dùng HTTP/HTTPS vì SockJS tự nâng cấp)
+const getSockJsUrl = (): string => {
     const apiBase = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
-    return apiBase
-        .replace(/^http:/, 'ws:')
-        .replace(/^https:/, 'wss:')
-        .replace(/\/api$/, '/ws');
+    // Thêm /ws vào sau /api vì Spring Boot có context-path=/api
+    return `${apiBase}/ws`;
 };
 
 export function useWebSocket({ warehouseId, onMessage, enabled = true }: UseWebSocketOptions) {
@@ -99,17 +98,17 @@ export function useWebSocket({ warehouseId, onMessage, enabled = true }: UseWebS
     useEffect(() => {
         if (!enabled) return;
 
-        // Kiểm tra quyền từ localStorage hoặc store
-        const userStr = localStorage.getItem('user');
+        // Kiểm tra quyền từ localStorage hoặc sessionStorage
+        const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
         const userData = userStr ? JSON.parse(userStr) : null;
-        const isAdmin = userData?.role === 'ROLE_ADMIN';
+        const actualUser = userData?.user ?? userData;
+        const isAdmin = actualUser?.role === 'ROLE_ADMIN';
 
         const customerAuthStr = localStorage.getItem('customer_auth');
         const customerData = customerAuthStr ? JSON.parse(customerAuthStr) : null;
         const customerId = customerData?.user?.id; // Lấy ID của customer
         const isCustomer = !!customerId;
 
-        // Nếu không phải Admin, không có warehouseId, và cũng không phải Customer thì bỏ qua
         if (!isAdmin && !warehouseId && !isCustomer) {
             console.log('[WebSocket] No warehouseId, not Admin, not Customer — skipping WebSocket connection');
             return;
@@ -122,7 +121,8 @@ export function useWebSocket({ warehouseId, onMessage, enabled = true }: UseWebS
                 '/topic/admin/low-stock',
                 '/topic/admin/new-order',
                 '/topic/admin/shift-alert',
-                '/topic/admin/transfer'
+                '/topic/admin/transfer',
+                '/topic/admin/inventory'
             ];
         } else if (warehouseId) {
             topics = [
@@ -134,7 +134,7 @@ export function useWebSocket({ warehouseId, onMessage, enabled = true }: UseWebS
             ];
         }
 
-        if (isCustomer) {
+        if (isCustomer && !isAdmin && !warehouseId) {
             topics.push(`/topic/user/${customerId}/orders`);
         }
 
@@ -142,14 +142,14 @@ export function useWebSocket({ warehouseId, onMessage, enabled = true }: UseWebS
         retryCountRef.current = 0;
         isDeactivatingRef.current = false;
 
-        const accessToken = localStorage.getItem('access_token') || userData?.accessToken || customerData?.accessToken;
+        const accessToken = localStorage.getItem('access_token') || sessionStorage.getItem('access_token') || userData?.accessToken || customerData?.accessToken;
 
         const client = new Client({
-            brokerURL: getWsUrl(),
+            webSocketFactory: () => new SockJS(getSockJsUrl()),
             connectHeaders: {
                 Authorization: accessToken ? `Bearer ${accessToken}` : '',
             },
-            reconnectDelay: 0,
+            reconnectDelay: 5000,
             heartbeatIncoming: 10000,
             heartbeatOutgoing: 10000,
 

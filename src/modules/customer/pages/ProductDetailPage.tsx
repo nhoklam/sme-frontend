@@ -15,7 +15,7 @@ import {
 } from '@mui/icons-material';
 import { useProductDetail, useProducts, useProductReviews } from '../hooks/useProducts';
 import { useCartContext } from '../../../store/CartContext';
-import { fmt, calcDiscount } from '../../../utils/constants';
+import { fmt, calcDiscount, getFakeDiscount, getFakeOriginalPrice } from '../../../utils/constants';
 import ProductCard from '../../../components/common/ProductCard';
 
 const RATING_DIST = [
@@ -164,7 +164,15 @@ const ProductDetailPage = () => {
     }
 
     const images = product.images.length > 0 ? product.images : (product.img ? [product.img] : []);
-    const discount = product.oldPrice ? calcDiscount(product.oldPrice, product.price) : 0;
+    
+    // Fake discount logic
+    const fakeDiscount = getFakeDiscount(product.id || '', product.sold || 0);
+    const finalDiscount = product.oldPrice && product.oldPrice > product.price 
+        ? calcDiscount(product.oldPrice, product.price) 
+        : fakeDiscount;
+    const finalOldPrice = product.oldPrice && product.oldPrice > product.price 
+        ? product.oldPrice 
+        : getFakeOriginalPrice(product.price, fakeDiscount);
 
     const handleAddToCart = () => {
         addToCart({ ...product, qty });
@@ -264,10 +272,10 @@ const ProductDetailPage = () => {
 
                             <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 2, mb: 3 }}>
                                 <Typography variant="h3" fontWeight={900} color="var(--color-secondary, #f5a623)">{fmt(product.price)}</Typography>
-                                {product.oldPrice > 0 && (
+                                {finalOldPrice > product.price && (
                                     <>
-                                        <Typography variant="h6" color="text.secondary" sx={{ textDecoration: 'line-through' }}>{fmt(product.oldPrice)}</Typography>
-                                        <Chip label={`Tiết kiệm ${discount}%`} size="small" sx={{ bgcolor: 'rgba(232, 64, 28, 0.08)', color: '#e8401c', fontWeight: 700, borderRadius: 1 }} />
+                                        <Typography variant="h6" color="text.secondary" sx={{ textDecoration: 'line-through' }}>{fmt(finalOldPrice)}</Typography>
+                                        <Chip label={`Tiết kiệm ${finalDiscount}%`} size="small" sx={{ bgcolor: 'rgba(232, 64, 28, 0.08)', color: '#e8401c', fontWeight: 700, borderRadius: 1 }} />
                                     </>
                                 )}
                             </Box>

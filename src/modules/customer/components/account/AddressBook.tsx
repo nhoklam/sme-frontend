@@ -7,6 +7,8 @@ import {
 import { Add, Edit, Delete, LocationOn, Star } from '@mui/icons-material';
 import { customerApi } from '../../../../services/customerApi';
 import { CustomerAddress } from '../../../../types';
+import { PROVINCES as ALLOWED_PROVINCES } from '../../../admin/pages/orders/OrderListPage';
+import { useConfirm } from '../../../../contexts/ConfirmContext';
 
 const DEFAULT_FORM: Partial<CustomerAddress> = {
     receiverName: '',
@@ -19,6 +21,7 @@ const DEFAULT_FORM: Partial<CustomerAddress> = {
 };
 
 const AddressBook: React.FC = () => {
+    const { confirm } = useConfirm();
     const [addresses, setAddresses] = useState<CustomerAddress[]>([]);
     const [loading, setLoading] = useState(true);
     
@@ -53,7 +56,13 @@ const AddressBook: React.FC = () => {
         // Fetch provinces from public API
         fetch('https://provinces.open-api.vn/api/?depth=3')
             .then(res => res.json())
-            .then(data => setProvinces(data))
+            .then(data => {
+                const allowedNames = ALLOWED_PROVINCES.map(p => p.name.toLowerCase());
+                const filteredProvinces = data.filter((p: any) => 
+                    allowedNames.some(name => p.name.toLowerCase().includes(name))
+                );
+                setProvinces(filteredProvinces);
+            })
             .catch(err => console.error('Error fetching provinces:', err));
     }, []);
 
@@ -123,7 +132,13 @@ const AddressBook: React.FC = () => {
     };
 
     const handleDelete = async (id: string) => {
-        if (!window.confirm('Bạn có chắc chắn muốn xóa địa chỉ này?')) return;
+        const ok = await confirm({
+            title: 'Xóa địa chỉ',
+            description: 'Bạn có chắc chắn muốn xóa địa chỉ này?',
+            confirmText: 'Xóa',
+            color: 'error'
+        });
+        if (!ok) return;
         try {
             await customerApi.deleteAddress(id);
             await fetchAddresses();

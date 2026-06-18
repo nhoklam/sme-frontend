@@ -11,6 +11,7 @@ import userService from '../../../../../services/userService';
 import type { Warehouse, UserResponse } from '../../../../../types';
 import { districtCentroids } from '../../../../../data/districtCentroids';
 import toast from 'react-hot-toast';
+import { useConfirm } from '../../../../../contexts/ConfirmContext';
 
 const LocationPickerMap = React.lazy(() => import('../../../../../components/ui/LocationPickerMap'));
 
@@ -29,6 +30,7 @@ export default function WarehousesTab() {
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);  
     const [managers, setManagers] = useState<UserResponse[]>([]);
     const [loading, setLoading] = useState(true);
+    const { confirm } = useConfirm();
     const [showModal, setShowModal] = useState(false);
     const [editing, setEditing] = useState<Warehouse | null>(null);
     const [saving, setSaving] = useState(false);
@@ -113,7 +115,13 @@ export default function WarehousesTab() {
 
     const handleToggle = async (w: Warehouse) => {
         const msg = w.isActive ? 'Ngừng hoạt động chi nhánh này?' : 'Khôi phục chi nhánh này?';
-        if (!window.confirm(msg)) return;
+        const ok = await confirm({
+            title: 'Trạng thái chi nhánh',
+            description: msg,
+            confirmText: 'Đồng ý',
+            color: w.isActive ? 'error' : 'success'
+        });
+        if (!ok) return;
         try {
             await warehouseService.toggleActive(w.id!, !w.isActive);
             toast.success(w.isActive ? 'Đã ngừng hoạt động' : 'Đã khôi phục');

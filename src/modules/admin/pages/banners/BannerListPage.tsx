@@ -60,7 +60,7 @@ export default function BannerListPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await bannerApi.getActiveBanners();
+      const res = await bannerApi.getAllBanners();
       setBanners(res.data || []);
     } catch { toast.error('Không thể tải danh sách banner'); }
     finally { setLoading(false); }

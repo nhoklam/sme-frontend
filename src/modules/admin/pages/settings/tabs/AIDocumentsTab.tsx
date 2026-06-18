@@ -11,8 +11,10 @@ import {
 } from '@mui/icons-material';
 import { aiService, KnowledgeDocument } from '../../../../../services/aiService';
 import toast from 'react-hot-toast';
+import { useConfirm } from '../../../../../contexts/ConfirmContext';
 
 export default function AIDocumentsTab() {
+    const { confirm } = useConfirm();
     const [docs, setDocs] = useState<KnowledgeDocument[]>([]);
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
@@ -63,7 +65,13 @@ export default function AIDocumentsTab() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!window.confirm('Bạn có chắc chắn muốn xóa tài liệu này? AI sẽ không còn truy cập được kiến thức này.')) return;
+        const ok = await confirm({
+            title: 'Xóa tài liệu AI',
+            description: 'Bạn có chắc chắn muốn xóa tài liệu này? AI sẽ không còn truy cập được kiến thức này.',
+            confirmText: 'Xóa',
+            color: 'error'
+        });
+        if (!ok) return;
         
         try {
             await aiService.deleteDocument(id);

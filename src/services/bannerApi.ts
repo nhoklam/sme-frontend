@@ -8,6 +8,12 @@ export const bannerApi = {
     });
   },
 
+  getAllBanners: async (type?: HomeBanner['bannerType']) => {
+    return axiosInstance.get<any, ApiResponse<HomeBanner[]>>('/banners/all', {
+      params: { type }
+    });
+  },
+
   createBanner: async (data: Omit<HomeBanner, 'id'>) => {
     return axiosInstance.post<any, ApiResponse<HomeBanner>>('/banners', data);
   },

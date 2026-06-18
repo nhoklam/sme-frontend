@@ -4,6 +4,7 @@ import { AddPhotoAlternate, DeleteOutline } from '@mui/icons-material';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import axiosInstance from '../../../../services/axiosConfig';
 import articleService, { CreateArticleRequest, UpdateArticleRequest } from '../../../../services/articleService';
+import toast from 'react-hot-toast';
 
 const SingleImageUploader = ({ imageUrl, onChange }: { imageUrl: string; onChange: (url: string) => void }) => {
     const inputRef = React.useRef<HTMLInputElement>(null);
@@ -12,7 +13,7 @@ const SingleImageUploader = ({ imageUrl, onChange }: { imageUrl: string; onChang
 
     const doUpload = async (files: FileList | File[]) => {
         const validFiles = Array.from(files).filter(f => f.type.startsWith('image/') && f.size <= 10 * 1024 * 1024);
-        if (validFiles.length === 0) return alert('Chỉ chấp nhận file ảnh và tối đa 10MB');
+        if (validFiles.length === 0) return toast.error('Chỉ chấp nhận file ảnh và tối đa 10MB');
         setUploading(true); setProgress(10);
         try {
             const form = new FormData();
@@ -25,7 +26,7 @@ const SingleImageUploader = ({ imageUrl, onChange }: { imageUrl: string; onChang
             if (url) onChange(url);
             setProgress(100);
         } catch (err: any) {
-            alert(err.response?.data?.message || err.message || 'Upload thất bại');
+            toast.error(err.response?.data?.message || err.message || 'Upload thất bại');
         } finally {
             setUploading(false);
             setTimeout(() => setProgress(0), 800);
@@ -117,7 +118,7 @@ const ArticleFormDialog: React.FC<ArticleFormDialogProps> = ({ open, onClose, ar
             onClose();
         },
         onError: (err: any) => {
-            alert(err.response?.data?.message || 'Có lỗi xảy ra');
+            toast.error(err.response?.data?.message || 'Có lỗi xảy ra');
         }
     });
 

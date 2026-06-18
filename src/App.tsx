@@ -4,6 +4,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import AppRoutes from './routes';
 import { lightTheme } from './themes';
+import { ConfirmProvider } from './contexts/ConfirmContext';
 // @ts-ignore
 import './App.css';
 
@@ -12,7 +13,9 @@ function App() {
     <BrowserRouter>
       <ThemeProvider theme={lightTheme}>
         <CssBaseline />
-        <AppRoutes />
+        <ConfirmProvider>
+          <AppRoutes />
+        </ConfirmProvider>
       </ThemeProvider>
     </BrowserRouter>
   );

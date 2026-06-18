@@ -85,7 +85,7 @@ const ShopPage: React.FC = () => {
     useEffect(() => {
         const categoryName = searchParams.get('category') || '';
         const sortParam = searchParams.get('sort') || 'soldDesc';
-        const searchKeyword = searchParams.get('search') || '';
+        const searchKeyword = searchParams.get('keyword') || searchParams.get('search') || '';
         const matchedCat = flatCategories.find(c => c.name === categoryName);
 
         setFilters(f => ({
@@ -153,70 +153,84 @@ const ShopPage: React.FC = () => {
 
     return (
         <Box sx={{ bgcolor: 'var(--bg-default)', minHeight: '100vh', pb: 8 }}>
-            {/* Breadcrumb bar */}
-            <Box sx={{ bgcolor: 'var(--bg-paper)', borderBottom: '1px solid var(--color-border)', py: 2 }}>
-                <Container maxWidth="lg">
-                    <Breadcrumbs sx={{ fontSize: 13, '& .MuiBreadcrumbs-separator': { color: 'text.secondary' } }}>
-                        <Link
-                            underline="hover"
-                            color="inherit"
-                            onClick={() => navigate('/')}
-                            sx={{ cursor: 'pointer', fontWeight: 500 }}
-                        >
-                            Trang chủ
-                        </Link>
-                        <Link
-                            underline="hover"
-                            color={filters.category ? 'inherit' : 'var(--color-secondary)'}
-                            onClick={() => {
-                                setFilters(f => ({ ...f, category: '', categoryId: '' }));
-                                setPage(0);
-                                navigate('/shop');
-                            }}
-                            sx={{ cursor: 'pointer', fontWeight: filters.category ? 500 : 700 }}
-                        >
-                            Cửa hàng
-                        </Link>
-                        {filters.category && (
-                            <Typography fontSize={13} color="var(--color-secondary)" fontWeight={700}>
-                                {filters.category}
-                            </Typography>
-                        )}
-                    </Breadcrumbs>
-                </Container>
-            </Box>
+            {/* Breadcrumb bar - Hide when searching without category */}
+            {(!filters.search || filters.category) && (
+                <Box sx={{ bgcolor: 'var(--bg-paper)', borderBottom: '1px solid var(--color-border)', py: 2 }}>
+                    <Container maxWidth="lg">
+                        <Breadcrumbs sx={{ fontSize: 13, '& .MuiBreadcrumbs-separator': { color: 'text.secondary' } }}>
+                            <Link
+                                underline="hover"
+                                color="inherit"
+                                onClick={() => navigate('/')}
+                                sx={{ cursor: 'pointer', fontWeight: 500 }}
+                            >
+                                Trang chủ
+                            </Link>
+                            <Link
+                                underline="hover"
+                                color={filters.category ? 'inherit' : 'var(--color-secondary)'}
+                                onClick={() => {
+                                    setFilters(f => ({ ...f, category: '', categoryId: '' }));
+                                    setPage(0);
+                                    navigate('/shop');
+                                }}
+                                sx={{ cursor: 'pointer', fontWeight: filters.category ? 500 : 700 }}
+                            >
+                                Cửa hàng
+                            </Link>
+                            {filters.category && (
+                                <Typography fontSize={13} color="var(--color-secondary)" fontWeight={700}>
+                                    {filters.category}
+                                </Typography>
+                            )}
+                        </Breadcrumbs>
+                    </Container>
+                </Box>
+            )}
 
             {/* Premium Hero Banner - Light Version */}
-            <Box sx={{ 
-                bgcolor: 'rgba(245, 166, 35, 0.04)', 
-                borderBottom: '1px solid rgba(245, 166, 35, 0.15)',
-                py: { xs: 3, md: 5 }, 
-                mb: 4, 
-            }}>
-                <Container maxWidth="lg" sx={{ textAlign: 'center' }}>
-                    <Typography variant="h3" sx={{ 
-                        fontFamily: '"Playfair Display", serif', 
-                        fontWeight: 700, 
-                        mb: 1.5, 
-                        color: 'var(--color-primary)' 
-                    }}>
-                        {filters.category || 'Tất Cả Sách'}
-                    </Typography>
-                    <Typography variant="subtitle1" sx={{ color: 'text.secondary', maxWidth: 600, mx: 'auto' }}>
-                        Khám phá kho tàng tri thức với <Typography component="span" fontWeight="bold" color="var(--color-secondary)">{totalElements || 0}</Typography> sản phẩm đang chờ bạn
-                    </Typography>
-                </Container>
-            </Box>
+            {(!filters.search || filters.category) && (
+                <Box sx={{ 
+                    bgcolor: 'rgba(245, 166, 35, 0.04)', 
+                    borderBottom: '1px solid rgba(245, 166, 35, 0.15)',
+                    py: { xs: 3, md: 5 }, 
+                    mb: 4, 
+                }}>
+                    <Container maxWidth="lg" sx={{ textAlign: 'center' }}>
+                        <Typography variant="h3" sx={{ 
+                            fontFamily: '"Playfair Display", serif', 
+                            fontWeight: 700, 
+                            mb: 1.5, 
+                            color: 'var(--color-primary)' 
+                        }}>
+                            {filters.category || 'Tất Cả Sách'}
+                        </Typography>
+                        <Typography variant="subtitle1" sx={{ color: 'text.secondary', maxWidth: 600, mx: 'auto' }}>
+                            Khám phá kho tàng tri thức với <Typography component="span" fontWeight="bold" color="var(--color-secondary)">{totalElements || 0}</Typography> sản phẩm đang chờ bạn
+                        </Typography>
+                    </Container>
+                </Box>
+            )}
 
             <Container maxWidth="lg" sx={{ py: 4 }}>
                 <Grid container spacing={4}>
                     {/* Main Content Full Width */}
                     <Grid size={{ xs: 12 }}>
-                        {/* Horizontal Toolbar */}
-                        <Paper elevation={0} sx={{ borderRadius: '12px', px: 3, py: 2, mb: 3, border: '1px solid var(--color-border)', bgcolor: 'var(--bg-paper)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
-                            
-                            {/* Left Filters */}
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                        {/* Search Result Header */}
+                        {(filters.search && !filters.category) && (
+                            <Paper elevation={0} sx={{ borderRadius: '12px', px: 3, py: 2, mb: 3, border: '1px solid var(--color-border)', bgcolor: '#fff' }}>
+                                <Typography variant="h6" sx={{ fontWeight: 700, color: 'var(--color-primary)' }}>
+                                    Kết quả tìm kiếm cho "{filters.search}"
+                                </Typography>
+                            </Paper>
+                        )}
+
+                        {/* Horizontal Toolbar - Hide when searching without category */}
+                        {(!filters.search || filters.category) && (
+                            <Paper elevation={0} sx={{ borderRadius: '12px', px: 3, py: 2, mb: 3, border: '1px solid var(--color-border)', bgcolor: 'var(--bg-paper)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+                                
+                                {/* Left Filters */}
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
                                 {/* Category Dropdown */}
                                 <FormControl size="small" sx={{ minWidth: 200 }}>
                                     <Select
@@ -331,9 +345,10 @@ const ShopPage: React.FC = () => {
                                 </FormControl>
                             </Box>
                         </Paper>
+                        )}
 
                         {/* Active Filters Display */}
-                        {activeFilterCount > 0 && (
+                        {(activeFilterCount > 0 && (!filters.search || filters.category)) && (
                             <Box sx={{ display: 'flex', gap: 1, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
                                 <Typography variant="body2" sx={{ color: 'text.secondary', mr: 1 }}>Đang lọc:</Typography>
                                 {filters.category && (
@@ -388,6 +403,7 @@ const ShopPage: React.FC = () => {
                                             rating: p.rating || 0, 
                                             reviewCount: 0, 
                                             badges: [] as const,
+                                            sold: p.sold || 0,
                                             onQuickView: () => setQuickViewProduct(p),
                                             onAddToCart: () => {
                                                 addToCart({ ...p, qty: 1 });

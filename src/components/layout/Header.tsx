@@ -41,6 +41,8 @@ const Header = () => {
     const isReviewActive = location.pathname === '/review-sach';
     const isNewsActive = location.pathname.startsWith('/article') || location.pathname === '/tin-tuc';
 
+
+
     const handleOpenMenu = (event: React.MouseEvent<HTMLElement>) => {
         setAnchorEl(event.currentTarget);
     };
@@ -52,18 +54,20 @@ const Header = () => {
     const handleLogout = () => {
         customerAuthService.logout();
         authService.logout();
-        window.location.href = '/';
+        window.location.href = '/login';
     };
 
     const handleSearch = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && searchVal.trim()) {
             navigate(`/shop?keyword=${encodeURIComponent(searchVal.trim())}`);
+            setSearchVal('');
         }
     };
 
     const handleSearchClick = () => {
         if (searchVal.trim()) {
             navigate(`/shop?keyword=${encodeURIComponent(searchVal.trim())}`);
+            setSearchVal('');
         }
     };
 

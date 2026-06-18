@@ -86,10 +86,11 @@ const fetchInventoryHistory = async (params: {
     keyword?: string;
     fromDate?: string;
     toDate?: string;
+    size?: number;
 }): Promise<PageResponse<InventoryTransaction>> => {
     const query = new URLSearchParams();
     query.set('page', String(params.page));
-    query.set('size', String(PAGE_SIZE));
+    query.set('size', String(params.size || PAGE_SIZE));
     if (params.warehouseId) query.set('warehouseId', params.warehouseId);
     if (params.transactionType) query.set('transactionType', params.transactionType);
     if (params.keyword) query.set('keyword', params.keyword);
@@ -380,7 +381,8 @@ const InventoryHistoryPage: React.FC = () => {
                 keyword: keyword || undefined,
                 fromDate: fromDate || undefined,
                 toDate: toDate || undefined,
-            });
+                size: 10000,
+            } as any);
             const rows = (bigData.content ?? []).map(tx => {
                 const anyTx = tx as any;
                 const productId = anyTx.productId ?? anyTx.product_id;

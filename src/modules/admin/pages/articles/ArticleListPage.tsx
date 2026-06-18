@@ -4,12 +4,15 @@ import { Add, Edit, Delete } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import articleService from '../../../../services/articleService';
 import ArticleFormDialog from './ArticleFormDialog';
+import { useConfirm } from '../../../../contexts/ConfirmContext';
+import toast from 'react-hot-toast';
 
 const ArticleListPage = () => {
     const queryClient = useQueryClient();
     const [page, setPage] = useState(0);
     const [openDialog, setOpenDialog] = useState(false);
     const [selectedId, setSelectedId] = useState<string | null>(null);
+    const { confirm } = useConfirm();
 
     const { data, isLoading } = useQuery({
         queryKey: ['admin_articles', page],
@@ -20,12 +23,18 @@ const ArticleListPage = () => {
         mutationFn: articleService.delete,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['admin_articles'] });
-            alert('Xóa bài viết thành công!');
+            toast.success('Xóa bài viết thành công!');
         }
     });
 
-    const handleDelete = (id: string) => {
-        if (window.confirm('Bạn có chắc chắn muốn xóa bài viết này?')) {
+    const handleDelete = async (id: string) => {
+        const ok = await confirm({
+            title: 'Xóa bài viết',
+            description: 'Bạn có chắc chắn muốn xóa bài viết này?',
+            confirmText: 'Xóa',
+            color: 'error'
+        });
+        if (ok) {
             deleteMutation.mutate(id);
         }
     };

@@ -20,6 +20,7 @@ import ProductImportDialog from './ProductImportDialog';
 import authService from '../../../../services/authService';
 import { buildCategoryTreeFlat } from '../../../../utils/categoryUtils';
 import inventoryService from '../../../../services/inventoryService';
+import { useConfirm } from '../../../../contexts/ConfirmContext';
 
 // ── Helpers ──────────────────────────────────────────────────
 const fmtCurrency = (n) =>
@@ -59,6 +60,7 @@ const ProductListPage = () => {
     const [products, setProducts] = useState([]);
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
+    const { confirm } = useConfirm();
     const [error, setError] = useState('');
     const [search, setSearch] = useState('');
     const [categoryId, setCategoryId] = useState('');
@@ -257,6 +259,33 @@ const ProductListPage = () => {
         setPrintItems(items);
     };
 
+    const handleBulkDelete = async () => {
+        const ok = await confirm({
+            title: 'Xóa sản phẩm',
+            description: `Bạn có chắc chắn muốn ngừng bán (xóa) ${selectedIds.length} sản phẩm đã chọn không?`,
+            confirmText: 'Xóa',
+            color: 'error'
+        });
+        if (!ok) return;
+
+        try {
+            const results = await Promise.allSettled(
+                selectedIds.map(id => axiosInstance.put(`/products/${id}`, { isActive: false }))
+            );
+            const failed = results.filter(r => r.status === 'rejected').length;
+            const succeeded = results.length - failed;
+            if (failed > 0) {
+                toast.error(`Có ${failed} sản phẩm không thể ngừng bán. Đã ngừng bán ${succeeded} sản phẩm.`);
+            } else {
+                toast.success(`Đã ngừng bán ${succeeded} sản phẩm thành công.`);
+            }
+            setSelectedIds([]);
+            loadProducts();
+        } catch (e) {
+            toast.error('Có lỗi xảy ra khi xóa một số sản phẩm.');
+        }
+    };
+
     const stats = [
         { label: 'Tổng sản phẩm', value: totalElements },
         { label: 'Đang bán', value: products.filter((p: any) => p.isActive && p.availableQuantity > 0).length },
@@ -282,6 +311,7 @@ const ProductListPage = () => {
                                 size="small"
                                 variant="outlined"
                                 color="error"
+                                onClick={handleBulkDelete}
                                 sx={{ textTransform: 'none', borderRadius: 2, height: 36, bgcolor: '#fff', borderColor: '#ef4444', color: '#ef4444', '&:hover': { bgcolor: '#fef2f2', borderColor: '#dc2626' } }}
                             >
                                 Xóa ({selectedIds.length})

@@ -8,6 +8,7 @@ import { useCurrentUser } from '../hooks/useAccount';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import customerAuthService from '../../../services/customerAuthService';
 import { customerApi } from '../../../services/customerApi';
+import toast from 'react-hot-toast';
 
 const AccountPage = () => {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -26,7 +27,7 @@ const AccountPage = () => {
 
     const handleLogout = () => {
         customerAuthService.logout();
-        navigate('/');
+        navigate('/login');
         window.location.reload();
     };
 
@@ -43,7 +44,7 @@ const AccountPage = () => {
             window.location.reload();
         } catch (error) {
             console.error('Lỗi upload avatar:', error);
-            alert('Có lỗi xảy ra khi cập nhật ảnh đại diện');
+            toast.error('Có lỗi xảy ra khi cập nhật ảnh đại diện');
         } finally {
             setUploadingAvatar(false);
         }

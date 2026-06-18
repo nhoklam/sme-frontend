@@ -13,6 +13,7 @@ import { customerApi } from '../../../../services/customerApi';
 import { useQueryClient } from '@tanstack/react-query';
 import orderService from '../../../../services/orderService';
 import { useWebSocket } from '../../../../store/hooks/useWebSocket';
+import toast from 'react-hot-toast';
 
 const STATUS_MAP: Record<string, { label: string; color: any }> = {
     PENDING: { label: 'Chờ xử lý', color: 'info' },
@@ -38,7 +39,10 @@ const OrderHistory = () => {
                 } catch (e) {
                     console.log('Audio init error:', e);
                 }
-                queryClient.invalidateQueries({ queryKey: ['my_orders'] });
+                // Đợi 500ms để đảm bảo backend đã commit transaction thay đổi trạng thái vào DB
+                setTimeout(() => {
+                    queryClient.invalidateQueries({ queryKey: ['myHistory'] });
+                }, 500);
             }
         }
     });
@@ -47,6 +51,17 @@ const OrderHistory = () => {
     const { orders, totalPages, isLoading } = useMyOrders({ page, size: 10 });
     const [selectedOrder, setSelectedOrder] = useState<OrderResponse | null>(null);
     const [reviewItem, setReviewItem] = useState<OrderItemResponse | null>(null);
+
+    // Tự động cập nhật Dialog chi tiết đơn hàng nếu đơn hàng thay đổi realtime
+    React.useEffect(() => {
+        if (selectedOrder && orders) {
+            const updatedOrder = orders.find((o: any) => o.id === selectedOrder.id);
+            // Chỉ cập nhật nếu trạng thái thay đổi hoặc có thông tin khác biệt để tránh re-render không cần thiết
+            if (updatedOrder && updatedOrder.status !== selectedOrder.status) {
+                setSelectedOrder(updatedOrder);
+            }
+        }
+    }, [orders, selectedOrder]);
     const [rating, setRating] = useState<number | null>(5);
     const [comment, setComment] = useState('');
     const [uploading, setUploading] = useState(false);
@@ -90,14 +105,14 @@ const OrderHistory = () => {
                 comment,
                 imageUrls: uploadedUrls
             });
-            alert('Cảm ơn bạn đã đánh giá!');
+            toast.success('Cảm ơn bạn đã đánh giá!');
             setReviewItem(null);
             setRating(5);
             setComment('');
             setImages([]);
             
             // Re-fetch orders to update isReviewed flag
-            queryClient.invalidateQueries({ queryKey: ['my_orders'] });
+            queryClient.invalidateQueries({ queryKey: ['myHistory'] });
             
             // Cập nhật selectedOrder cục bộ để đóng dialog nếu cần hoặc update state
             setSelectedOrder(prev => {
@@ -108,7 +123,7 @@ const OrderHistory = () => {
                 };
             });
         } catch (error: any) {
-            alert(error.response?.data?.message || 'Có lỗi xảy ra, vui lòng thử lại.');
+            toast.error(error.response?.data?.message || 'Có lỗi xảy ra, vui lòng thử lại.');
         } finally {
             setUploading(false);
         }
@@ -275,14 +290,14 @@ const OrderHistory = () => {
                                                 {selectedOrder.status === 'DELIVERED' && (
                                                     <Box sx={{ mt: 1, textAlign: 'right' }}>
                                                         <Button 
-                                                            variant="outlined" 
-                                                            color={item.isReviewed ? "inherit" : "primary"}
+                                                            variant={item.isReviewed ? "outlined" : "contained"} 
+                                                            color={item.isReviewed ? "inherit" : "success"}
                                                             size="small" 
-                                                            sx={{ textTransform: 'none', borderRadius: 1, height: 28, fontSize: '12px' }}
+                                                            sx={{ textTransform: 'none', borderRadius: 1, height: 28, fontSize: '12px', fontWeight: 600 }}
                                                             onClick={() => setReviewItem(item)}
                                                             disabled={item.isReviewed}
                                                         >
-                                                            {item.isReviewed ? 'Đã đánh giá' : 'Đánh giá sản phẩm'}
+                                                            {item.isReviewed ? 'Đã đánh giá' : 'Đã nhận'}
                                                         </Button>
                                                     </Box>
                                                 )}
@@ -337,7 +352,7 @@ const OrderHistory = () => {
                                     }
                                     window.location.href = checkoutUrl;
                                 } catch (error: any) {
-                                    alert(error.response?.data?.message || 'Có lỗi xảy ra khi tạo link thanh toán');
+                                    toast.error(error.response?.data?.message || 'Có lỗi xảy ra khi tạo link thanh toán');
                                 }
                             }}
                             variant="contained"
@@ -443,11 +458,11 @@ const OrderHistory = () => {
                                 setIsCanceling(true);
                                 const reason = cancelReason.trim() || 'Khách hàng tự hủy';
                                 await orderService.cancel(selectedOrder.id, reason);
-                                queryClient.invalidateQueries({ queryKey: ['my_orders'] });
+                                queryClient.invalidateQueries({ queryKey: ['myHistory'] });
                                 setSelectedOrder({ ...selectedOrder, status: 'CANCELLED' });
                                 setCancelDialogOpen(false);
                             } catch (err: any) {
-                                alert(err.response?.data?.message || 'Có lỗi xảy ra khi hủy đơn');
+                                toast.error(err.response?.data?.message || 'Có lỗi xảy ra khi hủy đơn');
                             } finally {
                                 setIsCanceling(false);
                             }

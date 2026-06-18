@@ -21,6 +21,7 @@ import orderService from '../../../services/orderService';
 import { customerApi } from '../../../services/customerApi';
 import { CustomerAddress } from '../../../types';
 import { useShippingCoordinates } from '../../../hooks/useShippingCoordinates';
+import { PROVINCES as ALLOWED_PROVINCES } from '../../admin/pages/orders/OrderListPage';
 
 const FREE_SHIP = 150000;
 
@@ -136,7 +137,13 @@ const CheckoutPage: React.FC = () => {
         // Fetch provinces
         fetch('https://provinces.open-api.vn/api/?depth=3')
             .then(res => res.json())
-            .then(data => setProvinces(data))
+            .then(data => {
+                const allowedNames = ALLOWED_PROVINCES.map(p => p.name.toLowerCase());
+                const filteredProvinces = data.filter((p: any) => 
+                    allowedNames.some(name => p.name.toLowerCase().includes(name))
+                );
+                setProvinces(filteredProvinces);
+            })
             .catch(err => console.error('Error fetching provinces:', err));
     }, []);
 

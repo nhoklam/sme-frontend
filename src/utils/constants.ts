@@ -20,6 +20,26 @@ export const calcDiscount = (oldPrice: number, price: number): number => {
     return Math.round(((oldPrice - price) / oldPrice) * 100);
 };
 
+/**
+ * Tạo giảm giá ảo nhất quán dựa trên ID và số lượng đã bán
+ * Bán chạy (sold >= 10) luôn giảm 30%, bình thường thì dưới 20%
+ */
+export const getFakeDiscount = (id: string | number, sold: number = 0): number => {
+    if (sold >= 10) return 30;
+    const discounts = [10, 12, 15, 18, 19];
+    const sum = String(id).split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return discounts[sum % discounts.length];
+};
+
+/**
+ * Tính giá gốc ảo dựa trên giá hiện tại và phần trăm giảm
+ */
+export const getFakeOriginalPrice = (price: number, discountPercent: number): number => {
+    if (discountPercent <= 0) return price;
+    const calcPrice = price / (1 - discountPercent / 100);
+    return Math.ceil(calcPrice / 1000) * 1000;
+};
+
 // ── Mock data ──────────────────────────────────────────────────
 
 export interface MockProduct {

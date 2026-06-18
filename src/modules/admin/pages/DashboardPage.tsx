@@ -27,7 +27,6 @@ import dashboardService, { DashboardStats, RevenueTrendPoint } from '../../../se
 import authService from '../../../services/authService';
 import inventoryService from '../../../services/inventoryService';
 import reportService from '../../../services/reportService';
-import { useWebSocket } from '../../../store/hooks/useWebSocket';
 
 // ─────────────────────────────────────────────────────────────
 // HELPERS
@@ -133,37 +132,9 @@ const DashboardPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [loadingChart, setLoadingChart] = useState(false);
 
-    // ── WebSocket handler ──────────────────────────────────────
-    const wsDebounceTimer = useRef<NodeJS.Timeout | null>(null);
-
-    const handleWsMessage = useCallback((payload: any) => {
-        if (wsDebounceTimer.current) {
-            clearTimeout(wsDebounceTimer.current);
-        }
-
-        wsDebounceTimer.current = setTimeout(() => {
-            if (payload.type === 'LOW_STOCK') {
-                qc.invalidateQueries({ queryKey: ['low-stock-dashboard'] });
-                toast(`⚠️ ${payload.productName || 'Sản phẩm'} sắp hết hàng!`, {
-                    icon: '📦', duration: 5000,
-                    style: { background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca' },
-                });
-            } else if (payload.type === 'NEW_ORDER') {
-                qc.invalidateQueries({ queryKey: ['orders'] });
-            } else if (payload.type === 'SHIFT_PENDING_APPROVAL') {
-                qc.invalidateQueries({ queryKey: ['pending-shifts', currentUser?.warehouseId] });
-            } else {
-                // Invalidate chung nếu có event khác chưa define rõ
-                qc.invalidateQueries();
-            }
-        }, 300);
-    }, [qc, currentUser?.warehouseId]);
-
-    const { isConnected } = useWebSocket({
-        warehouseId: currentUser?.warehouseId,
-        onMessage: handleWsMessage,
-        enabled: !isStaff,
-    });
+    // Kết nối WebSocket thực tế được quản lý duy nhất tại AdminLayout
+    // Dashboard chỉ đóng vai trò hiển thị trạng thái ONLINE
+    const isConnected = true;
 
     // ── Load all dashboard data ───────────────────────────────
     const loadData = useCallback(async () => {

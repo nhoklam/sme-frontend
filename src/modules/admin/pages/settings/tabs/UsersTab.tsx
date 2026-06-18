@@ -14,6 +14,7 @@ import warehouseService from '../../../../../services/warehouseService';
 import authService from '../../../../../services/authService';
 import type { UserResponse, Warehouse as WarehouseType } from '../../../../../types';
 import toast from 'react-hot-toast';
+import { useConfirm } from '../../../../../contexts/ConfirmContext';
 
 // ── Loại bỏ dấu tiếng Việt ─────────────────────────────────
 const removeDiacritics = (str: string): string => {
@@ -50,6 +51,7 @@ export default function UsersTab() {
     const currentUser = authService.getCurrentUser()?.user;
     const isManager = currentUser?.role === 'ROLE_MANAGER';
     const managerWarehouseId = currentUser?.warehouseId || '';
+    const { confirm } = useConfirm();
 
     const [allUsers, setAllUsers] = useState<UserResponse[]>([]);
     const [warehouses, setWarehouses] = useState<WarehouseType[]>([]);
@@ -152,7 +154,13 @@ export default function UsersTab() {
 
     const handleToggle = async (user: UserResponse) => {
         const action = user.isActive ? 'khóa' : 'kích hoạt';
-        if (!window.confirm(`Bạn có chắc muốn ${action} tài khoản "${user.fullName}"?`)) return;
+        const ok = await confirm({
+            title: 'Xác nhận trạng thái',
+            description: `Bạn có chắc muốn ${action} tài khoản "${user.fullName}"?`,
+            confirmText: 'Đồng ý',
+            color: user.isActive ? 'error' : 'success'
+        });
+        if (!ok) return;
         try {
             if (user.isActive) await userService.deactivate(user.id);
             else await userService.activate(user.id);

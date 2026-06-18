@@ -77,8 +77,6 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
     const [stockStatus, setStockStatus] = useState<StockStatusFilter>('all');
     const [page, setPage] = useState(0);
     const [pageSize, setPageSize] = useState(10);
-    const [stockPage, setStockPage] = useState(0);
-    const [importPage, setImportPage] = useState(0);
 
     // ── Modal state ───────────────────────────────────────────
     const [adjustTarget, setAdjustTarget] = useState<InventoryWithMeta | null>(null);
@@ -190,43 +188,71 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
         value: 0, // Backend needs to provide this
     };
 
-    // ── Excel export — xuất trang hiện tại (tạm thời) ─
-    const handleExport = () => {
-        exportToExcel(
-            paged,
-            [
-                { header: 'Tên sản phẩm', key: 'productName', width: 40 },
-                { header: 'SKU', key: 'productSku', width: 15 },
-                { header: 'Mã vạch/ISBN', key: 'isbnBarcode', width: 20 },
-                { header: 'Danh mục', key: 'categoryName', width: 18 },
-                { header: 'Chi nhánh', key: 'warehouseName', width: 25 },
-                { header: 'Tồn thực', key: 'quantity', width: 12 },
-                { header: 'Đã giữ chỗ', key: 'reservedQuantity', width: 12 },
-                { header: 'Khả dụng', key: 'availableQuantity', width: 12 },
-                { header: 'Định mức tối thiểu', key: 'minQuantity', width: 18 },
-                { header: 'Giá bán lẻ (VND)', key: 'retailPrice', width: 18, formatter: fmtVnd },
-                { header: 'Giá vốn MAC (VND)', key: 'macPrice', width: 18, formatter: fmtVnd },
-                {
-                    header: 'Giá trị tồn kho (VND)',
-                    key: 'quantity',
-                    width: 22,
-                    formatter: (v, row) => fmtVnd((row as InventoryWithMeta).quantity * ((row as InventoryWithMeta).retailPrice ?? 0)),
-                },
-                {
-                    header: 'Trạng thái',
-                    key: 'quantity',
-                    width: 14,
-                    formatter: (_v, row) => {
-                        const r = row as InventoryWithMeta;
-                        if (r.quantity === 0) return 'Hết hàng';
-                        if (r.minQuantity > 0 && r.quantity <= r.minQuantity) return 'Sắp hết';
-                        return 'Còn hàng';
+    // ── Excel export — xuất tất cả (vượt qua phân trang) ─
+    const handleExport = async () => {
+        try {
+            setSnack({ msg: 'Đang chuẩn bị dữ liệu xuất Excel...', sev: 'success' });
+            // Lấy toàn bộ dữ liệu khớp với bộ lọc
+            const res = await inventoryService.getByWarehousePaged(effectiveWarehouseId || null, {
+                keyword: debouncedSearch || undefined,
+                stockStatus: stockStatus !== 'all' ? stockStatus : undefined,
+                categoryId: selectedCategory || undefined,
+                page: 0,
+                size: 10000, // Số lượng lớn để lấy tất cả
+            });
+
+            const enriched = res.content.map(inv => {
+                const p = productMap.get(inv.productId);
+                return {
+                    ...inv,
+                    productName: p?.name ?? inv.productName ?? inv.productId,
+                    productSku: p?.sku ?? inv.productSku,
+                    isbnBarcode: p?.isbnBarcode ?? inv.isbnBarcode,
+                    categoryName: p?.categoryName ?? inv.categoryName,
+                    warehouseName: warehouses.find(w => w.id === inv.warehouseId)?.name ?? inv.warehouseId,
+                    retailPrice: p?.retailPrice ?? 0,
+                    macPrice: p?.macPrice ?? 0,
+                } as InventoryWithMeta;
+            });
+
+            exportToExcel(
+                enriched,
+                [
+                    { header: 'Tên sản phẩm', key: 'productName', width: 40 },
+                    { header: 'SKU', key: 'productSku', width: 15 },
+                    { header: 'Mã vạch/ISBN', key: 'isbnBarcode', width: 20 },
+                    { header: 'Danh mục', key: 'categoryName', width: 18 },
+                    { header: 'Chi nhánh', key: 'warehouseName', width: 25 },
+                    { header: 'Tồn thực', key: 'quantity', width: 12 },
+                    { header: 'Đã giữ chỗ', key: 'reservedQuantity', width: 12 },
+                    { header: 'Khả dụng', key: 'availableQuantity', width: 12 },
+                    { header: 'Định mức tối thiểu', key: 'minQuantity', width: 18 },
+                    { header: 'Giá bán lẻ (VND)', key: 'retailPrice', width: 18, formatter: fmtVnd },
+                    { header: 'Giá vốn MAC (VND)', key: 'macPrice', width: 18, formatter: fmtVnd },
+                    {
+                        header: 'Giá trị tồn kho (VND)',
+                        key: 'quantity',
+                        width: 22,
+                        formatter: (v, row) => fmtVnd((row as InventoryWithMeta).quantity * ((row as InventoryWithMeta).retailPrice ?? 0)),
                     },
-                },
-            ],
-            'ton-kho',
-            'Tồn Kho'
-        );
+                    {
+                        header: 'Trạng thái',
+                        key: 'quantity',
+                        width: 14,
+                        formatter: (_v, row) => {
+                            const r = row as InventoryWithMeta;
+                            if (r.quantity === 0) return 'Hết hàng';
+                            if (r.minQuantity > 0 && r.quantity <= r.minQuantity) return 'Sắp hết';
+                            return 'Còn hàng';
+                        },
+                    },
+                ],
+                'ton-kho',
+                'Tồn Kho'
+            );
+        } catch (error) {
+            setSnack({ msg: 'Xuất Excel thất bại', sev: 'error' });
+        }
     };
 
     // ── Handlers ──────────────────────────────────────────────
@@ -285,61 +311,6 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
 
     // ── Kiểm kho dialog state ──
     const [stockCountOpen, setStockCountOpen] = useState(false);
-    const [viewReceipt, setViewReceipt] = useState<SavedReceipt | null>(null);
-    const [editReceipt, setEditReceipt] = useState<SavedReceipt | null>(null);
-
-    // ── Lấy lịch sử kiểm kho từ API thật ──
-    const { data: stockCountHistory = [], isLoading: loadingHistory } = useQuery({
-        queryKey: ['stock-count-history', warehouses.length, !!productsData, stockCountOpen],
-        queryFn: async () => {
-            const history = await inventoryService.getHistory({ transactionType: 'ADJUSTMENT', size: 100 });
-            const receipts: SavedReceipt[] = [];
-            const groups: { [key: string]: SavedReceipt } = {};
-
-            history.content.forEach(tx => {
-                const match = tx.note?.match(/\[(PKK-\d+-\d+)\]/);
-                const code = match ? match[1] : `PKK-${tx.createdAt.split('T')[0]}-${tx.id.slice(-4)}`;
-
-                if (!groups[code]) {
-                    groups[code] = {
-                        code,
-                        time: new Date(tx.createdAt).toLocaleString('vi-VN'),
-                        items: [],
-                        warehouseName: warehouses.find(w => w.id === (tx as any).warehouseId)?.name || 'N/A'
-                    };
-                    receipts.push(groups[code]);
-                }
-
-                const htMatch = tx.note?.match(/HT (\d+)/);
-                const ttMatch = tx.note?.match(/TT (\d+)/);
-                const p = productMap.get((tx as any).productId);
-
-                groups[code].items.push({
-                    productId: (tx as any).productId,
-                    productName: p?.name || 'Sản phẩm đã xóa',
-                    sku: p?.sku || 'N/A',
-                    isbnBarcode: p?.isbnBarcode || 'N/A',
-                    unit: p?.unit || 'N/A',
-                    systemQty: htMatch ? Number(htMatch[1]) : tx.quantityBefore,
-                    actualQty: ttMatch ? Number(ttMatch[1]) : tx.quantityAfter,
-                    diff: tx.quantityChange,
-                    checked: true
-                });
-            });
-            return receipts;
-        },
-        enabled: warehouses.length > 0 && !!productsData
-    });
-
-    // ── Lấy lịch sử nhập kho từ API thật ──
-    const { data: importHistory = [], isLoading: loadingImports } = useQuery({
-        queryKey: ['import-history-real'],
-        queryFn: async () => {
-            const res = await purchaseService.getAll({ size: 20 });
-            return res.content;
-        }
-    });
-
 
     // ── Render ────────────────────────────────────────────────
     return (
@@ -571,127 +542,6 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
                 />
             </Paper>
 
-            {/* Lịch sử phiếu kiểm kho */}
-            <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #f0f0f0', mb: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
-                    <History sx={{ color: '#6b7280' }} />
-                    <Typography variant="h6" fontSize={16} fontWeight={800} color="#111">Lịch sử phiếu kiểm kho</Typography>
-                </Box>
-                <TableContainer>
-                    <Table size="small">
-                        <TableHead sx={{ bgcolor: '#f8fafc' }}>
-                            <TableRow>
-                                <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#475569' }}>Mã phiếu</TableCell>
-                                <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#475569' }}>Thời gian</TableCell>
-                                <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#475569' }}>Kho</TableCell>
-                                <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#475569' }}>Sản phẩm lệch</TableCell>
-                                <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#475569', textAlign: 'right' }}>Thao tác</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {loadingHistory ? (
-                                <TableRow><TableCell colSpan={5} align="center" sx={{ py: 4 }}><Skeleton variant="text" width="60%" /></TableCell></TableRow>
-                            ) : stockCountHistory.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
-                                        <Typography variant="body2" color="#9ca3af">Chưa có lịch sử kiểm kho nào</Typography>
-                                    </TableCell>
-                                </TableRow>
-                            ) : stockCountHistory.slice(stockPage * 5, (stockPage + 1) * 5).map((h, i) => (
-                                <TableRow key={i} sx={{ '&:hover': { bgcolor: '#f8fafc' } }}>
-                                    <TableCell>
-                                        <Typography variant="body2" fontWeight={700} color="#2563eb">{h.code}</Typography>
-                                    </TableCell>
-                                    <TableCell><Typography variant="body2">{h.time}</Typography></TableCell>
-                                    <TableCell><Typography variant="body2">{h.warehouseName}</Typography></TableCell>
-                                    <TableCell>
-                                        <Typography variant="body2" fontWeight={600}>
-                                            {h.items.length} <span style={{ color: '#6b7280', fontWeight: 400 }}>sản phẩm</span>
-                                        </Typography>
-                                    </TableCell>
-                                    <TableCell align="right">
-                                        <Tooltip title="Xem chi tiết">
-                                            <IconButton size="small" onClick={() => setViewReceipt(h)} sx={{ color: '#1976d2' }}>
-                                                <Visibility sx={{ fontSize: 18 }} />
-                                            </IconButton>
-                                        </Tooltip>
-                                        <Tooltip title="Sửa (Kiểm lại)">
-                                            <IconButton size="small" onClick={() => { setEditReceipt(h); setStockCountOpen(true); }} sx={{ color: '#f59e0b' }}>
-                                                <Edit sx={{ fontSize: 18 }} />
-                                            </IconButton>
-                                        </Tooltip>
-                                        <Tooltip title="Sao chép phiếu">
-                                            <IconButton size="small" onClick={() => {
-                                                const text = `${h.code}\n${h.time}\n\n` +
-                                                    h.items.map((it: any) => `${it.productName} | ${it.sku} | Tồn: ${it.systemQty} | TT: ${it.actualQty} | Lệch: ${it.diff}`).join('\n');
-                                                navigator.clipboard.writeText(text);
-                                                setSnack({ msg: 'Đã sao chép phiếu', sev: 'success' });
-                                            }} sx={{ color: '#6b7280' }}>
-                                                <ContentCopy sx={{ fontSize: 18 }} />
-                                            </IconButton>
-                                        </Tooltip>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-                {Math.ceil(stockCountHistory.length / 5) > 1 && (
-                    <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
-                        <Pagination count={Math.ceil(stockCountHistory.length / 5)} page={stockPage + 1} onChange={(_, v) => setStockPage(v - 1)} size="small" />
-                    </Box>
-                )}
-            </Paper>
-
-            {/* Lịch sử phiếu nhập kho */}
-            <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #f0f0f0', mb: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
-                    <Assignment sx={{ color: '#059669' }} />
-                    <Typography variant="h6" fontSize={16} fontWeight={800} color="#111">Lịch sử phiếu nhập hàng (Gần đây)</Typography>
-                </Box>
-                <TableContainer>
-                    <Table size="small">
-                        <TableHead sx={{ bgcolor: '#f0fdf4' }}>
-                            <TableRow>
-                                <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#065f46' }}>Mã phiếu</TableCell>
-                                <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#065f46' }}>Thời gian</TableCell>
-                                <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#065f46' }}>Kho nhập</TableCell>
-                                <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#065f46' }}>Tổng tiền</TableCell>
-                                <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#065f46' }}>Trạng thái</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {loadingImports ? (
-                                <TableRow><TableCell colSpan={5} align="center" sx={{ py: 3 }}><Skeleton variant="text" width="80%" /></TableCell></TableRow>
-                            ) : importHistory.length === 0 ? (
-                                <TableRow><TableCell colSpan={5} align="center" sx={{ py: 3 }}><Typography variant="body2" color="#9ca3af">Chưa có lịch sử nhập hàng</Typography></TableCell></TableRow>
-                            ) : importHistory.slice(importPage * 5, (importPage + 1) * 5).map((h, i) => (
-                                <TableRow key={i} sx={{ '&:hover': { bgcolor: '#f0fdf4' } }}>
-                                    <TableCell><Typography variant="body2" fontWeight={700} color="#059669">{h.code}</Typography></TableCell>
-                                    <TableCell><Typography variant="body2">{new Date(h.createdAt).toLocaleString('vi-VN')}</Typography></TableCell>
-                                    <TableCell><Typography variant="body2">{warehouses.find(w => w.id === h.warehouseId)?.name || 'N/A'}</Typography></TableCell>
-                                    <TableCell><Typography variant="body2" fontWeight={700}>{fmtVnd(h.totalAmount)}</Typography></TableCell>
-                                    <TableCell>
-                                        <Chip label={h.status === 'COMPLETED' ? 'Hoàn thành' : h.status === 'PENDING' ? 'Chờ duyệt' : 'Đã hủy'}
-                                            size="small"
-                                            sx={{
-                                                fontSize: 10, fontWeight: 800,
-                                                bgcolor: h.status === 'COMPLETED' ? '#dcfce7' : h.status === 'PENDING' ? '#fef3c7' : '#fee2e2',
-                                                color: h.status === 'COMPLETED' ? '#166534' : h.status === 'PENDING' ? '#92400e' : '#991b1b'
-                                            }} />
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-                {Math.ceil(importHistory.length / 5) > 1 && (
-                    <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
-                        <Pagination count={Math.ceil(importHistory.length / 5)} page={importPage + 1} onChange={(_, v) => setImportPage(v - 1)} size="small" />
-                    </Box>
-                )}
-            </Paper>
-
             {/* Modals */}
             <AdjustInventoryModal
                 open={adjustOpen}
@@ -749,47 +599,10 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
 
             {/* Kiểm kho Dialog */}
             {stockCountOpen && (
-                <StockCountTab warehouses={warehouses} onClose={() => { setStockCountOpen(false); setEditReceipt(null); refetch(); }} initialReceipt={editReceipt ?? undefined} />
+                <StockCountTab warehouses={warehouses} onClose={() => { setStockCountOpen(false); refetch(); }} />
             )}
 
-            {/* Xem chi tiết phiếu */}
-            <Dialog open={!!viewReceipt} onClose={() => setViewReceipt(null)} maxWidth="md" fullWidth>
-                <DialogTitle sx={{ fontWeight: 800, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    Chi tiết phiếu kiểm kho: {viewReceipt?.code}
-                    <IconButton size="small" onClick={() => setViewReceipt(null)}><Close /></IconButton>
-                </DialogTitle>
-                <DialogContent dividers sx={{ p: 0 }}>
-                    <Box sx={{ p: 2, bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                        <Typography variant="body2">Thời gian: <strong>{viewReceipt?.time}</strong> | Kho: <strong>{viewReceipt?.warehouseName}</strong></Typography>
-                    </Box>
-                    <Table size="small">
-                        <TableHead sx={{ bgcolor: '#fff' }}>
-                            <TableRow>
-                                <TableCell>Sản phẩm</TableCell>
-                                <TableCell>SKU</TableCell>
-                                <TableCell align="center">Tồn hệ thống</TableCell>
-                                <TableCell align="center">Thực tế</TableCell>
-                                <TableCell align="center">Lệch</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {viewReceipt?.items?.map((it: any, idx: number) => (
-                                <TableRow key={idx}>
-                                    <TableCell><Typography variant="body2" fontWeight={600}>{it.productName}</Typography></TableCell>
-                                    <TableCell><Typography variant="caption" fontFamily="monospace">{it.sku}</Typography></TableCell>
-                                    <TableCell align="center">{it.systemQty}</TableCell>
-                                    <TableCell align="center" sx={{ fontWeight: 700 }}>{it.actualQty}</TableCell>
-                                    <TableCell align="center">
-                                        <Typography fontWeight={700} color={it.diff > 0 ? '#16a34a' : it.diff < 0 ? '#dc2626' : '#6b7280'}>
-                                            {it.diff > 0 ? '+' : ''}{it.diff}
-                                        </Typography>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </DialogContent>
-            </Dialog>
+
         </Box>
     );
 };

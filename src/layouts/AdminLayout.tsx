@@ -24,6 +24,24 @@ import { vi } from 'date-fns/locale';
 import AIChatWidget from '../components/common/AIChatWidget';
 import { registerCountSetter, unregisterCountSetter } from '../store/notificationCount';
 
+const playNotificationSound = () => {
+    try {
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const oscillator = ctx.createOscillator();
+        const gain = ctx.createGain();
+        oscillator.connect(gain);
+        gain.connect(ctx.destination);
+        oscillator.frequency.value = 800;
+        oscillator.type = 'sine';
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+        oscillator.start(ctx.currentTime);
+        oscillator.stop(ctx.currentTime + 0.3);
+    } catch (e) {
+        console.log('Audio play error:', e);
+    }
+};
+
 /**
  * Render message thân thiện từ payload:
  * - Ưu tiên payload.warehouseName (records mới)
@@ -136,27 +154,30 @@ const AdminLayout = () => {
     useWebSocket({
         warehouseId: currentUser?.warehouseId,
         onMessage: (payload: WsPayload) => {
-            setUnreadCount(prev => prev + 1);
-            loadNotifications();
+            const isNotification = ['NEW_ORDER', 'IMPORT_SUCCESS', 'LOW_STOCK', 'OUT_OF_STOCK', 'TRANSFER_ARRIVED', 'SHIFT_PENDING_APPROVAL'].includes(payload.type);
+
+            if (isNotification) {
+                setUnreadCount(prev => prev + 1);
+                // Thêm delay 500ms để đảm bảo Backend đã lưu xong notification vào DB
+                setTimeout(() => {
+                    loadNotifications();
+                }, 500);
+                // Phát âm thanh thông báo "ding"
+                playNotificationSound();
+            }
 
             // Invalidate React Query caches để tự động cập nhật danh sách
             queryClient.invalidateQueries({ queryKey: ['orders'] });
-            queryClient.invalidateQueries({ queryKey: ['notifications'] });
-            queryClient.invalidateQueries({ queryKey: ['inventory'] });
-
-            // Phát âm thanh thông báo
-            try {
-                const audio = new Audio('/assets/ting.mp3');
-                audio.play().catch(e => console.log('Audio play error (blocked by browser):', e));
-            } catch (e) {
-                console.log('Audio init error:', e);
+            
+            if (isNotification) {
+                queryClient.invalidateQueries({ queryKey: ['notifications'] });
+                queryClient.invalidateQueries({ queryKey: ['inventory'] });
             }
 
             // Hiện Pop-up ngay trên màn hình
             switch (payload.type) {
                 case 'NEW_ORDER':
                     toast(`Đơn hàng mới: ${payload.orderCode}`, { icon: '🛒', style: { borderRadius: '10px', background: '#333', color: '#fff' } });
-                    queryClient.invalidateQueries({ queryKey: ['orders'] });
                     break;
                 case 'IMPORT_SUCCESS':
                     toast.success(`Nhập kho thành công: ${payload.orderCode}`);

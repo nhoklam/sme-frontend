@@ -11,10 +11,12 @@ import toast from 'react-hot-toast';
 import { reviewApi } from '../../../../services/reviewApi';
 import { ProductReview } from '../../../../types';
 import authService from '../../../../services/authService';
+import { useConfirm } from '../../../../contexts/ConfirmContext';
 
 export default function ReviewModerationPage() {
   const [page, setPage] = useState(0);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const { confirm } = useConfirm();
   const qc = useQueryClient();
   const user = authService.getCurrentUser()?.user;
   const isAdmin = user?.role === 'ROLE_ADMIN';
@@ -39,7 +41,13 @@ export default function ReviewModerationPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Bạn có chắc muốn xóa đánh giá này? Hành động này không thể hoàn tác.')) return;
+    const ok = await confirm({
+      title: 'Xóa đánh giá',
+      description: 'Bạn có chắc muốn xóa đánh giá này? Hành động này không thể hoàn tác.',
+      confirmText: 'Xóa',
+      color: 'error'
+    });
+    if (!ok) return;
     try {
       await reviewApi.deleteReview(id);
       toast.success('Đã xóa đánh giá');

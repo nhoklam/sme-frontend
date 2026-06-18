@@ -4,9 +4,7 @@ import { Box, Typography, Button, IconButton, Skeleton } from '@mui/material';
 import { FlashOn, ArrowBackIosNew, ArrowForwardIos } from '@mui/icons-material';
 import { useCartContext } from '../../../../store/CartContext';
 import { useProducts } from '../../hooks/useProducts';
-import { fmt } from '../../../../utils/constants';
-
-const DISCOUNT_PERCENTS = [30, 20, 25, 15, 30];
+import { fmt, getFakeDiscount, getFakeOriginalPrice } from '../../../../utils/constants';
 
 const FlashSale = () => {
     const navigate = useNavigate();
@@ -17,8 +15,8 @@ const FlashSale = () => {
 
     const flashProducts = useMemo(() =>
         products.map((p, i) => {
-            const disc = DISCOUNT_PERCENTS[i % DISCOUNT_PERCENTS.length];
-            const orig = Math.round(p.price / (1 - disc / 100));
+            const disc = getFakeDiscount(p.id, p.sold || 0);
+            const orig = p.oldPrice && p.oldPrice > p.price ? p.oldPrice : getFakeOriginalPrice(p.price, disc);
             const totalStock = p.stock + p.sold;
             const soldPercent = totalStock > 0 ? Math.round((p.sold / totalStock) * 100) : 0;
             return { ...p, originalPrice: orig, discountPercent: disc, displaySoldPercent: Math.max(10, soldPercent) };

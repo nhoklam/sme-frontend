@@ -18,6 +18,7 @@ import toast from 'react-hot-toast';
 import promotionService from '../../../../services/promotionService';
 import { Promotion, PromotionType } from '../../../../types';
 import authService from '../../../../services/authService';
+import { useConfirm } from '../../../../contexts/ConfirmContext';
 
 const fmtCurrency = (n: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n);
 const fmtDate = (s: string) => {
@@ -46,6 +47,7 @@ export default function PromotionPage() {
     const qc = useQueryClient();
     const user = authService.getCurrentUser()?.user;
     const isAdmin = user?.role === 'ROLE_ADMIN';
+    const { confirm } = useConfirm();
 
     const { data, isLoading } = useQuery({
         queryKey: ['promotions', page, search],
@@ -103,7 +105,13 @@ export default function PromotionPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!window.confirm('Bạn có chắc muốn xóa khuyến mãi này?')) return;
+        const ok = await confirm({
+            title: 'Xóa khuyến mãi',
+            description: 'Bạn có chắc muốn xóa khuyến mãi này?',
+            confirmText: 'Xóa',
+            color: 'error'
+        });
+        if (!ok) return;
         try {
             await promotionService.delete(id);
             toast.success('Đã xóa khuyến mãi');

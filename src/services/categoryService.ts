@@ -29,8 +29,15 @@ const categoryService = {
     },
 
     // Ẩn/kích hoạt danh mục (toggle isActive)
-    toggleActive: async (id: string, isActive: boolean): Promise<Category> => {
-        const res = await axiosInstance.put<ApiResponse<Category>>(`/categories/${id}`, { isActive });
+    toggleActive: async (id: string, fullData: Partial<Category>, isActive: boolean): Promise<Category> => {
+        const reqData: CategoryRequest = {
+            name: fullData.name || '',
+            parentId: fullData.parentId || null,
+            description: fullData.description || undefined,
+            sortOrder: fullData.sortOrder || 0,
+            isActive: isActive
+        };
+        const res = await axiosInstance.put<ApiResponse<Category>>(`/categories/${id}`, reqData);
         return res.data.data;
     },
 };

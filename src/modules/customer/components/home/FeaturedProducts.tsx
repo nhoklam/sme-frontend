@@ -106,9 +106,9 @@ const FeaturedProducts = () => {
                                     author={product.author}
                                     coverImage={product.img}
                                     price={product.price}
-                                    originalPrice={product.price * 1.2}
-                                    discountPercent={20}
-                                    badges={Math.random() > 0.8 ? ['bestseller'] : []}
+                                    originalPrice={product.oldPrice || undefined}
+                                    sold={product.sold || 0}
+                                    badges={(product.sold && product.sold > 20) || product.badge === 'Bestseller' ? ['bestseller'] : []}
                                     onAddToCart={() => {
                                         addToCart({
                                             ...product,

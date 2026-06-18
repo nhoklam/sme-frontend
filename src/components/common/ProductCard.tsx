@@ -5,6 +5,7 @@ import {
     IconButton, Skeleton, Chip, useTheme
 } from '@mui/material';
 import { ShoppingCartOutlined, FavoriteBorder, Favorite } from '@mui/icons-material';
+import { getFakeDiscount, getFakeOriginalPrice } from '../../utils/constants';
 
 export interface ProductCardProps {
     id: string;
@@ -21,11 +22,12 @@ export interface ProductCardProps {
     onAddToCart?: (id: string) => void;
     onQuickView?: (id: string) => void;
     onToggleWishlist?: (id: string, isAdded: boolean) => void;
+    sold?: number;
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({
     id, title, author, coverImage, price, originalPrice, 
-    badges = [], discountPercent, 
+    badges = [], discountPercent, sold = 0,
     isLoading = false, onAddToCart, onToggleWishlist
 }) => {
     const theme = useTheme();
@@ -64,6 +66,16 @@ const ProductCard: React.FC<ProductCardProps> = ({
     const isOutOfStock = badges.includes('out_of_stock');
     const fallbackImage = 'https://placehold.co/300x400/f8f8f8/999?text=📚';
     const displayImage = imgError || !coverImage ? fallbackImage : coverImage;
+
+    // --- FAKE DISCOUNT LOGIC ---
+    // Generate a consistent fake discount if none exists
+    let finalOriginalPrice = originalPrice;
+    let finalDiscountPercent = discountPercent;
+
+    if (!finalOriginalPrice || finalOriginalPrice <= price) {
+        finalDiscountPercent = getFakeDiscount(id, sold);
+        finalOriginalPrice = getFakeOriginalPrice(price, finalDiscountPercent);
+    }
 
     return (
         <Card 
@@ -160,17 +172,17 @@ const ProductCard: React.FC<ProductCardProps> = ({
                     </Typography>
                     
                     {/* Original Price & Discount */}
-                    {originalPrice && originalPrice > price && (
+                    {finalOriginalPrice && finalOriginalPrice > price && (
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
                             <Typography sx={{ color: '#999', fontSize: '0.75rem', textDecoration: 'line-through' }}>
-                                {formatPrice(originalPrice)}
+                                {formatPrice(finalOriginalPrice)}
                             </Typography>
-                            {discountPercent && (
+                            {finalDiscountPercent && (
                                 <Box sx={{ 
-                                    bgcolor: '#FF9800', color: '#fff', fontSize: '0.65rem', fontWeight: 700, 
+                                    bgcolor: '#1a1a2e', color: '#fff', fontSize: '0.65rem', fontWeight: 700, 
                                     px: 0.6, py: 0.2, borderRadius: '4px', lineHeight: 1.2 
                                 }}>
-                                    -{discountPercent}%
+                                    -{finalDiscountPercent}%
                                 </Box>
                             )}
                         </Box>

@@ -57,8 +57,9 @@ const BarcodeScannerDialog: React.FC<Props> = ({ open, onClose, onScan }) => {
                     { fps: 10, qrbox: { width: 250, height: 250 } },
                     (decodedText) => {
                         // Quét thành công
-                        qr.stop().then(() => qr.clear()).catch(() => {});
+                        if (!runningRef.current) return;
                         runningRef.current = false;
+                        qr.stop().then(() => qr.clear()).catch(() => {});
                         onScan(decodedText);
                         onClose();
                     },

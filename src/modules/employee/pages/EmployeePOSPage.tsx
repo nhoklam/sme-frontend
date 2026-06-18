@@ -36,6 +36,7 @@ import posService from '../../../services/posService';
 import QrPaymentDialog from '../components/pos/QrPaymentDialog';
 import { usePosPaymentWebSocket } from '../../../store/hooks/usePosPaymentWebSocket';
 import POSReceipt from '../components/POSReceipt';
+import productService from '../../../services/productService';
 
 const fmt = (n?: number) =>
     new Intl.NumberFormat('vi-VN', {
@@ -218,24 +219,23 @@ const EmployeePOSPage: React.FC = () => {
     const handleScanBarcode = useCallback(async (barcode: string) => {
         if (!currentUser?.warehouseId) return;
         try {
-            const res = await axiosInstance.get(`/inventory/warehouse/${currentUser.warehouseId}/search?keyword=${barcode}&page=0&size=5`);
-            const items = res.data?.data?.content || [];
-            const match = items.find((p: any) => 
-                (p.isbnBarcode && p.isbnBarcode.toLowerCase() === barcode.toLowerCase()) || 
-                (p.sku && p.sku.toLowerCase() === barcode.toLowerCase())
-            );
-
-            if (match) {
-                const pRes = await axiosInstance.get(`/products/${match.productId}`);
-                const product = pRes.data?.data;
-                if (product && addToCartRef.current) {
-                    addToCartRef.current(product);
-                }
-            } else {
-                setSnack({ msg: `Mã vạch ${barcode} không tìm thấy trong kho!`, sev: 'error' });
+            const product = await productService.getByBarcode(barcode);
+            if (product && addToCartRef.current) {
+                addToCartRef.current(product);
             }
         } catch (e) {
-            setSnack({ msg: `Lỗi quét mã vạch ${barcode}`, sev: 'error' });
+            try {
+                const r = await productService.search({ keyword: barcode, page: 0, size: 10, isActive: true, warehouseId: currentUser.warehouseId });
+                if (r.content.length === 1 && addToCartRef.current) {
+                    addToCartRef.current(r.content[0]);
+                } else if (r.content.length > 1) {
+                    setSnack({ msg: `Tìm thấy nhiều sản phẩm cho mã: ${barcode}. Vui lòng dùng thanh tìm kiếm.`, sev: 'warning' });
+                } else {
+                    setSnack({ msg: `Mã vạch ${barcode} không tìm thấy trong hệ thống!`, sev: 'error' });
+                }
+            } catch {
+                setSnack({ msg: `Lỗi quét mã vạch ${barcode} hoặc sản phẩm không tồn tại`, sev: 'error' });
+            }
         }
     }, [currentUser?.warehouseId]);
 
@@ -694,7 +694,12 @@ const EmployeePOSPage: React.FC = () => {
                     {/* SEARCH BAR & TABS */}
                     <Box sx={{ bgcolor: '#fff', borderRadius: 2, p: 1.5, display: 'flex', alignItems: 'center', gap: 2, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', flexShrink: 0 }}>
                         <Box sx={{ flex: 1 }}>
-                            <POSProductSearchBar onAdd={addToCart} disabled={!shift} warehouseId={currentUser?.warehouseId} />
+                            <POSProductSearchBar 
+                                onAdd={addToCart} 
+                                onError={(msg) => setSnack({ msg, sev: 'error' })}
+                                disabled={!shift} 
+                                warehouseId={currentUser?.warehouseId} 
+                            />
                         </Box>
 
                         {/* TABS CONTAINER */}

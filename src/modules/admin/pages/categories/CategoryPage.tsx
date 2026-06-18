@@ -426,7 +426,7 @@ const CategoryPage: React.FC = () => {
         if (!toggleTarget) return;
         setToggleLoading(true);
         try {
-            await categoryService.toggleActive(toggleTarget.id, !toggleTarget.isActive);
+            await categoryService.toggleActive(toggleTarget.id, toggleTarget, !toggleTarget.isActive);
             setSnack(
                 toggleTarget.isActive
                     ? `Đã ẩn danh mục "${toggleTarget.name}"`
