@@ -210,15 +210,11 @@ export function useWebSocket({ warehouseId, onMessage, enabled = true }: UseWebS
                 console.error('[WebSocket] STOMP error:', frame.headers?.message);
             },
 
-            // Giới hạn log debug để không làm rối console
-            debug: process.env.NODE_ENV === 'development'
-                ? (str) => {
-                    // Chỉ log các message quan trọng, bỏ qua heartbeat
-                    if (!str.includes('>>>') && !str.includes('<<<')) {
-                        console.debug('[STOMP]', str);
-                    }
+            debug: (str) => {
+                if (process.env.NODE_ENV === 'development' && !str.includes('>>>') && !str.includes('<<<')) {
+                    console.debug('[STOMP]', str);
                 }
-                : undefined,
+            },
         });
 
         client.activate();
