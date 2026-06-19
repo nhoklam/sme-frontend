@@ -3,7 +3,10 @@ import { Client, IMessage } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 
 const getSockJsUrl = (): string => {
-    const apiBase = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
+    let apiBase = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
+    if (apiBase.endsWith('/')) {
+        apiBase = apiBase.slice(0, -1);
+    }
     return `${apiBase}/ws`;
 };
 

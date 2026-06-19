@@ -46,8 +46,10 @@ const MAX_RETRIES = 3;
 
 // Lấy WebSocket URL (dùng HTTP/HTTPS vì SockJS tự nâng cấp)
 const getSockJsUrl = (): string => {
-    const apiBase = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
-    // Thêm /ws vào sau /api vì Spring Boot có context-path=/api
+    let apiBase = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
+    if (apiBase.endsWith('/')) {
+        apiBase = apiBase.slice(0, -1);
+    }
     return `${apiBase}/ws`;
 };
 
