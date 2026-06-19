@@ -29,8 +29,17 @@ const PaymentReturnPage = () => {
             if (vnpResponse) {
                 setOrderCode(vnpTxnRef || '');
                 if (vnpResponse === '00') {
-                    queryClient.invalidateQueries({ queryKey: ['myHistory'] });
-                    setStatus('success');
+                    try {
+                        // Gửi luôn tham số lên backend để kích hoạt update (đặc biệt cần cho localhost khi IPN của VNPay không gọi tới được)
+                        await axiosInstance.get(`/payments/vnpay/ipn${location.search}`);
+                        queryClient.invalidateQueries({ queryKey: ['myHistory'] });
+                        setStatus('success');
+                    } catch (error) {
+                        console.error('Lỗi xác thực VNPay:', error);
+                        // Vẫn cho success trên UI nếu cần, hoặc failed tùy ý
+                        queryClient.invalidateQueries({ queryKey: ['myHistory'] });
+                        setStatus('success'); 
+                    }
                 } else {
                     setStatus('failed');
                 }
