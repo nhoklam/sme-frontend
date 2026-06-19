@@ -10,7 +10,7 @@ import {
     Storefront, Dashboard as DashboardIcon,
     Logout as LogoutIcon, Logout,
     Add, Close, LocalOffer, Delete, Print, ReceiptLong,
-    Pause, ShoppingBasket, PersonAdd, Undo, ArrowBack, Person, MonetizationOn, Percent, Lock
+    Pause, ShoppingBasket, PersonAdd, Undo, ArrowBack, Person, MonetizationOn, Percent, Lock, Star
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 
@@ -860,17 +860,40 @@ const EmployeePOSPage: React.FC = () => {
                             </Tooltip>
                         </Box>
 
-                        {activeOrder.customer && (activeOrder.customer.loyaltyPoints ?? 0) >= 500 && (
+                        {activeOrder.customer && (activeOrder.customer.loyaltyPoints ?? 0) > 0 && (
                             <Box sx={{ mt: 1 }}>
-                                <Typography variant="caption" color="#8c8c8c" display="block" mb={0.5}>Quy đổi điểm (1đ = 100₫)</Typography>
-                                <FormControl fullWidth size="small">
-                                    <Select value={activeOrder.pointsToUse} onChange={e => updateOrder(o => ({ ...o, pointsToUse: Number(e.target.value) }))} sx={{ fontSize: 13, height: 32 }}>
-                                        <MenuItem value={0} sx={{ fontSize: 13 }}>Không dùng điểm</MenuItem>
-                                        {[500, 1000, 1500, 2000].filter(p => p <= (activeOrder.customer?.loyaltyPoints ?? 0)).map(p => (
-                                            <MenuItem key={p} value={p} sx={{ fontSize: 13 }}>{p} điểm → -{fmt(p * 100)}</MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
+                                <Box display="flex" justifyContent="space-between" mb={0.5}>
+                                    <Typography variant="caption" color="#8c8c8c">Quy đổi điểm (1đ = 100₫)</Typography>
+                                    <Typography variant="caption" color="#1890ff" fontWeight={600}>Khả dụng: {activeOrder.customer.loyaltyPoints}</Typography>
+                                </Box>
+                                <TextField
+                                    fullWidth size="small" type="number"
+                                    placeholder="Nhập số điểm muốn dùng..."
+                                    value={activeOrder.pointsToUse || ''}
+                                    onChange={e => {
+                                        let val = parseInt(e.target.value);
+                                        if (isNaN(val) || val < 0) val = 0;
+                                        const maxAllowed = Math.min(activeOrder.customer!.loyaltyPoints, Math.ceil(Math.max(0, totalAmount - orderDiscountAmt - couponDiscountAmt) / 100));
+                                        if (val > maxAllowed) val = maxAllowed;
+                                        updateOrder(o => ({ ...o, pointsToUse: val }));
+                                    }}
+                                    InputProps={{
+                                        endAdornment: (
+                                            <Typography 
+                                                variant="caption" color="#1890ff" fontWeight={600} 
+                                                sx={{ cursor: 'pointer', whiteSpace: 'nowrap', ml: 1 }} 
+                                                onClick={() => {
+                                                    const maxAllowed = Math.min(activeOrder.customer!.loyaltyPoints, Math.ceil(Math.max(0, totalAmount - orderDiscountAmt - couponDiscountAmt) / 100));
+                                                    updateOrder(o => ({ ...o, pointsToUse: maxAllowed }));
+                                                }}
+                                            >
+                                                Tối đa
+                                            </Typography>
+                                        ),
+                                        sx: { fontSize: 13, height: 32 }
+                                    }}
+                                    sx={{ '& input': { py: 0 } }}
+                                />
                             </Box>
                         )}
                     </Box>
@@ -979,6 +1002,16 @@ const EmployeePOSPage: React.FC = () => {
                             <Typography variant="body2" color="#262626">0đ</Typography>
                         </Box>
                     </Box>
+
+                    {pointsDiscount > 0 && (
+                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5}>
+                            <Box display="flex" alignItems="center" gap={0.5}>
+                                <Star sx={{ fontSize: 14, color: '#faad14' }} />
+                                <Typography variant="body2" color="#8c8c8c">Quy đổi điểm</Typography>
+                            </Box>
+                            <Typography variant="body2" color="#ff4d4f" fontWeight={600}>-{fmt(pointsDiscount)}</Typography>
+                        </Box>
+                    )}
 
                     <Box display="flex" gap={1} mb={1.5} bgcolor="#f5f5f5" p={0.5} borderRadius={1.5}>
                         <Button variant="contained" fullWidth sx={{ bgcolor: '#1890ff', color: '#fff', boxShadow: 'none', textTransform: 'none', borderRadius: 1 }}>Thanh toán</Button>
