@@ -1,25 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { bannerApi } from '../services/bannerApi';
 import { HomeBanner } from '../types';
 
 export const useBanners = (type?: HomeBanner['bannerType']) => {
-  const [banners, setBanners] = useState<HomeBanner[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, isLoading } = useQuery({
+    queryKey: ['banners', type],
+    queryFn: async () => {
+      const res = await bannerApi.getActiveBanners(type);
+      return res.success ? (res.data as HomeBanner[]) : [];
+    },
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+  });
 
-  useEffect(() => {
-    const fetchBanners = async () => {
-      setLoading(true);
-      try {
-        const res = await bannerApi.getActiveBanners(type);
-        if (res.success) setBanners(res.data);
-      } catch (err) {
-        console.error('Error fetching banners', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchBanners();
-  }, [type]);
-
-  return { banners, loading };
+  return {
+    banners: data ?? ([] as HomeBanner[]),
+    loading: isLoading,
+  };
 };

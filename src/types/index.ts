@@ -181,6 +181,7 @@ export interface ProductResponse {
   publishYear?: number;
   numberOfPages?: number;
   isActive: boolean;
+  isPublished?: boolean;
   availableQuantity?: number;
   createdAt: string;
 }
@@ -202,6 +203,7 @@ export interface CreateProductRequest {
   publisher?: string;
   publishYear?: number;
   numberOfPages?: number;
+  isPublished?: boolean;
 }
 
 export interface UpdateProductRequest {
@@ -223,6 +225,7 @@ export interface UpdateProductRequest {
   publishYear?: number;
   numberOfPages?: number;
   isActive?: boolean;
+  isPublished?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -285,19 +288,26 @@ export interface PurchaseOrder {
   warehouseId: string;
   createdByUserId?: string;
   approvedBy?: string;
+  approvedAt?: string;
+  rejectedBy?: string;
+  rejectedAt?: string;
+  rejectionReason?: string;
+  receivedBy?: string;
+  receivedAt?: string;
   totalAmount: number;
   paidAmount: number;
   status: PurchaseStatus;
   note?: string;
-  approvedAt?: string;
   createdAt: string;
   updatedAt?: string;
   createdBy?: string;
   updatedBy?: string;
+  creatorRole?: string;
+  cancelReason?: string;
   items: PurchaseItem[];
 }
 
-export type PurchaseStatus = 'DRAFT' | 'PENDING' | 'COMPLETED' | 'CANCELLED';
+export type PurchaseStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'COMPLETED' | 'CANCELLED';
 // ─────────────────────────────────────────────────────────────
 // BATCH / LOT NUMBER (thêm vào types/index.ts)
 // Paste các interface này vào cuối file types/index.ts
@@ -316,6 +326,7 @@ export interface PurchaseItem {
   lotNumber?: string;       // Mã lô nhập
   expiryDate?: string;      // Ngày hết hạn (ISO date string: "2025-12-31")
   manufacturingDate?: string; // Ngày sản xuất
+  receiveNote?: string;
 }
 
 // Thêm vào CreatePurchaseOrderRequest:
@@ -346,23 +357,63 @@ export interface InternalTransfer {
   toWarehouseId: string;
   createdByUserId: string;
   receivedByUserId?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectedBy?: string;
+  rejectedAt?: string;
+  rejectionReason?: string;
   status: TransferStatus;
   note?: string;
   dispatchedAt?: string;
   receivedAt?: string;
   referenceOrderId?: string;
   transferReason?: string;
+  creatorRole?: string;
+  cancelReason?: string;
+  dispatchedBy?: string;
   items: TransferItem[];
   createdAt: string;
 }
 
-export type TransferStatus = 'DRAFT' | 'DISPATCHED' | 'RECEIVED' | 'CANCELLED';
+export type TransferStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'DISPATCHED' | 'RECEIVED' | 'RECEIVED_PARTIAL' | 'REJECTED_BY_RECEIVER' | 'CANCELLED';
+
+export type StockAdjustmentStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+
+export interface StockAdjustment {
+  id: string;
+  code: string;
+  warehouseId: string;
+  createdByUser?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectedBy?: string;
+  rejectedAt?: string;
+  rejectionReason?: string;
+  status: StockAdjustmentStatus;
+  note?: string;
+  cancelReason?: string;
+  submittedAt?: string;
+  items: StockAdjustmentItem[];
+  createdAt: string;
+}
+
+export interface StockAdjustmentItem {
+  id: string;
+  productId: string;
+  systemQty: number;
+  actualQty: number;
+  diffQty: number;
+  reason?: string;
+  reasonType?: string;
+}
 
 export interface TransferItem {
   id: string;
   productId: string;
   quantity: number;
   receivedQty: number;
+  discrepancyQty?: number;
+  discrepancyReason?: string;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -860,6 +911,7 @@ export interface Product extends ProductResponse {
   totalReviews?: number;
   slug?: string;
   coverPrice?: number;
+  isPublished?: boolean;
 }
 
 export interface Author {

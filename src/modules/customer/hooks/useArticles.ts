@@ -19,7 +19,8 @@ export const useArticles = (params: UseArticlesParams) => {
             page: params.page ?? 0,
             size: params.size ?? 20,
         }),
-        staleTime: 5 * 60 * 1000,
+        staleTime: 0,
+        refetchOnWindowFocus: true,
     });
 
     return {
@@ -38,7 +39,8 @@ export const useArticleDetail = (slug: string) => {
         queryKey: ['article', slug],
         queryFn: () => articleService.getBySlug(slug),
         enabled: !!slug,
-        staleTime: 10 * 60 * 1000,
+        staleTime: 0,
+        refetchOnWindowFocus: true,
     });
 
     return {

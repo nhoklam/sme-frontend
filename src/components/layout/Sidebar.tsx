@@ -8,7 +8,7 @@ import {
     PointOfSale, Category, Warehouse, SwapHoriz, LocalShipping, ExpandLess,
     ExpandMore, AttachMoney, History, ManageAccounts, Notifications,
     Business, Logout, LocalOffer,
-    Image, PersonOutline, Summarize, BarChart, CalendarMonth, Star
+    Image, PersonOutline, Summarize, BarChart, CalendarMonth, Star, Assignment
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import authService from '../../services/authService';
@@ -40,6 +40,7 @@ const menuSections = [
             { text: 'Tồn kho', icon: <Warehouse />, path: '/admin/inventory' },
             { text: 'Nhập kho', icon: <LocalShipping />, path: '/admin/inventory/import' },
             { text: 'Chuyển kho', icon: <SwapHoriz />, path: '/admin/inventory/transfer' },
+            { text: 'Kiểm kê kho', icon: <Assignment />, path: '/admin/inventory/adjustment' },
             { text: 'Lịch sử kho', icon: <History />, path: '/admin/inventory/history' },
         ]
     },

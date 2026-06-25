@@ -1,25 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { authorApi } from '../services/authorApi';
 import { Author } from '../types';
 
 export const useFeaturedAuthors = () => {
-  const [authors, setAuthors] = useState<Author[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, isLoading } = useQuery({
+    queryKey: ['authors', 'featured'],
+    queryFn: async () => {
+      const res = await authorApi.getFeatured();
+      return res.success ? (res.data as Author[]) : [];
+    },
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+  });
 
-  useEffect(() => {
-    const fetchAuthors = async () => {
-      setLoading(true);
-      try {
-        const res = await authorApi.getFeatured();
-        if (res.success) setAuthors(res.data);
-      } catch (err) {
-        console.error('Error fetching featured authors', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchAuthors();
-  }, []);
-
-  return { authors, loading };
+  return {
+    authors: data ?? ([] as Author[]),
+    loading: isLoading,
+  };
 };

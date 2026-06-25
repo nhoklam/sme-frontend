@@ -23,6 +23,7 @@ const OrderListPage = lazy(() => import('../modules/admin/pages/orders/OrderList
 const InventoryPage = lazy(() => import('../modules/admin/pages/inventory/InventoryPage'));
 const ImportPage = lazy(() => import('../modules/admin/pages/inventory/ImportPage'));
 const TransfersPage = lazy(() => import('../modules/admin/pages/inventory/TransfersPage'));
+const InventoryAdjustmentPage = lazy(() => import('../modules/admin/pages/inventory/InventoryAdjustmentPage'));
 const InventoryHistoryPage = lazy(() => import('../modules/admin/pages/inventory/InventoryHistoryPage'));
 const StockAlertPage = lazy(() => import('../modules/admin/pages/inventory/StockAlertPage'));
 const CustomerListPage = lazy(() => import('../modules/admin/pages/customers/CustomerListPage'));
@@ -231,6 +232,7 @@ const AppRoutes: React.FC = () => (
             <Route path="inventory" element={<AdminGuard>{withSuspense(InventoryPage)}</AdminGuard>} />
             <Route path="inventory/import" element={<AdminGuard>{withSuspense(ImportPage)}</AdminGuard>} />
             <Route path="inventory/transfer" element={<AdminGuard>{withSuspense(TransfersPage)}</AdminGuard>} />
+            <Route path="inventory/adjustment" element={<AdminGuard>{withSuspense(InventoryAdjustmentPage)}</AdminGuard>} />
             <Route path="inventory/history" element={<AdminGuard>{withSuspense(InventoryHistoryPage)}</AdminGuard>} />
             <Route path="inventory/alerts" element={<AdminGuard>{withSuspense(StockAlertPage)}</AdminGuard>} />
 

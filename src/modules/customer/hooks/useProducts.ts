@@ -36,6 +36,7 @@ export const useProducts = (params: UseProductsParams): UseProductsResult => {
             keyword: params.keyword,
             categoryId: params.categoryId,
             isActive: true,
+            isPublished: true,
             sortBy: params.sortBy,
             page: params.page ?? 0,
             size: params.size ?? 20,
@@ -43,7 +44,8 @@ export const useProducts = (params: UseProductsParams): UseProductsResult => {
             maxPrice: params.maxPrice,
             minRating: params.minRating,
         }),
-        staleTime: 2 * 60 * 1000, // 2 phút
+        staleTime: 0,
+        refetchOnWindowFocus: true,
     });
 
     const products = useMemo(() => {
@@ -69,7 +71,8 @@ export const useProductDetail = (id: string) => {
         queryKey: ['product', id],
         queryFn: () => productService.getById(id),
         enabled: !!id,
-        staleTime: 5 * 60 * 1000,
+        staleTime: 0,
+        refetchOnWindowFocus: true,
     });
 
     return {
@@ -87,8 +90,9 @@ export const useProductDetail = (id: string) => {
 export const useFeaturedProducts = () => {
     const { data, isLoading, isError } = useQuery({
         queryKey: ['products', 'featured'],
-        queryFn: () => productService.search({ isActive: true, page: 0, size: 8 }),
-        staleTime: 3 * 60 * 1000,
+        queryFn: () => productService.search({ isActive: true, isPublished: true, page: 0, size: 8 }),
+        staleTime: 0,
+        refetchOnWindowFocus: true,
     });
 
     const products = useMemo(() => {
@@ -108,8 +112,9 @@ export const useFeaturedProducts = () => {
 export const useNewArrivals = () => {
     const { data, isLoading, isError } = useQuery({
         queryKey: ['products', 'newArrivals'],
-        queryFn: () => productService.search({ isActive: true, page: 0, size: 4 }),
-        staleTime: 3 * 60 * 1000,
+        queryFn: () => productService.search({ isActive: true, isPublished: true, page: 0, size: 4 }),
+        staleTime: 0,
+        refetchOnWindowFocus: true,
     });
 
     const products = useMemo(() => {

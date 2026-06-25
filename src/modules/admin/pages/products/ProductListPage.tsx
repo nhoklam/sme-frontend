@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import axiosInstance from '../../../../services/axiosConfig';
 import {
     Box, Typography, Paper, Table, TableBody, TableCell,
@@ -11,7 +12,7 @@ import {
 import toast from 'react-hot-toast';
 import {
     Search, Add, Visibility, Edit, ImageNotSupported,
-    Refresh, Print, FilterList, QrCodeScanner
+    Refresh, Print, FilterList, QrCodeScanner, Public
 } from '@mui/icons-material';
 import JsBarcode from 'jsbarcode';
 import BarcodePrintDialog, { BarcodePrintItem } from '../../../../components/common/BarcodePrintDialog';
@@ -52,6 +53,11 @@ const StatusChip = ({ isActive, stock }) => {
     return <Chip label="Đang bán" size="small" sx={{ bgcolor: '#d1fae5', color: '#065f46', fontWeight: 700, fontSize: 11, height: 22 }} />;
 };
 
+const WebChip = ({ isPublished }: { isPublished?: boolean }) =>
+    isPublished
+        ? <Chip label="Đã lên web" size="small" sx={{ bgcolor: '#eff6ff', color: '#1d4ed8', fontWeight: 700, fontSize: 11, height: 20, mt: 0.5 }} />
+        : <Chip label="Chưa lên web" size="small" sx={{ bgcolor: '#f1f5f9', color: '#94a3b8', fontWeight: 600, fontSize: 11, height: 20, mt: 0.5 }} />;
+
 
 
 // ── Main ─────────────────────────────────────────────────────
@@ -68,9 +74,11 @@ const ProductListPage = () => {
     const [minPrice, setMinPrice] = useState('');
     const [maxPrice, setMaxPrice] = useState('');
     const [isActive, setIsActive] = useState('');
+    const [isPublishedFilter, setIsPublishedFilter] = useState('');
     const [sortBy, setSortBy] = useState('');
     const currentUser = authService.getCurrentUser()?.user;
     const isManager = currentUser?.role === 'ROLE_MANAGER';
+    const queryClient = useQueryClient();
 
     const [filterWarehouseId, setFilterWarehouseId] = useState(isManager ? (currentUser?.warehouseId || '') : '');
     const [warehouses, setWarehouses] = useState<any[]>([]);
@@ -162,6 +170,7 @@ const ProductListPage = () => {
             if (minPrice) params.set('minPrice', minPrice);
             if (maxPrice) params.set('maxPrice', maxPrice);
             if (isActive !== '') params.set('isActive', isActive);
+            if (isPublishedFilter !== '') params.set('isPublished', isPublishedFilter);
             if (filterWarehouseId) params.set('warehouseId', filterWarehouseId);
             if (sortBy) params.set('sortBy', sortBy);
 
@@ -175,7 +184,7 @@ const ProductListPage = () => {
         } finally {
             setLoading(false);
         }
-    }, [search, categoryId, supplierId, minPrice, maxPrice, isActive, filterWarehouseId, sortBy, page]);
+    }, [search, categoryId, supplierId, minPrice, maxPrice, isActive, isPublishedFilter, filterWarehouseId, sortBy, page]);
 
     useEffect(() => {
         loadCategories();
@@ -259,6 +268,26 @@ const ProductListPage = () => {
         setPrintItems(items);
     };
 
+    const handleBulkPublish = async () => {
+        try {
+            const results = await Promise.allSettled(
+                selectedIds.map(id => axiosInstance.put(`/products/${id}`, { isPublished: true }))
+            );
+            const failed = results.filter(r => r.status === 'rejected').length;
+            const succeeded = results.length - failed;
+            if (failed > 0) {
+                toast.error(`Có ${failed} sản phẩm không thể đăng. Đã đăng ${succeeded} sản phẩm lên web.`);
+            } else {
+                toast.success(`Đã đăng ${succeeded} sản phẩm lên web thành công.`);
+            }
+            setSelectedIds([]);
+            loadProducts();
+            queryClient.invalidateQueries({ queryKey: ['products'] });
+        } catch {
+            toast.error('Có lỗi xảy ra khi đăng sản phẩm.');
+        }
+    };
+
     const handleBulkDelete = async () => {
         const ok = await confirm({
             title: 'Xóa sản phẩm',
@@ -312,7 +341,7 @@ const ProductListPage = () => {
                                 variant="outlined"
                                 color="error"
                                 onClick={handleBulkDelete}
-                                sx={{ textTransform: 'none', borderRadius: 2, height: 36, bgcolor: '#fff', borderColor: '#ef4444', color: '#ef4444', '&:hover': { bgcolor: '#fef2f2', borderColor: '#dc2626' } }}
+                                sx={{ textTransform: 'none', borderRadius: 2, height: 30, px: 1.2, fontSize: 11, fontWeight: 600, bgcolor: '#fff', borderColor: '#ef4444', color: '#ef4444', '&:hover': { bgcolor: '#fef2f2', borderColor: '#dc2626' } }}
                             >
                                 Xóa ({selectedIds.length})
                             </Button>
@@ -320,16 +349,27 @@ const ProductListPage = () => {
                                 size="small"
                                 variant="outlined"
                                 onClick={handleBulkPrint}
-                                startIcon={<Print />}
-                                sx={{ textTransform: 'none', borderRadius: 2, height: 36, bgcolor: '#fff', color: '#10b981', borderColor: '#10b981', '&:hover': { bgcolor: '#ecfdf5', borderColor: '#059669' } }}
+                                startIcon={<Print sx={{ fontSize: '14px !important' }} />}
+                                sx={{ textTransform: 'none', borderRadius: 2, height: 30, px: 1.2, fontSize: 11, fontWeight: 600, bgcolor: '#fff', color: '#10b981', borderColor: '#10b981', '&:hover': { bgcolor: '#ecfdf5', borderColor: '#059669' } }}
                             >
                                 In tem ({selectedIds.length})
                             </Button>
+                            {currentUser?.role === 'ROLE_ADMIN' && (
+                                <Button
+                                    size="small"
+                                    variant="outlined"
+                                    onClick={handleBulkPublish}
+                                    startIcon={<Public sx={{ fontSize: '14px !important' }} />}
+                                    sx={{ textTransform: 'none', borderRadius: 2, height: 30, px: 1.2, fontSize: 11, fontWeight: 600, bgcolor: '#fff', color: '#2563eb', borderColor: '#2563eb', '&:hover': { bgcolor: '#eff6ff', borderColor: '#1d4ed8' } }}
+                                >
+                                    Đăng web ({selectedIds.length})
+                                </Button>
+                            )}
                             <Button
                                 size="small"
                                 variant="text"
                                 onClick={() => setSelectedIds([])}
-                                sx={{ textTransform: 'none', color: '#64748b', mr: 1 }}
+                                sx={{ textTransform: 'none', fontSize: 11, color: '#64748b', mr: 0.5 }}
                             >
                                 Bỏ chọn tất cả
                             </Button>
@@ -443,6 +483,16 @@ const ProductListPage = () => {
                                     </Select>
                                 </FormControl>
                             </Grid>
+                            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                                <Typography variant="caption" fontWeight={700} color="#666" display="block" mb={0.5}>TÌNH TRẠNG WEB</Typography>
+                                <FormControl fullWidth size="small">
+                                    <Select value={isPublishedFilter} onChange={e => { setIsPublishedFilter(e.target.value); setPage(0); }} displayEmpty sx={{ fontSize: 13 }}>
+                                        <MenuItem value="">Tất cả</MenuItem>
+                                        <MenuItem value="true" sx={{ fontSize: 13 }}>Đã lên web</MenuItem>
+                                        <MenuItem value="false" sx={{ fontSize: 13 }}>Chưa lên web</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </Grid>
                             {!isManager && (
                                 <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                                     <Typography variant="caption" fontWeight={700} color="#666" display="block" mb={0.5}>KHO / CHI NHÁNH</Typography>
@@ -475,6 +525,7 @@ const ProductListPage = () => {
                                         setCategoryId('');
                                         setSupplierId('');
                                         setIsActive('');
+                                        setIsPublishedFilter('');
                                         if (!isManager) setFilterWarehouseId('');
                                         setMinPrice('');
                                         setMaxPrice('');
@@ -591,7 +642,10 @@ const ProductListPage = () => {
                                                 </Box>
                                             </Tooltip>
                                         </TableCell>
-                                        <TableCell><StatusChip isActive={p.isActive} stock={p.availableQuantity ?? 0} /></TableCell>
+                                        <TableCell>
+                                            <StatusChip isActive={p.isActive} stock={p.availableQuantity ?? 0} />
+                                            <WebChip isPublished={p.isPublished} />
+                                        </TableCell>
                                         <TableCell align="center">
                                             <Box sx={{ display: 'flex', gap: 0.5 }}>
                                                 <Tooltip title="Xem chi tiết">

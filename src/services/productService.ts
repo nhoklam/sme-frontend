@@ -9,11 +9,11 @@ import {
 } from '../types';
 
 const productService = {
-    // Tìm kiếm / lấy danh sách sản phẩm có phân trang
     search: async (params: {
         keyword?: string;
         categoryId?: string;
         isActive?: boolean;
+        isPublished?: boolean;
         sortBy?: string;
         page?: number;
         size?: number;
@@ -26,6 +26,7 @@ const productService = {
         if (params.keyword?.trim()) query.set('keyword', params.keyword.trim());
         if (params.categoryId) query.set('categoryId', params.categoryId);
         if (params.isActive !== undefined) query.set('isActive', String(params.isActive));
+        if (params.isPublished !== undefined) query.set('isPublished', String(params.isPublished));
         if (params.minPrice !== undefined) query.set('minPrice', String(params.minPrice));
         if (params.maxPrice !== undefined) query.set('maxPrice', String(params.maxPrice));
         if (params.minRating !== undefined) query.set('minRating', String(params.minRating));

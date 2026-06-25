@@ -10,7 +10,7 @@ import {
 import {
     Search, Add, Refresh, Visibility, Close,
     Delete, LocalShipping, ArrowForward, FileDownloadOutlined,
-    CheckCircle, Warning,
+    CheckCircle, Warning, Send, ThumbDown, Cancel, Block,
 } from '@mui/icons-material';
 import { transferService } from '../../../../services/transferService';
 import warehouseService from '../../../../services/warehouseService';
@@ -25,10 +25,25 @@ import authService from '../../../../services/authService';
 
 // ── helpers ────────────────────────────────────────────────────
 const STATUS_MAP: Record<TransferStatus, { label: string; color: string; bg: string }> = {
-    DRAFT: { label: 'Nháp', color: '#888', bg: '#f5f5f5' },
-    DISPATCHED: { label: 'Đã xuất', color: '#e65100', bg: '#fff3e0' },
-    RECEIVED: { label: 'Đã nhận', color: '#2e7d32', bg: '#e8f5e9' },
-    CANCELLED: { label: 'Đã hủy', color: '#d32f2f', bg: '#ffebee' },
+    DRAFT:                { label: 'Nháp',              color: '#888',    bg: '#f5f5f5' },
+    PENDING_APPROVAL:     { label: 'Chờ duyệt',         color: '#e65100', bg: '#fff3e0' },
+    APPROVED:             { label: 'Đã duyệt',          color: '#1565c0', bg: '#e3f2fd' },
+    REJECTED:             { label: 'Bị từ chối',        color: '#d32f2f', bg: '#ffebee' },
+    DISPATCHED:           { label: 'Đã xuất',           color: '#7c3aed', bg: '#ede9fe' },
+    RECEIVED:             { label: 'Đã nhận',           color: '#2e7d32', bg: '#e8f5e9' },
+    RECEIVED_PARTIAL:     { label: 'Nhận thiếu',        color: '#e65100', bg: '#fff3e0' },
+    REJECTED_BY_RECEIVER: { label: 'Kho nhập từ chối', color: '#d32f2f', bg: '#ffebee' },
+    CANCELLED:            { label: 'Đã hủy',            color: '#9e9e9e', bg: '#f5f5f5' },
+};
+
+const canApproveTransfer = (transfer: InternalTransfer, user: any): boolean => {
+    if (!user || !transfer.creatorRole) return false;
+    if (user.id === transfer.createdByUserId) return false;
+    if (transfer.creatorRole === 'ROLE_MANAGER' && user.role === 'ROLE_ADMIN') return true;
+    if (transfer.creatorRole === 'ROLE_ADMIN' && user.role === 'ROLE_MANAGER') {
+        return !!user.warehouseId && String(user.warehouseId).toLowerCase() === String(transfer.fromWarehouseId).toLowerCase();
+    }
+    return false;
 };
 
 // ══════════════════════════════════════════════════════════════
@@ -40,27 +55,36 @@ const TransferDetailDialog: React.FC<{
     warehouses: Warehouse[];
     products: Map<string, ProductResponse>;
     onClose: () => void;
+    onSubmit: () => void;
+    onApprove: () => void;
+    onReject: () => void;
     onDispatch: () => void;
-    onReceive: (items: Array<{ productId: string; receivedQty: number }>) => void;
+    onReceive: (items: Array<{ productId: string; receivedQty: number; discrepancyReason?: string }>) => void;
+    onRejectReceive: () => void;
+    onCancel: () => void;
     loading: boolean;
     currentUser: any;
     isAdmin: boolean;
-}> = ({ open, transfer, warehouses, products, onClose, onDispatch, onReceive, loading, currentUser, isAdmin }) => {
+}> = ({ open, transfer, warehouses, products, onClose, onSubmit, onApprove, onReject, onDispatch, onReceive, onRejectReceive, onCancel, loading, currentUser, isAdmin }) => {
+    const isAutoTransfer = !!transfer?.referenceOrderId;
+    const userWarehouseId = currentUser?.warehouseId;
+    const isFromWarehouse = !isAdmin && (userWarehouseId && transfer?.fromWarehouseId && String(userWarehouseId).toLowerCase() === String(transfer.fromWarehouseId).toLowerCase());
+    const isToWarehouse = !isAdmin && (userWarehouseId && transfer?.toWarehouseId && String(userWarehouseId).toLowerCase() === String(transfer.toWarehouseId).toLowerCase());
+    const isCreator = currentUser?.id === transfer?.createdByUserId;
     const fromWh = warehouses.find(w => w.id === transfer?.fromWarehouseId);
     const toWh = warehouses.find(w => w.id === transfer?.toWarehouseId);
-    const info = transfer ? STATUS_MAP[transfer.status] : { label: '', color: '', bg: '' };
+    const info = transfer ? (STATUS_MAP[transfer.status] ?? { label: transfer.status, color: '#888', bg: '#f5f5f5' }) : { label: '', color: '', bg: '' };
     const totalQty = transfer?.items.reduce((s, i) => s + i.quantity, 0) || 0;
 
-    // State nhập số lượng thực nhận — khởi tạo bằng số lượng gốc
     const [receivedQtys, setReceivedQtys] = useState<Record<string, number>>({});
+    const [discrepancyReasons, setDiscrepancyReasons] = useState<Record<string, string>>({});
 
     React.useEffect(() => {
         if (open && transfer) {
             const init: Record<string, number> = {};
-            transfer.items.forEach(item => {
-                init[item.id] = item.quantity; // mặc định = số lượng gửi
-            });
+            transfer.items.forEach(item => { init[item.id] = item.quantity; });
             setReceivedQtys(init);
+            setDiscrepancyReasons({});
         }
     }, [open, transfer]);
 
@@ -70,15 +94,23 @@ const TransferDetailDialog: React.FC<{
 
     const handleConfirmReceive = () => {
         if (!transfer) return;
-        const items = transfer.items.map(item => ({
-            productId: item.productId,
-            receivedQty: receivedQtys[item.id] ?? item.quantity,
-        }));
+        const items = transfer.items.map(item => {
+            const receivedQty = receivedQtys[item.id] ?? item.quantity;
+            const isShortItem = receivedQty < item.quantity;
+            return {
+                productId: item.productId,
+                receivedQty,
+                ...(isShortItem && discrepancyReasons[item.id]?.trim()
+                    ? { discrepancyReason: discrepancyReasons[item.id].trim() }
+                    : {}),
+            };
+        });
         onReceive(items);
     };
 
     const hasShortage = transfer?.items.some(item => (receivedQtys[item.id] ?? item.quantity) < item.quantity);
     const totalReceived = Object.values(receivedQtys).reduce((s, v) => s + v, 0);
+    const isReceivedState = transfer?.status === 'RECEIVED' || transfer?.status === 'RECEIVED_PARTIAL';
 
     return (
         <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 2.5 } }}>
@@ -98,7 +130,6 @@ const TransferDetailDialog: React.FC<{
             <Divider sx={{ mx: 3, mt: 1 }} />
 
             <DialogContent sx={{ px: 3, pt: 2 }}>
-                {/* Thông tin kho xuất / nhập */}
                 <Grid container spacing={2} sx={{ mb: 2 }}>
                     <Grid size={{ xs: 12, sm: 6 }}>
                         <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #f0f0f0', bgcolor: '#fff3e0' }}>
@@ -130,7 +161,6 @@ const TransferDetailDialog: React.FC<{
                     </Grid>
                 </Grid>
 
-                {/* Tóm tắt */}
                 <Box sx={{ p: 1.5, bgcolor: '#f5f5f5', borderRadius: 1.5, mb: 2, display: 'flex', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
                     <Box><Typography variant="caption" color="text.secondary">Mặt hàng</Typography><Typography fontWeight={700}>{transfer?.items.length || 0}</Typography></Box>
                     <Box><Typography variant="caption" color="text.secondary">SL gửi</Typography><Typography fontWeight={700}>{totalQty.toLocaleString()}</Typography></Box>
@@ -142,14 +172,12 @@ const TransferDetailDialog: React.FC<{
                     )}
                 </Box>
 
-                {/* Thông báo nếu nhận thiếu */}
                 {transfer?.status === 'DISPATCHED' && hasShortage && (
                     <Alert severity="warning" sx={{ mb: 2, borderRadius: 1.5 }}>
                         Một số mặt hàng nhận số lượng ít hơn số gửi — hệ thống sẽ chỉ cộng tồn kho theo SL thực nhận.
                     </Alert>
                 )}
 
-                {/* Bảng sản phẩm */}
                 <Typography variant="subtitle2" fontWeight={700} mb={1}>Danh sách hàng hóa</Typography>
                 <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #f0f0f0', borderRadius: 1.5 }}>
                     <Table size="small">
@@ -164,16 +192,18 @@ const TransferDetailDialog: React.FC<{
                                 {transfer?.status !== 'DRAFT' && (
                                     <TableCell align="center" sx={{ fontWeight: 700, fontSize: 11 }}>Tình trạng</TableCell>
                                 )}
+                                {transfer?.status === 'DISPATCHED' && (
+                                    <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>Lý do chênh lệch</TableCell>
+                                )}
                             </TableRow>
                         </TableHead>
                         <TableBody>
                             {transfer?.items.map((item, idx) => {
                                 const p = products.get(item.productId);
-                                const receivedQty = transfer.status === 'RECEIVED'
+                                const receivedQty = isReceivedState
                                     ? item.receivedQty
                                     : (receivedQtys[item.id] ?? item.quantity);
                                 const isShort = receivedQty < item.quantity;
-                                const isExact = receivedQty === item.quantity;
 
                                 return (
                                     <TableRow key={item.id} sx={{ bgcolor: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
@@ -199,32 +229,32 @@ const TransferDetailDialog: React.FC<{
                                             <Typography variant="caption" fontFamily="monospace" color="#888">
                                                 {p?.isbnBarcode || '—'}
                                             </Typography>
+                                            {isReceivedState && item.discrepancyReason && (
+                                                <Typography variant="caption" color="#e65100" display="block" mt={0.25}>
+                                                    ⚠ {item.discrepancyReason}
+                                                </Typography>
+                                            )}
                                         </TableCell>
                                         <TableCell align="center">
                                             <Typography fontWeight={700}>{item.quantity}</Typography>
                                         </TableCell>
                                         <TableCell align="center">
                                             {transfer.status === 'DISPATCHED' ? (
-                                                // Cho nhập số lượng thực nhận
                                                 <TextField
                                                     size="small"
                                                     type="number"
                                                     value={receivedQtys[item.id] ?? item.quantity}
                                                     onChange={e => updateReceivedQty(item.id, parseInt(e.target.value) || 0, item.quantity)}
                                                     inputProps={{ min: 0, max: item.quantity, style: { width: 70, textAlign: 'center' } }}
-                                                    sx={{
-                                                        '& .MuiOutlinedInput-root': {
-                                                            bgcolor: isShort ? '#fff3e0' : '#f0fff4',
-                                                        }
-                                                    }}
+                                                    sx={{ '& .MuiOutlinedInput-root': { bgcolor: isShort ? '#fff3e0' : '#f0fff4' } }}
                                                 />
                                             ) : (
-                                                <Typography fontWeight={700} color="#2e7d32">{item.receivedQty || 0}</Typography>
+                                                <Typography fontWeight={700} color={isShort ? '#e65100' : '#2e7d32'}>{item.receivedQty || 0}</Typography>
                                             )}
                                         </TableCell>
                                         {transfer.status !== 'DRAFT' && (
                                             <TableCell align="center">
-                                                {transfer.status === 'RECEIVED' ? (
+                                                {isReceivedState ? (
                                                     item.receivedQty >= item.quantity ? (
                                                         <Chip label="Đủ" size="small" icon={<CheckCircle sx={{ fontSize: 12 }} />}
                                                             sx={{ height: 22, fontSize: 10, bgcolor: '#e8f5e9', color: '#2e7d32', fontWeight: 700 }} />
@@ -244,6 +274,22 @@ const TransferDetailDialog: React.FC<{
                                                 ) : null}
                                             </TableCell>
                                         )}
+                                        {transfer.status === 'DISPATCHED' && (
+                                            <TableCell>
+                                                {isShort ? (
+                                                    <TextField
+                                                        size="small"
+                                                        placeholder="Nhập lý do thiếu hàng..."
+                                                        value={discrepancyReasons[item.id] || ''}
+                                                        onChange={e => setDiscrepancyReasons(prev => ({ ...prev, [item.id]: e.target.value }))}
+                                                        inputProps={{ style: { width: 200 } }}
+                                                        sx={{ '& .MuiOutlinedInput-root': { bgcolor: '#fff3e0' } }}
+                                                    />
+                                                ) : (
+                                                    <Typography variant="caption" color="#aaa">—</Typography>
+                                                )}
+                                            </TableCell>
+                                        )}
                                     </TableRow>
                                 );
                             })}
@@ -251,6 +297,18 @@ const TransferDetailDialog: React.FC<{
                     </Table>
                 </TableContainer>
 
+                {transfer?.rejectionReason && (
+                    <Box sx={{ mt: 2, p: 1.5, bgcolor: '#ffebee', borderRadius: 1.5, border: '1px solid #ffcdd2' }}>
+                        <Typography variant="caption" fontWeight={700} color="#d32f2f">Lý do từ chối:</Typography>
+                        <Typography variant="body2" color="#d32f2f" mt={0.5}>{transfer.rejectionReason}</Typography>
+                    </Box>
+                )}
+                {transfer?.cancelReason && (
+                    <Box sx={{ mt: 2, p: 1.5, bgcolor: '#ffebee', borderRadius: 1.5, border: '1px solid #ffcdd2' }}>
+                        <Typography variant="caption" fontWeight={700} color="#d32f2f">Lý do hủy:</Typography>
+                        <Typography variant="body2" color="#d32f2f" mt={0.5}>{transfer.cancelReason}</Typography>
+                    </Box>
+                )}
                 {transfer?.note && (
                     <Box sx={{ mt: 2, p: 1.5, bgcolor: '#f5f5f5', borderRadius: 1.5 }}>
                         <Typography variant="caption" fontWeight={700}>Ghi chú:</Typography>
@@ -259,19 +317,76 @@ const TransferDetailDialog: React.FC<{
                 )}
             </DialogContent>
 
-            <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+            <DialogActions sx={{ px: 3, pb: 2.5, gap: 1, flexWrap: 'wrap', borderTop: '1px solid #e2e8f0' }}>
                 <Button onClick={onClose} variant="outlined">Đóng</Button>
-                {transfer?.status === 'DRAFT' && (isAdmin || (currentUser?.warehouseId && transfer?.fromWarehouseId && String(currentUser.warehouseId).toLowerCase() === String(transfer.fromWarehouseId).toLowerCase())) && (
-                    <Button onClick={onDispatch} variant="contained" disabled={loading} sx={{ bgcolor: '#e65100' }}>
+                <Box sx={{ flex: 1 }} />
+
+                {/* DRAFT — Auto-transfer: kho xuất xác nhận xuất kho trực tiếp */}
+                {transfer?.status === 'DRAFT' && isAutoTransfer && isFromWarehouse && (
+                    <Button onClick={onDispatch} variant="contained" disabled={loading}
+                        sx={{ textTransform: 'none', bgcolor: '#7c3aed', '&:hover': { bgcolor: '#6d28d9' } }}>
                         {loading ? <CircularProgress size={16} sx={{ color: '#fff', mr: 1 }} /> : null}
                         {loading ? 'Đang xử lý...' : 'Xác nhận xuất kho'}
                     </Button>
                 )}
-                {transfer?.status === 'DISPATCHED' && (isAdmin || (currentUser?.warehouseId && transfer?.toWarehouseId && String(currentUser.warehouseId).toLowerCase() === String(transfer.toWarehouseId).toLowerCase())) && (
-                    <Button onClick={handleConfirmReceive} variant="contained" disabled={loading} sx={{ bgcolor: '#2e7d32' }}>
+
+                {/* DRAFT — Manual: chỉ người tạo mới gửi duyệt / hủy */}
+                {transfer?.status === 'DRAFT' && !isAutoTransfer && isCreator && !isAdmin && (
+                    <>
+                        <Button onClick={() => onSubmit()} variant="contained" disabled={loading} startIcon={<Send />}
+                            sx={{ textTransform: 'none', bgcolor: '#f59e0b', color: '#fff', '&:hover': { bgcolor: '#d97706' } }}>
+                            Gửi duyệt
+                        </Button>
+                        <Button onClick={() => onCancel()} variant="outlined" color="error" disabled={loading} sx={{ textTransform: 'none' }}>
+                            Hủy phiếu
+                        </Button>
+                    </>
+                )}
+
+                {/* PENDING_APPROVAL: duyệt chéo */}
+                {transfer?.status === 'PENDING_APPROVAL' && (
+                    <>
+                        {transfer && canApproveTransfer(transfer, currentUser) && (
+                            <>
+                                <Button onClick={() => onApprove()} variant="contained" disabled={loading} startIcon={<CheckCircle />}
+                                    sx={{ textTransform: 'none', bgcolor: '#2e7d32', '&:hover': { bgcolor: '#1b5e20' } }}>
+                                    Duyệt
+                                </Button>
+                                <Button onClick={() => onReject()} variant="contained" disabled={loading} startIcon={<ThumbDown />}
+                                    sx={{ textTransform: 'none', bgcolor: '#ef4444', '&:hover': { bgcolor: '#dc2626' } }}>
+                                    Từ chối
+                                </Button>
+                            </>
+                        )}
+                        {isCreator && !isAdmin && (
+                            <Button onClick={() => onCancel()} variant="outlined" color="error" disabled={loading} sx={{ textTransform: 'none' }}>
+                                Hủy phiếu
+                            </Button>
+                        )}
+                    </>
+                )}
+
+                {/* APPROVED: xuất kho — chỉ kho xuất */}
+                {transfer?.status === 'APPROVED' && isFromWarehouse && (
+                    <Button onClick={onDispatch} variant="contained" disabled={loading}
+                        sx={{ textTransform: 'none', bgcolor: '#7c3aed', '&:hover': { bgcolor: '#6d28d9' } }}>
                         {loading ? <CircularProgress size={16} sx={{ color: '#fff', mr: 1 }} /> : null}
-                        {loading ? 'Đang xử lý...' : hasShortage ? `Nhận hàng (${totalReceived} / ${totalQty})` : 'Xác nhận nhận hàng đủ'}
+                        {loading ? 'Đang xử lý...' : 'Xác nhận xuất kho'}
                     </Button>
+                )}
+
+                {/* DISPATCHED: kho nhập nhận hàng hoặc từ chối nhận */}
+                {transfer?.status === 'DISPATCHED' && isToWarehouse && (
+                    <>
+                        <Button onClick={() => onRejectReceive()} variant="outlined" color="error" disabled={loading} startIcon={<Block />}
+                            sx={{ textTransform: 'none' }}>
+                            Từ chối nhận
+                        </Button>
+                        <Button onClick={handleConfirmReceive} variant="contained" disabled={loading} sx={{ bgcolor: '#2e7d32' }}>
+                            {loading ? <CircularProgress size={16} sx={{ color: '#fff', mr: 1 }} /> : null}
+                            {loading ? 'Đang xử lý...' : hasShortage ? `Nhận hàng (${totalReceived} / ${totalQty})` : 'Xác nhận nhận hàng đủ'}
+                        </Button>
+                    </>
                 )}
             </DialogActions>
         </Dialog>
@@ -300,13 +415,13 @@ const CreateTransferDialog: React.FC<{
     const [snack, setSnack] = useState<{ msg: string; sev: 'success' | 'error' } | null>(null);
 
     React.useEffect(() => {
-        if (!open) { 
+        if (!open) {
             if (!isAdmin && currentUser?.warehouseId) {
                 setFromWid(currentUser.warehouseId);
             } else {
-                setFromWid(''); 
+                setFromWid('');
             }
-            setToWid(''); setNote(''); setCart([]); setKw(''); 
+            setToWid(''); setNote(''); setCart([]); setKw('');
         } else if (!isAdmin && currentUser?.warehouseId) {
             setFromWid(currentUser.warehouseId);
         }
@@ -328,8 +443,8 @@ const CreateTransferDialog: React.FC<{
         });
         if (kw.trim()) {
             const lowerKw = kw.toLowerCase();
-            list = list.filter(p => p.name.toLowerCase().includes(lowerKw) || 
-                                     p.sku?.toLowerCase().includes(lowerKw) || 
+            list = list.filter(p => p.name.toLowerCase().includes(lowerKw) ||
+                                     p.sku?.toLowerCase().includes(lowerKw) ||
                                      p.isbnBarcode?.toLowerCase().includes(lowerKw));
         }
         return list;
@@ -344,7 +459,6 @@ const CreateTransferDialog: React.FC<{
             return [...prev, { productId: p.id, productName: p.name, isbnBarcode: p.isbnBarcode, sku: p.sku, quantity: 1, availableStock: available, imageUrl: p.imageUrl }];
         });
         setKw('');
-
     };
 
     const updateQty = (id: string, qty: number) => {
@@ -378,7 +492,7 @@ const CreateTransferDialog: React.FC<{
             <DialogTitle sx={{ pb: 0.5, pt: 2.5, px: 3, display: 'flex', justifyContent: 'space-between' }}>
                 <Box>
                     <Typography fontWeight={800} fontSize={16}>Tạo Phiếu Chuyển Kho</Typography>
-                    <Typography variant="caption" color="text.secondary">Điều chuyển hàng hóa giữa các chi nhánh</Typography>
+                    <Typography variant="caption" color="text.secondary">Phiếu sẽ ở trạng thái NHÁP cho đến khi gửi duyệt</Typography>
                 </Box>
                 <IconButton size="small" onClick={onClose}><Close /></IconButton>
             </DialogTitle>
@@ -443,10 +557,7 @@ const CreateTransferDialog: React.FC<{
                                                             )}
                                                             <Tooltip title={p.name} arrow placement="top">
                                                                 <Typography variant="body2" fontWeight={600} fontSize={13} sx={{
-                                                                    whiteSpace: 'nowrap',
-                                                                    overflow: 'hidden',
-                                                                    textOverflow: 'ellipsis',
-                                                                    maxWidth: 350
+                                                                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 350
                                                                 }}>
                                                                     {p.name}
                                                                 </Typography>
@@ -500,10 +611,7 @@ const CreateTransferDialog: React.FC<{
                                                     )}
                                                     <Tooltip title={item.productName} arrow placement="top">
                                                         <Typography fontWeight={600} fontSize={13} sx={{
-                                                            whiteSpace: 'nowrap',
-                                                            overflow: 'hidden',
-                                                            textOverflow: 'ellipsis',
-                                                            maxWidth: 300
+                                                            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 300
                                                         }}>
                                                             {item.productName}
                                                         </Typography>
@@ -569,6 +677,12 @@ const TransfersPage: React.FC = () => {
     const [createOpen, setCreateOpen] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
     const [snack, setSnack] = useState<{ msg: string; sev: 'success' | 'error' } | null>(null);
+    const [rejectOpen, setRejectOpen] = useState(false);
+    const [rejectReason, setRejectReason] = useState('');
+    const [cancelOpen, setCancelOpen] = useState(false);
+    const [cancelReason, setCancelReason] = useState('');
+    const [rejectReceiveOpen, setRejectReceiveOpen] = useState(false);
+    const [rejectReceiveReason, setRejectReceiveReason] = useState('');
     const PAGE_SIZE = 15;
 
     const currentUser = authService.getCurrentUser()?.user;
@@ -605,6 +719,56 @@ const TransfersPage: React.FC = () => {
 
     const refresh = () => qc.invalidateQueries({ queryKey: ['transfers'] });
 
+    const handleSubmit = async (transferId?: string) => {
+        const id = (typeof transferId === 'string') ? transferId : selected?.id;
+        if (!id) return;
+        setActionLoading(true);
+        try {
+            await transferService.submit(id);
+            setSnack({ msg: 'Đã gửi phiếu chuyển để duyệt!', sev: 'success' });
+            setDetailOpen(false); refresh();
+        } catch (e: any) {
+            setSnack({ msg: e.response?.data?.message || 'Gửi duyệt thất bại', sev: 'error' });
+        } finally { setActionLoading(false); }
+    };
+
+    const handleApprove = async (transferId?: string) => {
+        const id = (typeof transferId === 'string') ? transferId : selected?.id;
+        if (!id) return;
+        setActionLoading(true);
+        try {
+            await transferService.approve(id);
+            setSnack({ msg: 'Duyệt phiếu chuyển thành công!', sev: 'success' });
+            setDetailOpen(false); refresh();
+        } catch (e: any) {
+            setSnack({ msg: e.response?.data?.message || 'Duyệt thất bại', sev: 'error' });
+        } finally { setActionLoading(false); }
+    };
+
+    const handleRejectConfirm = async () => {
+        if (!selected || !rejectReason.trim()) return;
+        setActionLoading(true);
+        try {
+            await transferService.reject(selected.id, rejectReason);
+            setSnack({ msg: 'Đã từ chối phiếu chuyển.', sev: 'success' });
+            setRejectOpen(false); setRejectReason(''); setDetailOpen(false); refresh();
+        } catch (e: any) {
+            setSnack({ msg: e.response?.data?.message || 'Thất bại', sev: 'error' });
+        } finally { setActionLoading(false); }
+    };
+
+    const handleCancel = async () => {
+        if (!selected || !cancelReason.trim()) return;
+        setActionLoading(true);
+        try {
+            await transferService.cancel(selected.id, cancelReason);
+            setSnack({ msg: 'Đã hủy phiếu chuyển kho.', sev: 'success' });
+            setCancelOpen(false); setCancelReason(''); setDetailOpen(false); refresh();
+        } catch (e: any) {
+            setSnack({ msg: e.response?.data?.message || 'Hủy thất bại', sev: 'error' });
+        } finally { setActionLoading(false); }
+    };
+
     const handleDispatch = async () => {
         if (!selected) return;
         setActionLoading(true);
@@ -613,14 +777,24 @@ const TransfersPage: React.FC = () => {
             setSnack({ msg: 'Xác nhận xuất kho thành công!', sev: 'success' });
             setDetailOpen(false);
             refresh();
-            // Cập nhật tồn kho sau khi xuất
             qc.invalidateQueries({ queryKey: ['inventory-all'] });
         } catch (e: any) {
             setSnack({ msg: e.response?.data?.message || 'Thất bại', sev: 'error' });
         } finally { setActionLoading(false); }
     };
 
-    // Nhận hàng với số lượng thực nhận từng món
+    const handleDispatchDirect = async (transferId: string) => {
+        setActionLoading(true);
+        try {
+            await transferService.dispatch(transferId);
+            setSnack({ msg: 'Xác nhận xuất kho thành công!', sev: 'success' });
+            refresh();
+            qc.invalidateQueries({ queryKey: ['inventory-all'] });
+        } catch (e: any) {
+            setSnack({ msg: e.response?.data?.message || 'Thất bại', sev: 'error' });
+        } finally { setActionLoading(false); }
+    };
+
     const handleReceive = async (items: Array<{ productId: string; receivedQty: number }>) => {
         if (!selected) return;
         setActionLoading(true);
@@ -629,14 +803,25 @@ const TransfersPage: React.FC = () => {
             setSnack({ msg: 'Xác nhận nhận hàng thành công!', sev: 'success' });
             setDetailOpen(false);
             refresh();
-            // Cập nhật tồn kho sau khi nhận
             qc.invalidateQueries({ queryKey: ['inventory-all'] });
         } catch (e: any) {
             setSnack({ msg: e.response?.data?.message || 'Thất bại', sev: 'error' });
         } finally { setActionLoading(false); }
     };
 
-    // Excel export
+    const handleRejectReceiveConfirm = async () => {
+        if (!selected || !rejectReceiveReason.trim()) return;
+        setActionLoading(true);
+        try {
+            await transferService.rejectReceive(selected.id, rejectReceiveReason);
+            setSnack({ msg: 'Đã từ chối nhận hàng. Tồn kho kho xuất sẽ được hoàn lại.', sev: 'success' });
+            setRejectReceiveOpen(false); setRejectReceiveReason(''); setDetailOpen(false); refresh();
+            qc.invalidateQueries({ queryKey: ['inventory-all'] });
+        } catch (e: any) {
+            setSnack({ msg: e.response?.data?.message || 'Thất bại', sev: 'error' });
+        } finally { setActionLoading(false); }
+    };
+
     const handleExport = async () => {
         try {
             const all = await transferService.getAll({ page: 0, size: 9999, status: statusFilter || undefined, keyword: keyword || undefined });
@@ -657,7 +842,7 @@ const TransfersPage: React.FC = () => {
                 { header: 'Mã phiếu', key: 'code', width: 20 },
                 { header: 'Kho xuất', key: 'fromWarehouse', width: 28 },
                 { header: 'Kho nhập', key: 'toWarehouse', width: 28 },
-                { header: 'Trạng thái', key: 'status', width: 14 },
+                { header: 'Trạng thái', key: 'status', width: 18 },
                 { header: 'Số mặt hàng', key: 'itemCount', width: 14 },
                 { header: 'SL gửi', key: 'totalQty', width: 12 },
                 { header: 'SL đã nhận', key: 'totalReceived', width: 12 },
@@ -685,10 +870,12 @@ const TransfersPage: React.FC = () => {
                         onClick={handleExport} sx={{ textTransform: 'none', borderColor: '#2e7d32', color: '#2e7d32' }}>
                         Excel
                     </Button>
-                    <Button variant="contained" startIcon={<Add />} onClick={() => setCreateOpen(true)}
-                        sx={{ bgcolor: '#2563eb', textTransform: 'none', fontWeight: 700, '&:hover': { bgcolor: '#1d4ed8' } }}>
-                        Tạo phiếu chuyển
-                    </Button>
+                    {!isAdmin && (
+                        <Button variant="contained" startIcon={<Add />} onClick={() => setCreateOpen(true)}
+                            sx={{ bgcolor: '#2563eb', textTransform: 'none', fontWeight: 700, '&:hover': { bgcolor: '#1d4ed8' } }}>
+                            Tạo phiếu chuyển
+                        </Button>
+                    )}
                 </Box>
             </Box>
 
@@ -697,10 +884,18 @@ const TransfersPage: React.FC = () => {
                     <TextField size="small" placeholder="Tìm theo mã phiếu..."
                         value={keyword} onChange={e => setKeyword(e.target.value)} sx={{ flex: 1, minWidth: 200 }}
                         InputProps={{ startAdornment: <InputAdornment position="start"><Search /></InputAdornment> }} />
-                    <FormControl size="small" sx={{ minWidth: 180 }}>
+                    <FormControl size="small" sx={{ minWidth: 200 }}>
                         <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} displayEmpty>
                             <MenuItem value="">Tất cả trạng thái</MenuItem>
-                            {Object.entries(STATUS_MAP).map(([k, v]) => <MenuItem key={k} value={k}>{v.label}</MenuItem>)}
+                            <MenuItem value="DRAFT">Nháp</MenuItem>
+                            <MenuItem value="PENDING_APPROVAL">Chờ duyệt</MenuItem>
+                            <MenuItem value="APPROVED">Đã duyệt</MenuItem>
+                            <MenuItem value="REJECTED">Bị từ chối</MenuItem>
+                            <MenuItem value="DISPATCHED">Đã xuất</MenuItem>
+                            <MenuItem value="RECEIVED">Đã nhận</MenuItem>
+                            <MenuItem value="RECEIVED_PARTIAL">Nhận thiếu</MenuItem>
+                            <MenuItem value="REJECTED_BY_RECEIVER">Kho nhập từ chối</MenuItem>
+                            <MenuItem value="CANCELLED">Đã hủy</MenuItem>
                         </Select>
                     </FormControl>
                     <Button size="small" variant="outlined" startIcon={<Refresh />} onClick={refresh}>Làm mới</Button>
@@ -727,12 +922,13 @@ const TransfersPage: React.FC = () => {
                             ) : orders.length === 0 ? (
                                 <TableRow><TableCell colSpan={9} align="center" sx={{ py: 6 }}>Chưa có phiếu chuyển kho nào</TableCell></TableRow>
                             ) : orders.map(t => {
-                                const info = STATUS_MAP[t.status];
+                                const info = STATUS_MAP[t.status] ?? { label: t.status, color: '#888', bg: '#f5f5f5' };
                                 const fromWh = warehouseMap.get(t.fromWarehouseId);
                                 const toWh = warehouseMap.get(t.toWarehouseId);
                                 const totalQty = t.items.reduce((s, i) => s + i.quantity, 0);
                                 const totalReceived = t.items.reduce((s, i) => s + (i.receivedQty || 0), 0);
-                                const hasShortage = t.status === 'RECEIVED' && totalReceived < totalQty;
+                                const isReceivedState = t.status === 'RECEIVED' || t.status === 'RECEIVED_PARTIAL';
+                                const hasShortage = isReceivedState && totalReceived < totalQty;
                                 return (
                                     <TableRow key={t.id} hover sx={{ cursor: 'pointer' }}
                                         onClick={() => { setSelected(t); setDetailOpen(true); }}>
@@ -758,7 +954,7 @@ const TransfersPage: React.FC = () => {
                                             <Typography fontWeight={700}>{totalQty.toLocaleString()}</Typography>
                                         </TableCell>
                                         <TableCell>
-                                            {t.status === 'RECEIVED' ? (
+                                            {isReceivedState ? (
                                                 <Typography fontWeight={700} color={hasShortage ? '#e65100' : '#2e7d32'}>
                                                     {totalReceived.toLocaleString()}
                                                     {hasShortage && <Typography component="span" variant="caption" color="#e65100" ml={0.5}>(thiếu)</Typography>}
@@ -776,9 +972,76 @@ const TransfersPage: React.FC = () => {
                                             </Typography>
                                         </TableCell>
                                         <TableCell onClick={e => e.stopPropagation()}>
-                                            <IconButton size="small" onClick={() => { setSelected(t); setDetailOpen(true); }} sx={{ color: '#3b82f6', '&:hover': { bgcolor: '#eff6ff' } }}>
-                                                <Visibility sx={{ fontSize: 16 }} />
-                                            </IconButton>
+                                            {(() => {
+                                                const isAuto = !!t.referenceOrderId;
+                                                const isFromWh = !isAdmin && (currentUser?.warehouseId && String(currentUser.warehouseId).toLowerCase() === String(t.fromWarehouseId).toLowerCase());
+                                                const isToWh = !isAdmin && (currentUser?.warehouseId && String(currentUser.warehouseId).toLowerCase() === String(t.toWarehouseId).toLowerCase());
+                                                const isCreatorRow = currentUser?.id === t.createdByUserId;
+                                                return (
+                                                    <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                                        <Tooltip title="Chi tiết">
+                                                            <IconButton size="small" onClick={() => { setSelected(t); setDetailOpen(true); }}
+                                                                sx={{ color: '#3b82f6', '&:hover': { bgcolor: '#eff6ff' } }}>
+                                                                <Visibility sx={{ fontSize: 16 }} />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                        {/* DRAFT + Auto: kho xuất xác nhận xuất */}
+                                                        {t.status === 'DRAFT' && isAuto && isFromWh && (
+                                                            <Tooltip title="Xuất kho">
+                                                                <IconButton size="small" onClick={() => { setSelected(t); handleDispatchDirect(t.id); }}
+                                                                    sx={{ color: '#7c3aed', '&:hover': { bgcolor: '#ede9fe' } }}>
+                                                                    <LocalShipping sx={{ fontSize: 16 }} />
+                                                                </IconButton>
+                                                            </Tooltip>
+                                                        )}
+                                                        {/* DRAFT + Manual: chỉ người tạo mới gửi duyệt */}
+                                                        {t.status === 'DRAFT' && !isAuto && isCreatorRow && !isAdmin && (
+                                                            <Tooltip title="Gửi duyệt">
+                                                                <IconButton size="small" onClick={() => { setSelected(t); handleSubmit(t.id); }}
+                                                                    sx={{ color: '#f59e0b', '&:hover': { bgcolor: '#fffbeb' } }}>
+                                                                    <Send sx={{ fontSize: 16 }} />
+                                                                </IconButton>
+                                                            </Tooltip>
+                                                        )}
+                                                        {/* PENDING_APPROVAL: duyệt chéo */}
+                                                        {t.status === 'PENDING_APPROVAL' && canApproveTransfer(t, currentUser) && (
+                                                            <Tooltip title="Duyệt">
+                                                                <IconButton size="small" onClick={() => { setSelected(t); handleApprove(t.id); }}
+                                                                    sx={{ color: '#16a34a', '&:hover': { bgcolor: '#f0fdf4' } }}>
+                                                                    <CheckCircle sx={{ fontSize: 16 }} />
+                                                                </IconButton>
+                                                            </Tooltip>
+                                                        )}
+                                                        {/* APPROVED: kho xuất xác nhận xuất */}
+                                                        {t.status === 'APPROVED' && isFromWh && (
+                                                            <Tooltip title="Xuất kho">
+                                                                <IconButton size="small" onClick={() => { setSelected(t); handleDispatchDirect(t.id); }}
+                                                                    sx={{ color: '#7c3aed', '&:hover': { bgcolor: '#ede9fe' } }}>
+                                                                    <LocalShipping sx={{ fontSize: 16 }} />
+                                                                </IconButton>
+                                                            </Tooltip>
+                                                        )}
+                                                        {/* DISPATCHED: kho nhập nhận hàng hoặc từ chối */}
+                                                        {t.status === 'DISPATCHED' && isToWh && (
+                                                            <Tooltip title="Nhận hàng">
+                                                                <IconButton size="small" onClick={() => { setSelected(t); setDetailOpen(true); }}
+                                                                    sx={{ color: '#2e7d32', '&:hover': { bgcolor: '#f0fdf4' } }}>
+                                                                    <CheckCircle sx={{ fontSize: 16 }} />
+                                                                </IconButton>
+                                                            </Tooltip>
+                                                        )}
+                                                        {/* Hủy: chỉ người tạo, DRAFT/PENDING, không phải auto */}
+                                                        {(t.status === 'DRAFT' || t.status === 'PENDING_APPROVAL') && !isAuto && isCreatorRow && !isAdmin && (
+                                                            <Tooltip title="Hủy">
+                                                                <IconButton size="small" onClick={() => { setSelected(t); setCancelOpen(true); }}
+                                                                    sx={{ color: '#ef4444', '&:hover': { bgcolor: '#fef2f2' } }}>
+                                                                    <Cancel sx={{ fontSize: 16 }} />
+                                                                </IconButton>
+                                                            </Tooltip>
+                                                        )}
+                                                    </Box>
+                                                );
+                                            })()}
                                         </TableCell>
                                     </TableRow>
                                 );
@@ -799,13 +1062,69 @@ const TransfersPage: React.FC = () => {
                 warehouses={warehouses}
                 products={productMap}
                 onClose={() => setDetailOpen(false)}
+                onSubmit={handleSubmit}
+                onApprove={handleApprove}
+                onReject={() => setRejectOpen(true)}
                 onDispatch={handleDispatch}
                 onReceive={handleReceive}
+                onRejectReceive={() => setRejectReceiveOpen(true)}
+                onCancel={() => setCancelOpen(true)}
                 loading={actionLoading}
                 currentUser={currentUser}
                 isAdmin={isAdmin}
             />
             <CreateTransferDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={refresh} warehouses={warehouses} products={productsData} currentUser={currentUser} isAdmin={isAdmin} />
+
+            {/* Reject Dialog */}
+            <Dialog open={rejectOpen} onClose={() => setRejectOpen(false)} maxWidth="xs" fullWidth>
+                <DialogTitle>Từ chối phiếu chuyển kho</DialogTitle>
+                <DialogContent>
+                    <TextField fullWidth multiline rows={3} label="Lý do từ chối *" value={rejectReason}
+                        onChange={e => setRejectReason(e.target.value)} margin="normal"
+                        error={rejectReason.trim().length === 0}
+                        helperText={rejectReason.trim().length === 0 ? 'Vui lòng nhập lý do' : ''} />
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setRejectOpen(false)}>Đóng</Button>
+                    <Button onClick={handleRejectConfirm} variant="contained" color="error"
+                        disabled={!rejectReason.trim() || actionLoading}>Xác nhận từ chối</Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Cancel Dialog */}
+            <Dialog open={cancelOpen} onClose={() => { setCancelOpen(false); setCancelReason(''); }} maxWidth="xs" fullWidth>
+                <DialogTitle>Hủy phiếu chuyển kho</DialogTitle>
+                <DialogContent>
+                    <TextField fullWidth multiline rows={3} label="Lý do hủy *" value={cancelReason}
+                        onChange={e => setCancelReason(e.target.value)} margin="normal"
+                        error={cancelReason.trim().length === 0}
+                        helperText={cancelReason.trim().length === 0 ? 'Vui lòng nhập lý do hủy' : ''} />
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => { setCancelOpen(false); setCancelReason(''); }}>Đóng</Button>
+                    <Button onClick={handleCancel} variant="contained" color="error"
+                        disabled={!cancelReason.trim() || actionLoading}>Xác nhận hủy</Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Reject Receive Dialog */}
+            <Dialog open={rejectReceiveOpen} onClose={() => { setRejectReceiveOpen(false); setRejectReceiveReason(''); }} maxWidth="xs" fullWidth>
+                <DialogTitle>Từ chối nhận hàng</DialogTitle>
+                <DialogContent>
+                    <Alert severity="warning" sx={{ mb: 2, mt: 1 }}>
+                        Toàn bộ hàng sẽ được trả lại kho xuất. Tồn kho kho xuất sẽ được hoàn lại tự động.
+                    </Alert>
+                    <TextField fullWidth multiline rows={3} label="Lý do từ chối nhận *" value={rejectReceiveReason}
+                        onChange={e => setRejectReceiveReason(e.target.value)}
+                        error={rejectReceiveReason.trim().length === 0}
+                        helperText={rejectReceiveReason.trim().length === 0 ? 'Vui lòng nhập lý do' : ''} />
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => { setRejectReceiveOpen(false); setRejectReceiveReason(''); }}>Đóng</Button>
+                    <Button onClick={handleRejectReceiveConfirm} variant="contained" color="error"
+                        disabled={!rejectReceiveReason.trim() || actionLoading}>Xác nhận từ chối nhận</Button>
+                </DialogActions>
+            </Dialog>
 
             <Snackbar open={!!snack} autoHideDuration={3000} onClose={() => setSnack(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
                 {snack ? <Alert severity={snack.sev} onClose={() => setSnack(null)} sx={{ borderRadius: 2 }}>{snack.msg}</Alert> : <div />}

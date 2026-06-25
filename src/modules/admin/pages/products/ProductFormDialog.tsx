@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
     Box, Typography, Button, Grid as Grid, TextField,
-    Select, MenuItem, FormControl, Switch,
+    Select, MenuItem, FormControl, FormHelperText, Switch,
     InputAdornment, Alert, IconButton, Tooltip,
-    Skeleton, LinearProgress, Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress
+    Skeleton, LinearProgress, Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress,
+    Autocomplete, Chip
 } from '@mui/material';
 import {
     Save, InfoOutlined, AddPhotoAlternate,
@@ -14,6 +16,7 @@ import axiosInstance from '../../../../services/axiosConfig';
 import productService from '../../../../services/productService';
 import categoryService from '../../../../services/categoryService';
 import supplierService from '../../../../services/supplierService';
+import authorService, { AuthorResponse } from '../../../../services/authorService';
 import toast from 'react-hot-toast';
 import { Category, Supplier, UpdateProductRequest, CreateProductRequest } from '../../../../types';
 import JsBarcode from 'jsbarcode';
@@ -25,6 +28,24 @@ const fmt = (n?: number) =>
 
 const UNIT_OPTIONS = ['Cuốn', 'Bộ', 'Tập', 'Hộp', 'Gói'];
 const COVER_TYPE_OPTIONS = ['Bìa cứng', 'Bìa mềm', 'Bìa gập'];
+
+const PUBLISHER_OPTIONS = [
+    'NXB Trẻ', 'NXB Kim Đồng', 'NXB Giáo Dục Việt Nam', 'NXB Tổng Hợp TP.HCM',
+    'NXB Văn Học', 'NXB Phụ Nữ', 'NXB Lao Động', 'NXB Hội Nhà Văn',
+    'NXB Thế Giới', 'NXB Đại Học Quốc Gia', 'NXB Chính Trị Quốc Gia',
+    'Nhã Nam', 'Alpha Books', 'Thái Hà Books', 'Đông A', 'Đinh Tị Books',
+    'First News', 'Minh Long', 'Skybooks', 'AZ Việt Nam',
+];
+
+const LANGUAGE_OPTIONS = [
+    'Tiếng Việt', 'Tiếng Anh', 'Tiếng Pháp', 'Tiếng Nhật',
+    'Tiếng Trung', 'Tiếng Hàn', 'Tiếng Đức', 'Tiếng Tây Ban Nha',
+    'Song ngữ Việt-Anh', 'Song ngữ Việt-Pháp', 'Song ngữ Việt-Nhật',
+];
+
+const currentYear = new Date().getFullYear();
+const PUBLISH_YEAR_OPTIONS: number[] = [];
+for (let y = currentYear; y >= 1900; y--) PUBLISH_YEAR_OPTIONS.push(y);
 
 const FieldLabel = ({ label, required, hint }: { label: string; required?: boolean; hint?: string }) => (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.75, minHeight: 22 }}>
@@ -147,17 +168,20 @@ const INITIAL_FORM = {
     description: '', retailPrice: '' as string | number, wholesalePrice: '' as string | number,
     imageUrls: [] as string[], unit: 'Cuốn', weight: '' as string | number, isActive: true,
     author: '', publisher: '', publishYear: '' as string | number, numberOfPages: '' as string | number,
-    dimensions: '', coverType: '', language: 'Tiếng Việt',
+    dimensions: '', coverType: '', language: 'Tiếng Việt', isPublished: false,
 };
 
 const ProductFormDialog: React.FC<Props> = ({ open, onClose, onSuccess, productId }) => {
     const user = authService.getCurrentUser()?.user;
+    const isAdmin = user?.role === 'ROLE_ADMIN';
     const isManager = user?.role === 'ROLE_MANAGER';
     const disablePrice = !!productId && isManager;
+    const queryClient = useQueryClient();
 
     const [form, setForm] = useState(INITIAL_FORM);
     const [categories, setCategories] = useState<Category[]>([]);
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+    const [authors, setAuthors] = useState<AuthorResponse[]>([]);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -183,9 +207,14 @@ const ProductFormDialog: React.FC<Props> = ({ open, onClose, onSuccess, productI
 
     const loadMeta = useCallback(async () => {
         try {
-            const [cats, supsPage] = await Promise.all([categoryService.getAll(), supplierService.getAll()]);
+            const [cats, supsPage, authorsPage] = await Promise.all([
+                categoryService.getAll(),
+                supplierService.getAll(),
+                authorService.search({ page: 0, size: 500 }),
+            ]);
             setCategories(cats);
             setSuppliers(supsPage.content ?? []);
+            setAuthors(authorsPage.content ?? []);
         } catch { }
     }, []);
 
@@ -199,9 +228,10 @@ const ProductFormDialog: React.FC<Props> = ({ open, onClose, onSuccess, productI
                 description: p.description ?? '', retailPrice: p.retailPrice ?? '', wholesalePrice: p.wholesalePrice ?? '',
                 imageUrls: p.imageUrls?.length ? p.imageUrls : (p.imageUrl ? [p.imageUrl] : []),
                 unit: p.unit ?? 'Cuốn', weight: p.weight ?? '', isActive: p.isActive ?? true,
-                author: p.author ?? '', publisher: p.publisher ?? '', 
+                author: p.author ?? '', publisher: p.publisher ?? '',
                 publishYear: p.publishYear ?? '', numberOfPages: p.numberOfPages ?? '',
                 dimensions: (p as any).dimensions ?? '', coverType: (p as any).coverType ?? '', language: (p as any).language ?? 'Tiếng Việt',
+                isPublished: p.isPublished ?? false,
             });
         } catch { setErrorMsg('Không thể tải dữ liệu sản phẩm'); }
         finally { setLoading(false); }
@@ -226,8 +256,21 @@ const ProductFormDialog: React.FC<Props> = ({ open, onClose, onSuccess, productI
         const errs: Record<string, string> = {};
         if (!form.name.trim()) errs.name = 'Tên không được để trống';
         if (!form.categoryId) errs.categoryId = 'Vui lòng chọn danh mục';
-        if (!form.retailPrice || Number(form.retailPrice) <= 0) errs.retailPrice = 'Giá bán lẻ phải là số dương';
-        if (!productId && !form.isbnBarcode.trim()) errs.isbnBarcode = 'Vui lòng nhập/quét mã vạch';
+        if (!form.retailPrice || Number(form.retailPrice) <= 0) errs.retailPrice = 'Giá bán phải là số dương';
+        if (form.wholesalePrice !== '' && Number(form.wholesalePrice) < 0) errs.wholesalePrice = 'Giá sỉ không được âm';
+        if (form.wholesalePrice !== '' && form.retailPrice && Number(form.wholesalePrice) > Number(form.retailPrice)) {
+            errs.wholesalePrice = 'Giá sỉ phải thấp hơn hoặc bằng giá bán';
+        }
+        if (form.weight !== '' && Number(form.weight) < 0) errs.weight = 'Trọng lượng không được âm';
+        if (form.numberOfPages !== '' && Number(form.numberOfPages) < 0) errs.numberOfPages = 'Số trang không được âm';
+        if (!productId) {
+            const barcode = form.isbnBarcode.trim();
+            if (!barcode) {
+                errs.isbnBarcode = 'Vui lòng nhập/quét mã vạch';
+            } else if (!/^[a-zA-Z0-9-]+$/.test(barcode)) {
+                errs.isbnBarcode = 'Mã vạch chỉ chứa chữ cái, số và dấu gạch ngang';
+            }
+        }
         return errs;
     };
 
@@ -253,6 +296,7 @@ const ProductFormDialog: React.FC<Props> = ({ open, onClose, onSuccess, productI
                     description: form.description?.trim() || undefined,
                     retailPrice, wholesalePrice, imageUrls: form.imageUrls, unit: form.unit, weight, isActive: form.isActive,
                     author: form.author?.trim() || undefined, publisher: form.publisher?.trim() || undefined, publishYear, numberOfPages,
+                    isPublished: isAdmin ? form.isPublished : undefined,
                     ...extraBookFields,
                 };
                 await productService.update(productId, payload);
@@ -263,11 +307,14 @@ const ProductFormDialog: React.FC<Props> = ({ open, onClose, onSuccess, productI
                     isbnBarcode: form.isbnBarcode.trim(), sku: form.sku?.trim() || undefined, description: form.description?.trim() || undefined,
                     retailPrice, wholesalePrice, imageUrls: form.imageUrls, unit: form.unit, weight,
                     author: form.author?.trim() || undefined, publisher: form.publisher?.trim() || undefined, publishYear, numberOfPages,
+                    isPublished: isAdmin ? form.isPublished : false,
                     ...extraBookFields,
                 };
                 await productService.create(payload);
                 toast.success('Thêm sản phẩm thành công');
             }
+            queryClient.invalidateQueries({ queryKey: ['products'] });
+            queryClient.invalidateQueries({ queryKey: ['categories'] });
             onSuccess(); onClose();
         } catch (e: any) { setErrorMsg(e.response?.data?.message || e.message || 'Thao tác thất bại'); }
         finally { setSaving(false); }
@@ -315,6 +362,7 @@ const ProductFormDialog: React.FC<Props> = ({ open, onClose, onSuccess, productI
                                                             </MenuItem>
                                                         ))}
                                                     </Select>
+                                                    {errors.categoryId && <FormHelperText>{errors.categoryId}</FormHelperText>}
                                                 </FormControl>
                                             </Grid>
                                             <Grid size={{ xs: 12, sm: 6 }}>
@@ -350,13 +398,13 @@ const ProductFormDialog: React.FC<Props> = ({ open, onClose, onSuccess, productI
                                         <SectionHeader icon={Sell} title="Giá bán & Đơn vị" />
                                         <Grid container spacing={2}>
                                             <Grid size={{ xs: 12, sm: 4 }}>
-                                                <FieldLabel label="Giá bán lẻ" required />
+                                                <FieldLabel label="Giá bán" required />
                                                 <TextField fullWidth size="small" type="number" value={form.retailPrice} onChange={set('retailPrice')} error={!!errors.retailPrice} helperText={errors.retailPrice} sx={inputStyles} disabled={disablePrice}
                                                     InputProps={{ endAdornment: <InputAdornment position="end"><Typography variant="caption" fontWeight={700} color="#94a3b8">₫</Typography></InputAdornment> }} />
                                             </Grid>
                                             <Grid size={{ xs: 12, sm: 4 }}>
-                                                <FieldLabel label="Giá bán sỉ" />
-                                                <TextField fullWidth size="small" type="number" value={form.wholesalePrice} onChange={set('wholesalePrice')} sx={inputStyles} disabled={disablePrice}
+                                                <FieldLabel label="Giá sỉ" hint="Giá bán cho đại lý, phải ≤ giá bán" />
+                                                <TextField fullWidth size="small" type="number" value={form.wholesalePrice} onChange={set('wholesalePrice')} error={!!errors.wholesalePrice} helperText={errors.wholesalePrice} sx={inputStyles} disabled={disablePrice}
                                                     InputProps={{ endAdornment: <InputAdornment position="end"><Typography variant="caption" fontWeight={700} color="#94a3b8">₫</Typography></InputAdornment> }} />
                                             </Grid>
                                             <Grid size={{ xs: 12, sm: 4 }}>
@@ -375,24 +423,66 @@ const ProductFormDialog: React.FC<Props> = ({ open, onClose, onSuccess, productI
                                         <SectionHeader icon={Inventory} title="Thông tin sách & Khối lượng" />
                                         <Grid container spacing={2}>
                                             <Grid size={{ xs: 12, sm: 6 }}>
-                                                <FieldLabel label="Tác giả" />
-                                                <TextField fullWidth size="small" placeholder="Tên tác giả..." value={form.author} onChange={set('author')} sx={inputStyles} />
+                                                <FieldLabel label="Tác giả" hint="Chọn tác giả đã có trong hệ thống" />
+                                                <Autocomplete
+                                                    size="small"
+                                                    options={authors}
+                                                    getOptionLabel={(opt) => opt.name}
+                                                    value={authors.find(a => a.name === form.author) || null}
+                                                    onChange={(_e, newVal) => {
+                                                        setForm(f => ({ ...f, author: newVal?.name ?? '', }));
+                                                        if (errors.author) setErrors(er => { const n = { ...er }; delete n.author; return n; });
+                                                    }}
+                                                    isOptionEqualToValue={(opt, val) => opt.id === val.id}
+                                                    renderInput={(params) => (
+                                                        <TextField {...params} placeholder="Tìm tác giả..." sx={inputStyles} />
+                                                    )}
+                                                    noOptionsText="Không tìm thấy. Vui lòng tạo tác giả mới tại mục Quản lý Tác giả."
+                                                />
                                             </Grid>
                                             <Grid size={{ xs: 12, sm: 6 }}>
-                                                <FieldLabel label="Nhà xuất bản" />
-                                                <TextField fullWidth size="small" placeholder="VD: NXB Trẻ..." value={form.publisher} onChange={set('publisher')} sx={inputStyles} />
+                                                <FieldLabel label="Nhà xuất bản" hint="Chọn hoặc nhập tên NXB" />
+                                                <Autocomplete
+                                                    size="small"
+                                                    freeSolo
+                                                    options={PUBLISHER_OPTIONS}
+                                                    value={form.publisher || ''}
+                                                    onChange={(_e, newVal) => {
+                                                        setForm(f => ({ ...f, publisher: (newVal as string) ?? '' }));
+                                                    }}
+                                                    onInputChange={(_e, newInput) => {
+                                                        setForm(f => ({ ...f, publisher: newInput }));
+                                                    }}
+                                                    renderInput={(params) => (
+                                                        <TextField {...params} placeholder="VD: NXB Trẻ..." sx={inputStyles} />
+                                                    )}
+                                                />
                                             </Grid>
                                             <Grid size={{ xs: 12, sm: 4 }}>
                                                 <FieldLabel label="Năm xuất bản" />
-                                                <TextField fullWidth size="small" type="number" placeholder="VD: 2023" value={form.publishYear} onChange={set('publishYear')} sx={inputStyles} />
+                                                <FormControl fullWidth size="small" sx={inputStyles}>
+                                                    <Select
+                                                        value={form.publishYear === '' ? '' : Number(form.publishYear)}
+                                                        onChange={set('publishYear')}
+                                                        displayEmpty
+                                                        MenuProps={{ PaperProps: { sx: { maxHeight: 300 } } }}
+                                                    >
+                                                        <MenuItem value="">— Chọn năm —</MenuItem>
+                                                        {PUBLISH_YEAR_OPTIONS.map(y => (
+                                                            <MenuItem key={y} value={y} sx={{ fontSize: 13 }}>{y}</MenuItem>
+                                                        ))}
+                                                    </Select>
+                                                </FormControl>
                                             </Grid>
                                             <Grid size={{ xs: 12, sm: 4 }}>
                                                 <FieldLabel label="Số trang" />
-                                                <TextField fullWidth size="small" type="number" placeholder="VD: 350" value={form.numberOfPages} onChange={set('numberOfPages')} sx={inputStyles} />
+                                                <TextField fullWidth size="small" type="number" placeholder="VD: 350" value={form.numberOfPages} onChange={set('numberOfPages')} error={!!errors.numberOfPages} helperText={errors.numberOfPages} sx={inputStyles}
+                                                    inputProps={{ min: 0 }} />
                                             </Grid>
                                             <Grid size={{ xs: 12, sm: 4 }}>
                                                 <FieldLabel label="Trọng lượng (g)" />
-                                                <TextField fullWidth size="small" type="number" placeholder="VD: 200" value={form.weight} onChange={set('weight')} sx={inputStyles} />
+                                                <TextField fullWidth size="small" type="number" placeholder="VD: 200" value={form.weight} onChange={set('weight')} error={!!errors.weight} helperText={errors.weight} sx={inputStyles}
+                                                    inputProps={{ min: 0 }} />
                                             </Grid>
                                             <Grid size={{ xs: 12, sm: 4 }}>
                                                 <FieldLabel label="Kích thước" hint="VD: 20x14cm" />
@@ -408,8 +498,39 @@ const ProductFormDialog: React.FC<Props> = ({ open, onClose, onSuccess, productI
                                                 </FormControl>
                                             </Grid>
                                             <Grid size={{ xs: 12, sm: 4 }}>
-                                                <FieldLabel label="Ngôn ngữ" />
-                                                <TextField fullWidth size="small" placeholder="VD: Tiếng Việt" value={form.language} onChange={set('language')} sx={inputStyles} />
+                                                <FieldLabel label="Ngôn ngữ" hint="Chọn một hoặc nhiều ngôn ngữ" />
+                                                <FormControl fullWidth size="small" sx={inputStyles}>
+                                                    <Select
+                                                        multiple
+                                                        value={form.language ? form.language.split(',').map(s => s.trim()).filter(Boolean) : []}
+                                                        onChange={(e) => {
+                                                            const val = e.target.value as string[];
+                                                            setForm(f => ({ ...f, language: val.join(', ') }));
+                                                        }}
+                                                        displayEmpty
+                                                        renderValue={(selected) => {
+                                                            if ((selected as string[]).length === 0) return <Typography variant="body2" color="#94a3b8" fontSize={13}>— Chọn ngôn ngữ —</Typography>;
+                                                            return (
+                                                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                                                    {(selected as string[]).map(val => (
+                                                                        <Chip key={val} label={val} size="small" 
+                                                                            sx={{ height: 22, fontSize: 11, fontWeight: 600 }} 
+                                                                            onDelete={() => {
+                                                                                const updated = (form.language || '').split(',').map(s => s.trim()).filter(s => s !== val);
+                                                                                setForm(f => ({ ...f, language: updated.join(', ') }));
+                                                                            }}
+                                                                            onMouseDown={(e) => e.stopPropagation()}
+                                                                        />
+                                                                    ))}
+                                                                </Box>
+                                                            );
+                                                        }}
+                                                    >
+                                                        {LANGUAGE_OPTIONS.map(lang => (
+                                                            <MenuItem key={lang} value={lang} sx={{ fontSize: 13 }}>{lang}</MenuItem>
+                                                        ))}
+                                                    </Select>
+                                                </FormControl>
                                             </Grid>
                                         </Grid>
                                     </Box>
@@ -461,6 +582,19 @@ const ProductFormDialog: React.FC<Props> = ({ open, onClose, onSuccess, productI
                                                 <Typography variant="caption" color="text.secondary">Trạng thái hiển thị POS</Typography>
                                             </Box>
                                             <Switch checked={form.isActive} onChange={e => setForm(f => ({ ...f, isActive: e.target.checked }))} color="success" disabled={isManager} />
+                                        </Box>
+                                    )}
+
+                                    {/* PHẦN 8: ĐĂNG LÊN WEB (Chỉ ADMIN) */}
+                                    {isAdmin && (
+                                        <Box sx={{ p: 2, bgcolor: form.isPublished ? '#eff6ff' : '#f8fafc', borderRadius: 3, border: '1px solid', borderColor: form.isPublished ? '#bfdbfe' : '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                            <Box>
+                                                <Typography variant="body2" fontWeight={800} color={form.isPublished ? '#1d4ed8' : '#64748b'}>
+                                                    {form.isPublished ? 'ĐÃ ĐĂNG LÊN WEB' : 'CHƯA ĐĂNG WEB'}
+                                                </Typography>
+                                                <Typography variant="caption" color="text.secondary">Hiển thị trên trang bán hàng online</Typography>
+                                            </Box>
+                                            <Switch checked={form.isPublished} onChange={e => setForm(f => ({ ...f, isPublished: e.target.checked }))} color="primary" />
                                         </Box>
                                     )}
                                 </Box>

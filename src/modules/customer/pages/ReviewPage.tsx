@@ -15,13 +15,16 @@ const ReviewPage: React.FC = () => {
     const { data: featuredData } = useQuery({
         queryKey: ['customer_featured_articles'],
         queryFn: () => articleService.search({ page: 0, size: 6, isActive: true }),
-        staleTime: 5 * 60 * 1000
+        staleTime: 0,
+        refetchOnWindowFocus: true,
     });
 
     // Query 2: Danh sách bài viết có phân trang (10 bài/trang)
     const { data: listData, isLoading: isListLoading } = useQuery({
         queryKey: ['customer_articles_list', listPage],
-        queryFn: () => articleService.search({ page: listPage, size: 10, isActive: true })
+        queryFn: () => articleService.search({ page: listPage, size: 10, isActive: true }),
+        staleTime: 0,
+        refetchOnWindowFocus: true,
     });
 
     const handlePageChange = (_event: React.ChangeEvent<unknown>, value: number) => {

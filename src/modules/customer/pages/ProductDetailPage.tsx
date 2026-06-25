@@ -5,12 +5,12 @@ import {
     Box, Container, Grid, Typography, Button, IconButton,
     Chip, Rating, Divider, Breadcrumbs, Link, Paper,
     Tabs, Tab, Avatar, TextField, LinearProgress, Modal,
-    Skeleton, Alert, useTheme, TableContainer, Table, TableBody, TableRow, TableCell, Pagination,
+    Skeleton, Alert, TableContainer, Table, TableBody, TableRow, TableCell, Pagination,
 } from '@mui/material';
 import {
     ShoppingCart, FavoriteBorder, Favorite, Share,
     LocalShipping, Verified, Add, Remove,
-    Star, CheckCircle, ZoomIn, Close,
+    CheckCircle, ZoomIn, Close,
     ArrowBackIos, ArrowForwardIos,
 } from '@mui/icons-material';
 import { useProductDetail, useProducts, useProductReviews } from '../hooks/useProducts';
@@ -114,7 +114,6 @@ const ImageGallery = ({ images = [] as string[], title }: { images: string[]; ti
 const ProductDetailPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const theme = useTheme();
     const { product, isLoading, isError } = useProductDetail(id ?? '');
     const { addToCart, openCart } = useCartContext();
 
@@ -244,138 +243,206 @@ const ProductDetailPage = () => {
                         </Grid>
 
                         <Grid size={{ xs: 12, md: 7 }}>
-                            <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-                                {product.badge && <Chip label={product.badge} size="small" sx={{ bgcolor: theme.palette.error.main, color: '#fff', fontWeight: 700, fontSize: 11, borderRadius: 1 }} />}
-                                {product.category && <Chip label={product.category} size="small" variant="outlined" sx={{ fontSize: 11, fontWeight: 600, color: 'var(--color-secondary, #f5a623)', borderColor: 'var(--color-secondary, #f5a623)' }} />}
+
+                            {/* Badges */}
+                            <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                                {product.category && (
+                                    <Chip label={product.category} size="small" variant="outlined"
+                                        sx={{ fontSize: 11, fontWeight: 600, color: '#f5a623', borderColor: '#f5a623', bgcolor: 'rgba(245,166,35,0.06)' }} />
+                                )}
+                                {product.badge && (
+                                    <Chip label={product.badge} size="small"
+                                        sx={{ bgcolor: '#ef4444', color: '#fff', fontWeight: 700, fontSize: 11, borderRadius: 1 }} />
+                                )}
+                                <Chip icon={<CheckCircle sx={{ fontSize: 12, color: '#f5a623 !important' }} />}
+                                    label="Chính hãng" size="small"
+                                    sx={{ bgcolor: 'rgba(245,166,35,0.08)', color: '#f5a623', fontWeight: 600, fontSize: 11 }} />
                             </Box>
 
-                            <Typography variant="h4" fontWeight={800} sx={{ mb: 1.5, lineHeight: 1.3, fontFamily: '"Playfair Display", serif', color: 'var(--color-primary, #0a192f)' }}>{product.title}</Typography>
+                            {/* Title */}
+                            <Typography fontWeight={800} sx={{
+                                mb: 1.5, lineHeight: 1.4,
+                                fontFamily: '"Playfair Display", serif',
+                                color: '#0a192f',
+                                fontSize: { xs: 18, sm: 20, md: 22 }
+                            }}>
+                                {product.title}
+                            </Typography>
+
+                            {/* Author */}
                             {product.author && (
-                                <Typography variant="body1" color="text.secondary" sx={{ mb: 2.5 }}>
-                                    Tác giả: <strong style={{ color: 'var(--color-primary, #0a192f)' }}>{product.author}</strong>
+                                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                    Tác giả: <strong style={{ color: '#0a192f' }}>{product.author}</strong>
                                 </Typography>
                             )}
 
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
-                                <Chip icon={<CheckCircle sx={{ fontSize: 14, color: 'var(--color-secondary, #f5a623) !important' }} />}
-                                    label="Chính hãng" size="small" sx={{ bgcolor: 'rgba(245, 166, 35, 0.08)', color: 'var(--color-secondary, #f5a623)', fontWeight: 600, fontSize: 11 }} />
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                    <Star sx={{ color: 'var(--color-secondary, #f5a623)', fontSize: 18 }} />
-                                    <Typography variant="body2" fontWeight={700}>{product.rating?.toFixed(1) || '0.0'}</Typography>
-                                    <Typography variant="body2" color="text.secondary">({product.reviewCount || 0} đánh giá)</Typography>
-                                    <Typography variant="body2" color="text.secondary" sx={{ mx: 0.5 }}>|</Typography>
-                                    <Typography variant="body2" color="text.secondary">Đã bán {product.sold || 0}</Typography>
-                                </Box>
+                            {/* Rating */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2.5, flexWrap: 'wrap' }}>
+                                <Rating value={product.rating || 0} readOnly precision={0.1} size="small" sx={{ color: '#f5a623' }} />
+                                <Typography variant="body2" fontWeight={700} color="text.secondary">
+                                    {product.rating?.toFixed(1) || '0.0'}
+                                </Typography>
+                                <Typography variant="body2" color="#d1d5db">·</Typography>
+                                <Typography variant="body2" color="text.secondary">{product.reviewCount || 0} đánh giá</Typography>
+                                <Typography variant="body2" color="#d1d5db">·</Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    Đã bán <strong>{product.sold || 0}</strong>
+                                </Typography>
                             </Box>
 
-                            <Divider sx={{ mb: 3 }} />
+                            <Divider sx={{ mb: 2.5 }} />
 
-                            <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 2, mb: 3 }}>
-                                <Typography variant="h3" fontWeight={900} color="var(--color-secondary, #f5a623)">{fmt(product.price)}</Typography>
+                            {/* Price card */}
+                            <Box sx={{
+                                bgcolor: '#fffbeb', border: '1px solid #fde68a', borderRadius: 2.5,
+                                px: 2.5, py: 2, mb: 2.5,
+                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                flexWrap: 'wrap', gap: 1.5
+                            }}>
+                                <Box>
+                                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5, flexWrap: 'wrap' }}>
+                                        <Typography sx={{
+                                            fontSize: { xs: 26, md: 30 }, fontWeight: 900,
+                                            color: '#f5a623', letterSpacing: '-0.5px', lineHeight: 1
+                                        }}>
+                                            {fmt(product.price)}
+                                        </Typography>
+                                        {finalOldPrice > product.price && (
+                                            <Typography sx={{ fontSize: 15, color: '#9ca3af', textDecoration: 'line-through', fontWeight: 500 }}>
+                                                {fmt(finalOldPrice)}
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                    {finalOldPrice > product.price && (
+                                        <Typography variant="caption" sx={{ color: '#059669', fontWeight: 700, display: 'block', mt: 0.6 }}>
+                                            Tiết kiệm {fmt(finalOldPrice - product.price)} so với giá gốc
+                                        </Typography>
+                                    )}
+                                </Box>
                                 {finalOldPrice > product.price && (
-                                    <>
-                                        <Typography variant="h6" color="text.secondary" sx={{ textDecoration: 'line-through' }}>{fmt(finalOldPrice)}</Typography>
-                                        <Chip label={`Tiết kiệm ${finalDiscount}%`} size="small" sx={{ bgcolor: 'rgba(232, 64, 28, 0.08)', color: '#e8401c', fontWeight: 700, borderRadius: 1 }} />
-                                    </>
+                                    <Box sx={{
+                                        bgcolor: '#ef4444', color: '#fff', fontWeight: 800,
+                                        fontSize: 18, px: 1.5, py: 0.5, borderRadius: 1.5,
+                                        lineHeight: 1.5
+                                    }}>
+                                        -{finalDiscount}%
+                                    </Box>
                                 )}
                             </Box>
 
-                            <Paper elevation={0} sx={{ bgcolor: '#f8f9fa', p: 2.5, borderRadius: 3, mb: 4, border: '1px solid #eef2f6' }}>
-                                <Grid container spacing={2}>
-                                    {[
-                                        ['📦 Tình trạng', product.stock > 0 ? `Còn hàng (${product.stock} cuốn)` : 'Hết hàng'],
-                                        ['🖼️ Số lượng ảnh', `${images.length} hình ảnh`],
-                                    ].map(([label, val]) => (
-                                        <Grid size={{ xs: 6 }} key={label as string}>
-                                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>{label}</Typography>
-                                            <Typography variant="body1" fontWeight={700} sx={{ color: 'var(--color-primary, #0a192f)', mt: 0.5 }}>{val}</Typography>
-                                        </Grid>
-                                    ))}
-                                </Grid>
-                            </Paper>
-
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, mb: 4 }}>
-                                <Typography variant="body1" fontWeight={700} color="var(--color-primary, #0a192f)">Số lượng:</Typography>
-                                <Box sx={{ display: 'flex', alignItems: 'center', border: '1px solid #e2e8f0', borderRadius: 2, bgcolor: '#fff', p: 0.5 }}>
-                                    <IconButton size="small" onClick={() => setQty(Math.max(1, qty - 1))} sx={{ bgcolor: '#f8f9fa', '&:hover': { bgcolor: '#edf2f7' } }}><Remove fontSize="small" /></IconButton>
-                                    <input 
-                                        type="number" 
-                                        value={qty} 
-                                        onChange={(e) => {
-                                            const v = parseInt(e.target.value);
-                                            if (!isNaN(v)) {
-                                                setQty(Math.max(1, Math.min(product.stock, v)));
-                                            } else if (e.target.value === '') {
-                                                setQty(1);
-                                            }
-                                        }}
-                                        style={{ width: 48, textAlign: 'center', fontWeight: 800, fontSize: 16, border: 'none', outline: 'none', padding: 0, WebkitAppearance: 'none', MozAppearance: 'textfield' }} 
-                                    />
-                                    <IconButton size="small" onClick={() => setQty(Math.min(product.stock, qty + 1))} sx={{ bgcolor: '#f8f9fa', '&:hover': { bgcolor: '#edf2f7' } }}><Add fontSize="small" /></IconButton>
+                            {/* Stock pill */}
+                            <Box sx={{ mb: 3 }}>
+                                <Box sx={{
+                                    display: 'inline-flex', alignItems: 'center', gap: 1,
+                                    px: 2, py: 0.7, borderRadius: 20,
+                                    bgcolor: product.stock > 0 ? '#f0fdf4' : '#fef2f2',
+                                    border: `1px solid ${product.stock > 0 ? '#bbf7d0' : '#fecaca'}`,
+                                }}>
+                                    <Box sx={{
+                                        width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                                        bgcolor: product.stock > 0 ? '#22c55e' : '#ef4444',
+                                        ...(product.stock > 0 && { boxShadow: '0 0 0 3px rgba(34,197,94,0.2)' })
+                                    }} />
+                                    <Typography variant="body2" fontWeight={700}
+                                        sx={{ color: product.stock > 0 ? '#15803d' : '#dc2626' }}>
+                                        {product.stock > 0 ? `Còn hàng · ${product.stock} cuốn` : 'Hết hàng'}
+                                    </Typography>
                                 </Box>
-                                <Typography variant="body2" color="text.secondary">(Còn {product.stock})</Typography>
                             </Box>
 
-                            <Box sx={{ display: 'flex', gap: 2.5, mb: 4, flexWrap: 'wrap' }}>
-                                <Button
-                                    variant="outlined"
-                                    size="large"
-                                    startIcon={<ShoppingCart />}
-                                    onClick={handleAddToCart}
-                                    disabled={product.stock <= 0}
-                                    sx={{
-                                        flex: 1,
-                                        minWidth: 180,
-                                        borderColor: 'var(--color-secondary, #f5a623)',
-                                        color: 'var(--color-secondary, #f5a623)',
-                                        textTransform: 'none',
-                                        fontWeight: 700,
-                                        py: 1.5,
-                                        borderRadius: 2,
-                                        transition: 'all 0.2s',
-                                        '&:hover': {
-                                            borderColor: 'var(--color-secondary, #f5a623)',
-                                            bgcolor: 'rgba(245, 166, 35, 0.05)',
-                                            transform: 'translateY(-2px)'
-                                        }
-                                    }}
-                                >
-                                    Thêm vào giỏ hàng
-                                </Button>
-                                <Button
-                                    variant="contained"
-                                    size="large"
-                                    onClick={handleBuyNow}
-                                    disabled={product.stock <= 0}
-                                    sx={{
-                                        flex: 1,
-                                        minWidth: 180,
-                                        bgcolor: 'var(--color-secondary, #f5a623)',
-                                        color: '#fff',
-                                        textTransform: 'none',
-                                        fontWeight: 700,
-                                        py: 1.5,
-                                        borderRadius: 2,
-                                        transition: 'all 0.2s',
-                                        '&:hover': {
-                                            bgcolor: '#e0951a',
-                                            transform: 'translateY(-2px)',
-                                            boxShadow: '0 4px 12px rgba(245, 166, 35, 0.3)'
-                                        }
-                                    }}
-                                >
-                                    Mua ngay
-                                </Button>
+                            {/* Quantity + CTA */}
+                            <Box sx={{ bgcolor: '#f8fafc', borderRadius: 2.5, p: 2.5, border: '1px solid #e2e8f0', mb: 2.5 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                                    <Typography variant="body2" fontWeight={700} color="#475569" sx={{ minWidth: 70 }}>
+                                        Số lượng:
+                                    </Typography>
+                                    <Box sx={{
+                                        display: 'inline-flex', alignItems: 'center',
+                                        border: '1.5px solid #e2e8f0', borderRadius: 2,
+                                        bgcolor: '#fff', overflow: 'hidden'
+                                    }}>
+                                        <IconButton size="small"
+                                            onClick={() => setQty(Math.max(1, qty - 1))}
+                                            disabled={product.stock <= 0}
+                                            sx={{ borderRadius: 0, px: 1.2, '&:hover': { bgcolor: '#f1f5f9' } }}>
+                                            <Remove sx={{ fontSize: 16 }} />
+                                        </IconButton>
+                                        <input
+                                            type="number"
+                                            value={qty}
+                                            onChange={(e) => {
+                                                const v = parseInt(e.target.value);
+                                                if (!isNaN(v)) setQty(Math.max(1, Math.min(product.stock, v)));
+                                                else if (e.target.value === '') setQty(1);
+                                            }}
+                                            style={{
+                                                width: 44, textAlign: 'center', fontWeight: 800, fontSize: 15,
+                                                border: 'none', borderLeft: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0',
+                                                outline: 'none', padding: '6px 0',
+                                                WebkitAppearance: 'none', MozAppearance: 'textfield' as any
+                                            }}
+                                        />
+                                        <IconButton size="small"
+                                            onClick={() => setQty(Math.min(product.stock, qty + 1))}
+                                            disabled={product.stock <= 0}
+                                            sx={{ borderRadius: 0, px: 1.2, '&:hover': { bgcolor: '#f1f5f9' } }}>
+                                            <Add sx={{ fontSize: 16 }} />
+                                        </IconButton>
+                                    </Box>
+                                </Box>
+
+                                <Box sx={{ display: 'flex', gap: 1.5 }}>
+                                    <Button
+                                        variant="outlined"
+                                        startIcon={<ShoppingCart />}
+                                        onClick={handleAddToCart}
+                                        disabled={product.stock <= 0}
+                                        sx={{
+                                            flex: 1, py: 1.4, borderRadius: 2,
+                                            textTransform: 'none', fontWeight: 700, fontSize: 14,
+                                            borderColor: '#f5a623', color: '#f5a623',
+                                            '&:hover': { bgcolor: 'rgba(245,166,35,0.06)', borderColor: '#e0951a' },
+                                        }}
+                                    >
+                                        Thêm vào giỏ
+                                    </Button>
+                                    <Button
+                                        variant="contained"
+                                        onClick={handleBuyNow}
+                                        disabled={product.stock <= 0}
+                                        sx={{
+                                            flex: 1, py: 1.4, borderRadius: 2,
+                                            textTransform: 'none', fontWeight: 700, fontSize: 14,
+                                            bgcolor: '#f5a623', color: '#fff', boxShadow: 'none',
+                                            '&:hover': { bgcolor: '#e0951a', boxShadow: '0 4px 14px rgba(245,166,35,0.35)' },
+                                        }}
+                                    >
+                                        Mua ngay
+                                    </Button>
+                                </Box>
                             </Box>
 
-                            <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', pt: 1 }}>
+                            {/* Trust badges */}
+                            <Box sx={{
+                                display: 'flex', gap: 0, flexWrap: 'wrap',
+                                border: '1px solid #e2e8f0', borderRadius: 2, overflow: 'hidden'
+                            }}>
                                 {[
-                                    { icon: <LocalShipping sx={{ fontSize: 18, color: '#1565c0' }} />, text: 'Miễn phí vận chuyển từ 150k' },
-                                    { icon: <Verified sx={{ fontSize: 18, color: '#2e7d32' }} />, text: 'Sách mới chính hãng 100%' },
-                                    { icon: <CheckCircle sx={{ fontSize: 18, color: '#f57c00' }} />, text: 'Đổi trả miễn phí trong 7 ngày' },
+                                    { icon: <LocalShipping sx={{ fontSize: 18, color: '#1565c0' }} />, text: 'Freeship từ 150k', bg: '#fff' },
+                                    { icon: <Verified sx={{ fontSize: 18, color: '#2e7d32' }} />, text: 'Chính hãng 100%', bg: '#f8fafc' },
+                                    { icon: <CheckCircle sx={{ fontSize: 18, color: '#f57c00' }} />, text: 'Đổi trả 7 ngày', bg: '#fff' },
                                 ].map((item, i) => (
-                                    <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                        {item.icon}<Typography variant="body2" fontWeight={600} color="text.secondary">{item.text}</Typography>
+                                    <Box key={i} sx={{
+                                        flex: 1, minWidth: 110,
+                                        display: 'flex', flexDirection: 'column', alignItems: 'center',
+                                        gap: 0.5, py: 1.5, px: 1,
+                                        bgcolor: item.bg,
+                                        borderRight: i < 2 ? '1px solid #e2e8f0' : 'none',
+                                    }}>
+                                        {item.icon}
+                                        <Typography variant="caption" fontWeight={600} color="text.secondary" textAlign="center">
+                                            {item.text}
+                                        </Typography>
                                     </Box>
                                 ))}
                             </Box>
@@ -444,68 +511,141 @@ const ProductDetailPage = () => {
                         </TabPanel>
 
                         <TabPanel value={tab} index={1}>
-                            <Grid container spacing={4}>
-                                <Grid size={{ xs: 12, md: 4 }}>
-                                    <Box sx={{ textAlign: 'center', p: 4, bgcolor: 'rgba(245, 166, 35, 0.03)', border: '1px solid rgba(245, 166, 35, 0.12)', borderRadius: 3 }}>
-                                        <Typography variant="h2" fontWeight={900} color="var(--color-secondary, #f5a623)">{product.rating?.toFixed(1) || '0.0'}</Typography>
-                                        <Rating value={product.rating || 0} readOnly precision={0.1} sx={{ my: 1, color: 'var(--color-secondary, #f5a623)' }} />
-                                        <Typography variant="body2" color="text.secondary" fontWeight={500}>{product.reviewCount || 0} đánh giá thực tế</Typography>
-                                    </Box>
-                                </Grid>
-                                <Grid size={{ xs: 12, md: 8 }}>
-                                    <Box sx={{ mb: 3, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                                        <Chip 
-                                            label="Tất cả" 
-                                            onClick={() => { setReviewRating(null); setReviewPage(0); }} 
-                                            color={reviewRating === null ? "primary" : "default"} 
-                                            variant={reviewRating === null ? "filled" : "outlined"} 
-                                        />
-                                        {[5, 4, 3, 2, 1].map(r => (
-                                            <Chip 
-                                                key={r} 
-                                                label={`${r} Sao`} 
-                                                onClick={() => { setReviewRating(r); setReviewPage(0); }} 
-                                                color={reviewRating === r ? "primary" : "default"} 
-                                                variant={reviewRating === r ? "filled" : "outlined"} 
-                                            />
-                                        ))}
-                                    </Box>
+                            {/* ── Rating summary ── */}
+                            <Box sx={{
+                                display: 'flex', alignItems: 'center', gap: { xs: 3, md: 5 },
+                                p: { xs: 2.5, md: 3.5 }, mb: 4,
+                                bgcolor: '#fffbeb', borderRadius: 2.5, border: '1px solid #fde68a',
+                                flexWrap: 'wrap'
+                            }}>
+                                <Box sx={{ textAlign: 'center', minWidth: 80 }}>
+                                    <Typography sx={{ fontSize: { xs: 44, md: 56 }, fontWeight: 900, color: '#f5a623', lineHeight: 1 }}>
+                                        {product.rating?.toFixed(1) || '0.0'}
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ color: '#d97706', fontWeight: 600 }}>trên 5</Typography>
+                                </Box>
+                                <Box>
+                                    <Rating value={product.rating || 0} readOnly precision={0.1}
+                                        sx={{ color: '#f5a623', fontSize: { xs: 22, md: 28 } }} />
+                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                        <strong>{product.reviewCount || 0}</strong> đánh giá thực tế từ khách hàng
+                                    </Typography>
+                                </Box>
+                            </Box>
 
-                                    {reviews.length > 0 ? reviews.map((r: any) => (
-                                        <Box key={r.id} sx={{ mb: 3, pb: 3, borderBottom: '1px solid #eef2f6', '&:last-child': { borderBottom: 'none', pb: 0 } }}>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1.5 }}>
-                                                <Avatar sx={{ width: 40, height: 40, bgcolor: 'var(--color-primary, #0a192f)', fontSize: 15, fontWeight: 700 }}>{r.customerName?.[0] || 'U'}</Avatar>
-                                                <Box>
-                                                    <Typography variant="body1" fontWeight={700} color="var(--color-primary, #0a192f)">{r.customerName}</Typography>
-                                                    <Typography variant="caption" color="text.secondary">{new Date(r.createdAt).toLocaleDateString('vi-VN')}</Typography>
+                            {/* ── Filter chips ── */}
+                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 3.5 }}>
+                                {([{ label: 'Tất cả', val: null as number | null }, { label: '5 ⭐', val: 5 }, { label: '4 ⭐', val: 4 }, { label: '3 ⭐', val: 3 }, { label: '2 ⭐', val: 2 }, { label: '1 ⭐', val: 1 }] as { label: string; val: number | null }[]).map(item => (
+                                    <Button key={item.label} size="small"
+                                        onClick={() => { setReviewRating(item.val); setReviewPage(0); }}
+                                        sx={{
+                                            textTransform: 'none', borderRadius: 20, fontWeight: 600, fontSize: 13,
+                                            px: 2, py: 0.6, minWidth: 'unset',
+                                            ...(reviewRating === item.val
+                                                ? { bgcolor: '#f5a623', color: '#fff', border: '1.5px solid #f5a623', '&:hover': { bgcolor: '#e0951a' } }
+                                                : { bgcolor: '#fff', color: '#475569', border: '1.5px solid #e2e8f0', '&:hover': { borderColor: '#f5a623', color: '#f5a623' } }
+                                            )
+                                        }}
+                                    >
+                                        {item.label}
+                                    </Button>
+                                ))}
+                            </Box>
+
+                            {/* ── Review list ── */}
+                            {reviews.length > 0 ? (
+                                <Box>
+                                    {reviews.map((r: any, idx: number) => (
+                                        <Box key={r.id} sx={{
+                                            py: 3,
+                                            borderBottom: idx < reviews.length - 1 ? '1px solid #f1f5f9' : 'none',
+                                        }}>
+                                            <Box sx={{ display: 'flex', gap: 2 }}>
+                                                <Avatar sx={{
+                                                    width: 44, height: 44, flexShrink: 0,
+                                                    bgcolor: '#0a192f', fontSize: 16, fontWeight: 800
+                                                }}>
+                                                    {r.customerName?.[0]?.toUpperCase() || 'U'}
+                                                </Avatar>
+                                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                                    {/* Header: name + badge + date */}
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 0.5 }}>
+                                                        <Typography fontWeight={700} fontSize={14} color="#0a192f">
+                                                            {r.customerName}
+                                                        </Typography>
+                                                        <Box sx={{
+                                                            display: 'inline-flex', alignItems: 'center', gap: 0.4,
+                                                            px: 1, py: 0.2, borderRadius: 10,
+                                                            bgcolor: '#f0fdf4', border: '1px solid #bbf7d0'
+                                                        }}>
+                                                            <CheckCircle sx={{ fontSize: 10, color: '#22c55e' }} />
+                                                            <Typography sx={{ fontSize: 10, fontWeight: 700, color: '#15803d' }}>Đã mua hàng</Typography>
+                                                        </Box>
+                                                        <Typography variant="caption" color="#94a3b8" sx={{ ml: 'auto' }}>
+                                                            {new Date(r.createdAt).toLocaleDateString('vi-VN')}
+                                                        </Typography>
+                                                    </Box>
+
+                                                    {/* Stars */}
+                                                    <Rating value={r.rating} readOnly size="small"
+                                                        sx={{ color: '#f5a623', mb: 1.2 }} />
+
+                                                    {/* Comment */}
+                                                    <Typography variant="body2" sx={{ color: '#374151', lineHeight: 1.8 }}>
+                                                        {r.comment}
+                                                    </Typography>
+
+                                                    {/* Images */}
+                                                    {r.imageUrls && r.imageUrls.length > 0 && (
+                                                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1.5 }}>
+                                                            {r.imageUrls.map((img: string, i: number) => (
+                                                                <Box key={i} component="img" src={img} alt="review"
+                                                                    sx={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 1.5, border: '1px solid #e2e8f0', cursor: 'pointer', '&:hover': { opacity: 0.85 } }} />
+                                                            ))}
+                                                        </Box>
+                                                    )}
                                                 </Box>
-                                                <Rating value={r.rating} readOnly size="small" sx={{ ml: 'auto', color: 'var(--color-secondary, #f5a623)' }} />
                                             </Box>
-                                            <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.7, mb: r.imageUrls?.length ? 1.5 : 0 }}>{r.comment}</Typography>
-                                            {r.imageUrls && r.imageUrls.length > 0 && (
-                                                <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: 1 }}>
-                                                    {r.imageUrls.map((img: string, idx: number) => (
-                                                        <Box key={idx} component="img" src={img} alt="review image" sx={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 2, border: '1px solid #eef2f6' }} />
-                                                    ))}
-                                                </Box>
-                                            )}
                                         </Box>
-                                    )) : (
-                                        <Typography variant="body1" color="text.secondary">Chưa có đánh giá nào cho bộ lọc này.</Typography>
-                                    )}
+                                    ))}
+                                </Box>
+                            ) : (
+                                <Box sx={{ textAlign: 'center', py: 8, bgcolor: '#f8fafc', borderRadius: 2.5, border: '1px dashed #e2e8f0' }}>
+                                    <Typography sx={{ fontSize: 42, mb: 1.5 }}>✍️</Typography>
+                                    <Typography fontWeight={700} color="#475569" mb={0.5}>
+                                        {reviewRating ? `Chưa có đánh giá ${reviewRating} sao` : 'Chưa có đánh giá nào'}
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                        Hãy là người đầu tiên chia sẻ cảm nhận về sản phẩm này
+                                    </Typography>
+                                </Box>
+                            )}
 
-                                    {reviewTotalPages > 1 && (
-                                        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-                                            <Pagination 
-                                                count={reviewTotalPages} 
-                                                page={reviewPage + 1} 
-                                                onChange={(_, p) => setReviewPage(p - 1)} 
-                                                color="primary" 
-                                            />
-                                        </Box>
-                                    )}
-                                </Grid>
-                            </Grid>
+                            {/* ── Pagination ── */}
+                            {totalReviews > 0 && (
+                                <Box sx={{
+                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                    mt: 4, pt: 3, borderTop: '1px solid #f1f5f9',
+                                    flexWrap: 'wrap', gap: 2
+                                }}>
+                                    <Typography variant="body2" color="text.secondary">
+                                        Hiển thị {Math.min(reviewPage * 5 + 1, totalReviews)}–{Math.min((reviewPage + 1) * 5, totalReviews)} trong tổng <strong>{totalReviews}</strong> đánh giá
+                                    </Typography>
+                                    <Pagination
+                                        count={reviewTotalPages}
+                                        page={reviewPage + 1}
+                                        onChange={(_, p) => setReviewPage(p - 1)}
+                                        shape="rounded"
+                                        sx={{
+                                            '& .MuiPaginationItem-root': { fontWeight: 600, borderRadius: 1.5 },
+                                            '& .MuiPaginationItem-root.Mui-selected': {
+                                                bgcolor: '#f5a623', color: '#fff',
+                                                '&:hover': { bgcolor: '#e0951a' }
+                                            },
+                                        }}
+                                    />
+                                </Box>
+                            )}
                         </TabPanel>
                     </Box>
                 </Paper>

@@ -16,6 +16,7 @@ import {
 } from '@mui/icons-material';
 import categoryService, { CategoryRequest } from '../../../../services/categoryService';
 import { Category } from '../../../../types';
+import authService from '../../../../services/authService';
 
 // ── Initial form ────────────────────────────────────────────
 const INITIAL_FORM: CategoryRequest = {
@@ -350,6 +351,7 @@ const ToggleActiveDialog: React.FC<ConfirmDialogProps> = ({
 // MAIN PAGE
 // ══════════════════════════════════════════════════════════════
 const CategoryPage: React.FC = () => {
+    const isAdmin = authService.getCurrentUser()?.user?.role === 'ROLE_ADMIN';
     const [categories, setCategories] = useState<Category[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -590,35 +592,39 @@ const CategoryPage: React.FC = () => {
 
                     {/* Thao tác */}
                     <TableCell sx={{ py: 1.5 }} align="center">
-                        <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
-                            <Tooltip title="Chỉnh sửa">
-                                <IconButton
-                                    size="small"
-                                    onClick={() => handleOpenEdit(cat)}
-                                    sx={{ color: '#f59e0b', '&:hover': { bgcolor: '#fef3c7' } }}
-                                >
-                                    <Edit sx={{ fontSize: 15 }} />
-                                </IconButton>
-                            </Tooltip>
-                            <Tooltip title={cat.isActive ? 'Ẩn danh mục' : 'Kích hoạt'}>
-                                <IconButton
-                                    size="small"
-                                    onClick={() => setToggleTarget(cat)}
-                                    sx={{
-                                        color: cat.isActive ? '#ef4444' : '#22c55e',
-                                        '&:hover': {
-                                            bgcolor: cat.isActive ? '#fef2f2' : '#f0fdf4',
-                                        },
-                                    }}
-                                >
-                                    {cat.isActive ? (
-                                        <VisibilityOff sx={{ fontSize: 15 }} />
-                                    ) : (
-                                        <Visibility sx={{ fontSize: 15 }} />
-                                    )}
-                                </IconButton>
-                            </Tooltip>
-                        </Box>
+                        {isAdmin ? (
+                            <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
+                                <Tooltip title="Chỉnh sửa">
+                                    <IconButton
+                                        size="small"
+                                        onClick={() => handleOpenEdit(cat)}
+                                        sx={{ color: '#f59e0b', '&:hover': { bgcolor: '#fef3c7' } }}
+                                    >
+                                        <Edit sx={{ fontSize: 15 }} />
+                                    </IconButton>
+                                </Tooltip>
+                                <Tooltip title={cat.isActive ? 'Ẩn danh mục' : 'Kích hoạt'}>
+                                    <IconButton
+                                        size="small"
+                                        onClick={() => setToggleTarget(cat)}
+                                        sx={{
+                                            color: cat.isActive ? '#ef4444' : '#22c55e',
+                                            '&:hover': {
+                                                bgcolor: cat.isActive ? '#fef2f2' : '#f0fdf4',
+                                            },
+                                        }}
+                                    >
+                                        {cat.isActive ? (
+                                            <VisibilityOff sx={{ fontSize: 15 }} />
+                                        ) : (
+                                            <Visibility sx={{ fontSize: 15 }} />
+                                        )}
+                                    </IconButton>
+                                </Tooltip>
+                            </Box>
+                        ) : (
+                            <Typography variant="caption" color="#ccc">—</Typography>
+                        )}
                     </TableCell>
                 </TableRow>
 
@@ -660,21 +666,23 @@ const CategoryPage: React.FC = () => {
                             <Refresh sx={{ fontSize: 18 }} />
                         </IconButton>
                     </Tooltip>
-                    <Button
-                        variant="contained"
-                        startIcon={<Add />}
-                        onClick={handleOpenCreate}
-                        sx={{
-                            bgcolor: '#2563eb',
-                            textTransform: 'none',
-                            fontWeight: 700,
-                            borderRadius: 1.5,
-                            height: 40,
-                            '&:hover': { bgcolor: '#1d4ed8' },
-                        }}
-                    >
-                        Thêm danh mục
-                    </Button>
+                    {isAdmin && (
+                        <Button
+                            variant="contained"
+                            startIcon={<Add />}
+                            onClick={handleOpenCreate}
+                            sx={{
+                                bgcolor: '#2563eb',
+                                textTransform: 'none',
+                                fontWeight: 700,
+                                borderRadius: 1.5,
+                                height: 40,
+                                '&:hover': { bgcolor: '#1d4ed8' },
+                            }}
+                        >
+                            Thêm danh mục
+                        </Button>
+                    )}
                 </Box>
             </Box>
 
@@ -850,20 +858,22 @@ const CategoryPage: React.FC = () => {
                                         <Typography variant="body2" color="text.secondary">
                                             Chưa có danh mục nào
                                         </Typography>
-                                        <Button
-                                            variant="contained"
-                                            size="small"
-                                            startIcon={<Add />}
-                                            onClick={handleOpenCreate}
-                                            sx={{
-                                                mt: 2,
-                                                textTransform: 'none',
-                                                fontWeight: 700,
-                                                bgcolor: '#1976d2',
-                                            }}
-                                        >
-                                            Thêm danh mục đầu tiên
-                                        </Button>
+                                        {isAdmin && (
+                                            <Button
+                                                variant="contained"
+                                                size="small"
+                                                startIcon={<Add />}
+                                                onClick={handleOpenCreate}
+                                                sx={{
+                                                    mt: 2,
+                                                    textTransform: 'none',
+                                                    fontWeight: 700,
+                                                    bgcolor: '#1976d2',
+                                                }}
+                                            >
+                                                Thêm danh mục đầu tiên
+                                            </Button>
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             )}
