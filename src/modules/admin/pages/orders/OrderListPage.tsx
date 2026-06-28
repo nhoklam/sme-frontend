@@ -924,6 +924,7 @@ const OrderListPage: React.FC = () => {
     const [warehouseFilter, setWarehouseFilter] = useState('');
     const [employeeFilter, setEmployeeFilter] = useState('');
     const [employees, setEmployees] = useState<any[]>([]);
+    const [allEmployees, setAllEmployees] = useState<any[]>([]);
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [dateRange, setDateRange] = useState('last_30_days');
     const [customStartDate, setCustomStartDate] = useState('');
@@ -950,12 +951,29 @@ const OrderListPage: React.FC = () => {
         setWarehouseFilter(userWarehouseId || '');
         if (isManager || isAdmin) {
             import('../../../../services/userService').then(({ default: userService }) => {
-                userService.getAll({ warehouseId: userWarehouseId || undefined }).then(users => {
-                    setEmployees(users.filter(u => u.role === 'ROLE_CASHIER' || u.role === 'ROLE_MANAGER'));
+                userService.getAll({}).then(users => {
+                    const filtered = users.filter((u: any) => u.role === 'ROLE_CASHIER' || u.role === 'ROLE_MANAGER');
+                    setAllEmployees(filtered);
+                    if (isManager && userWarehouseId) {
+                        setEmployees(filtered.filter((u: any) => u.warehouseId === userWarehouseId));
+                    } else {
+                        setEmployees(filtered);
+                    }
                 }).catch(() => {});
             });
         }
     }, [userWarehouseId, isManager, isAdmin]);
+
+    // Admin: khi đổi chi nhánh → filter client-side theo warehouseId và reset filter nhân viên cũ
+    useEffect(() => {
+        if (!isAdmin) return;
+        setEmployeeFilter('');
+        if (warehouseFilter) {
+            setEmployees(allEmployees.filter((u: any) => u.warehouseId === warehouseFilter));
+        } else {
+            setEmployees(allEmployees);
+        }
+    }, [warehouseFilter, isAdmin, allEmployees]);
 
     useEffect(() => {
         if (urlOrderId) {
@@ -1235,10 +1253,12 @@ const OrderListPage: React.FC = () => {
 
     const clearFilters = () => {
         setSearch(""); setStatusFilter(""); setPaymentStatusFilter("");
-        setPaymentMethodFilter(""); setProvinceFilter(""); setEmployeeFilter("");
+        setPaymentMethodFilter(""); setProvinceFilter("");
+        if (tabIndex === 1) setEmployeeFilter("");
+        if (isAdmin) setWarehouseFilter("");
     };
 
-    const activeFilterCount = [search, statusFilter, paymentStatusFilter, paymentMethodFilter, provinceFilter, employeeFilter].filter(Boolean).length;
+    const activeFilterCount = [search, statusFilter, paymentStatusFilter, paymentMethodFilter, provinceFilter, isAdmin ? warehouseFilter : '', tabIndex === 1 ? employeeFilter : ''].filter(Boolean).length;
     
     const isLoading = tabIndex === 0 ? onlineQuery.isFetching : offlineQuery.isFetching;
     const currentOrders = tabIndex === 0 ? (onlineQuery.data?.content || []) : (offlineQuery.data?.content || []);
@@ -1398,7 +1418,19 @@ const OrderListPage: React.FC = () => {
                                 {PROVINCES.map(p => <MenuItem key={p.code} value={p.code} sx={{ fontSize: 13 }}>{p.name}</MenuItem>)}
                             </Select>
                         </FormControl>
-                        {isManager && (
+                        {isAdmin && (
+                            <FormControl size="small" sx={{ minWidth: 190 }}>
+                                <Select value={warehouseFilter}
+                                    onChange={(e: SelectChangeEvent<string>) => setWarehouseFilter(e.target.value)}
+                                    displayEmpty sx={{ fontSize: 13 }}>
+                                    <MenuItem value="">Tất cả chi nhánh</MenuItem>
+                                    {warehouses.filter(w => w.isActive).map(w => (
+                                        <MenuItem key={w.id} value={w.id} sx={{ fontSize: 13 }}>{w.name}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        )}
+                        {tabIndex === 1 && (isAdmin || isManager) && (
                             <FormControl size="small" sx={{ minWidth: 170 }}>
                                 <Select value={employeeFilter}
                                     onChange={(e: SelectChangeEvent<string>) => setEmployeeFilter(e.target.value)}
@@ -1430,7 +1462,8 @@ const OrderListPage: React.FC = () => {
                         {paymentStatusFilter && <Chip size="small" label={PAYMENT_OPTIONS.find(o => o.value === paymentStatusFilter)?.label} onDelete={() => setPaymentStatusFilter("")} sx={{ bgcolor: "#e8f5e9", color: "#2e7d32", fontWeight: 600 }} />}
                         {paymentMethodFilter && <Chip size="small" label={paymentMethodFilter} onDelete={() => setPaymentMethodFilter("")} sx={{ bgcolor: "#f3e5f5", color: "#6a1b9a", fontWeight: 600 }} />}
                         {provinceFilter && <Chip size="small" label={getProvinceName(provinceFilter)} onDelete={() => setProvinceFilter("")} sx={{ bgcolor: "#e1f5fe", color: "#0277bd", fontWeight: 600 }} />}
-                        {employeeFilter && <Chip size="small" label={`Nhân viên: ${employeeFilter}`} onDelete={() => setEmployeeFilter("")} sx={{ bgcolor: "#e8eaf6", color: "#3f51b5", fontWeight: 600 }} />}
+                        {isAdmin && warehouseFilter && <Chip size="small" label={`Chi nhánh: ${warehouses.find(w => w.id === warehouseFilter)?.name ?? warehouseFilter}`} onDelete={() => setWarehouseFilter("")} sx={{ bgcolor: "#e8f5e9", color: "#2e7d32", fontWeight: 600 }} />}
+                        {tabIndex === 1 && employeeFilter && <Chip size="small" label={`Nhân viên: ${employeeFilter}`} onDelete={() => setEmployeeFilter("")} sx={{ bgcolor: "#e8eaf6", color: "#3f51b5", fontWeight: 600 }} />}
                     </Box>
                 )}
             </Paper>

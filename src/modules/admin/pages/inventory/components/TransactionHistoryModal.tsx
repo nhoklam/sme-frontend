@@ -3,7 +3,7 @@ import {
     Dialog, DialogContent, DialogTitle, DialogActions,
     Table, TableBody, TableCell, TableHead, TableRow,
     Chip, Typography, Box, IconButton, Divider, Button, Pagination,
-    CircularProgress, FormControl, Select, MenuItem, InputLabel,
+    CircularProgress, FormControl, Select, MenuItem, InputLabel, Tooltip,
 } from '@mui/material';
 import { Close, FileDownloadOutlined, FilterList } from '@mui/icons-material';
 import inventoryService from '../../../../../services/inventoryService';
@@ -230,8 +230,12 @@ const TransactionHistoryModal: React.FC<Props> = ({
                                         </TableCell>
                                         <TableCell><Typography variant="caption">{tx.quantityBefore}</Typography></TableCell>
                                         <TableCell><Typography variant="caption" fontWeight={700}>{tx.quantityAfter}</Typography></TableCell>
-                                        <TableCell sx={{ py: 1.25, maxWidth: 200 }}>
-                                            <Typography variant="caption" color="#888" noWrap>{tx.note || '—'}</Typography>
+                                        <TableCell sx={{ py: 1.25, maxWidth: 180, overflow: 'hidden' }}>
+                                            <Tooltip title={tx.note || ''} placement="top" disableHoverListener={!tx.note || tx.note.length <= 30}>
+                                                <Typography variant="caption" color="#888" noWrap sx={{ display: 'block', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                    {tx.note || '—'}
+                                                </Typography>
+                                            </Tooltip>
                                         </TableCell>
                                         <TableCell sx={{ py: 1.25 }}>
                                             <Typography variant="caption" color="text.secondary">{tx.createdBy || '—'}</Typography>

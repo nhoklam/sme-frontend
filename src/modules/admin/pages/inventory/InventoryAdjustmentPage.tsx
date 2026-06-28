@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import toast from 'react-hot-toast';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     Box, Typography, Button, Paper, Table, TableBody,
@@ -7,11 +8,12 @@ import {
     Dialog, DialogTitle, DialogContent, DialogActions,
     Select, MenuItem, FormControl, Snackbar, Alert,
     Skeleton, Pagination, Divider, CircularProgress,
-    Tooltip, Tabs, Tab,
+    Tooltip, Tabs, Tab, LinearProgress,
 } from '@mui/material';
 import {
     Search, Add, Refresh, Visibility, CheckCircle,
     Close, Delete, Send, ThumbDown, Cancel, Assignment,
+    FileDownloadOutlined,
 } from '@mui/icons-material';
 import { adjustmentService, AdjustItemPayload } from '../../../../services/adjustmentService';
 import warehouseService from '../../../../services/warehouseService';
@@ -22,6 +24,7 @@ import {
     ProductResponse, Inventory,
 } from '../../../../types';
 import authService from '../../../../services/authService';
+import userService from '../../../../services/userService';
 
 // ── helpers ─────────────────────────────────────────────────
 const REASON_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
@@ -51,6 +54,7 @@ const AdjDetailDialog: React.FC<{
     adj: StockAdjustment | null;
     warehouses: Warehouse[];
     products: Map<string, ProductResponse>;
+    userMap: Map<string, string>;
     onClose: () => void;
     onSubmit: () => void;
     onApprove: () => void;
@@ -59,7 +63,7 @@ const AdjDetailDialog: React.FC<{
     loading: boolean;
     isAdmin: boolean;
     currentUser: any;
-}> = ({ open, adj, warehouses, products, onClose, onSubmit, onApprove, onReject, onCancel, loading, isAdmin, currentUser }) => {
+}> = ({ open, adj, warehouses, products, userMap, onClose, onSubmit, onApprove, onReject, onCancel, loading, isAdmin, currentUser }) => {
     const warehouse = warehouses.find(w => w.id === adj?.warehouseId);
     const statusInfo = adj ? STATUS_MAP[adj.status] : { label: '', color: '', bg: '' };
     const isCreator = currentUser?.id === adj?.createdByUser;
@@ -83,7 +87,7 @@ const AdjDetailDialog: React.FC<{
                         {[
                             ['Kho', warehouse?.name || adj?.warehouseId],
                             ['Ngày tạo', fmtDt(adj?.createdAt)],
-                            ['Người tạo', adj?.createdByUser || '—'],
+                            ['Người tạo', adj?.createdByUser ? (userMap.get(adj.createdByUser) || adj.createdByUser.slice(0, 8) + '...') : '—'],
                         ].map(([label, value]) => (
                             <Box key={label} sx={{ display: 'flex', mb: 0.75 }}>
                                 <Typography variant="body2" fontWeight={700} sx={{ minWidth: 110, color: '#475569' }}>{label}:</Typography>
@@ -286,16 +290,21 @@ const CreateAdjDialog: React.FC<{
         setSearchKw(''); setSearchResults([]);
     };
 
-    const loadAllInventory = () => {
+    const loadAllInventory = async () => {
         if (!warehouseId) return;
-        inventoryService.getByWarehouse(warehouseId).then(data => {
-            setCart(data.map(inv => {
-                const existing = cart.find(c => c.productId === inv.productId);
-                if (existing) return existing;
-                const p = productMap.get(inv.productId);
-                return { productId: inv.productId, productName: p?.name || inv.productId.slice(0, 12), systemQty: inv.quantity, actualQty: inv.quantity, reason: '', reasonType: '' };
-            }));
-        });
+        const [data, productsRes] = await Promise.all([
+            inventoryService.getByWarehouse(warehouseId),
+            productService.search({ size: 2000, isActive: true }),
+        ]);
+        const freshMap = new Map<string, ProductResponse>();
+        productsRes.content.forEach(p => freshMap.set(p.id, p));
+        if (freshMap.size > 0) setProductMap(freshMap);
+        setCart(prev => data.map(inv => {
+            const existing = prev.find(c => c.productId === inv.productId);
+            if (existing) return existing;
+            const p = freshMap.get(inv.productId);
+            return { productId: inv.productId, productName: p?.name || inv.productId.slice(0, 8), systemQty: inv.quantity, actualQty: inv.quantity, reason: '', reasonType: '' };
+        }));
     };
 
     const updateItem = (productId: string, field: keyof AdjCartItem, value: any) => {
@@ -337,6 +346,36 @@ const CreateAdjDialog: React.FC<{
         } catch (e: any) {
             setSnack({ msg: e.response?.data?.message || 'Tạo phiếu kiểm kê thất bại', sev: 'error' });
         } finally { setCreating(false); }
+    };
+
+    const checkedCount = cart.filter(i => i.actualQty !== i.systemQty || i.reason || i.reasonType).length;
+    const progressPct = cart.length > 0 ? Math.round((checkedCount / cart.length) * 100) : 0;
+
+    const handleExport = async () => {
+        const XLSX = await import('xlsx');
+        const rows = cart.map((item, idx) => {
+            const diff = item.actualQty - item.systemQty;
+            const barcode = productMap.get(item.productId)?.isbnBarcode || '';
+            return {
+                STT: idx + 1,
+                'Mã hàng': barcode,
+                'Tên hàng': item.productName,
+                ĐVT: 'cuốn',
+                'Tồn kho HT': item.systemQty,
+                'Thực tế': item.actualQty,
+                'SL lệch': diff === 0 ? 0 : diff,
+                'Loại nguyên nhân': REASON_TYPE_OPTIONS.find(o => o.value === item.reasonType)?.label || '',
+                'Ghi chú': item.reason || '',
+            };
+        });
+        const ws = XLSX.utils.json_to_sheet(rows);
+        ws['!cols'] = [
+            { wch: 5 }, { wch: 16 }, { wch: 36 }, { wch: 7 },
+            { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 20 }, { wch: 28 },
+        ];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Kiểm kê');
+        XLSX.writeFile(wb, `kiem-ke-${warehouseName || 'kho'}-${new Date().toISOString().slice(0, 10)}.xlsx`);
     };
 
     // ── render ────────────────────────────────────────────────
@@ -466,8 +505,13 @@ const CreateAdjDialog: React.FC<{
                                                         {barcode || '—'}
                                                     </Typography>
                                                 </TableCell>
-                                                <TableCell sx={{ py: 0.75 }}>
-                                                    <Typography fontWeight={600} fontSize={12.5} color="#1e293b">{item.productName}</Typography>
+                                                <TableCell sx={{ py: 0.75, maxWidth: 200 }}>
+                                                    <Tooltip title={item.productName} placement="top" arrow enterDelay={400}>
+                                                        <Typography fontWeight={600} fontSize={12.5} color="#1e293b"
+                                                            sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                            {item.productName}
+                                                        </Typography>
+                                                    </Tooltip>
                                                 </TableCell>
                                                 <TableCell align="center" sx={{ py: 0.75 }}>
                                                     <Typography variant="caption" color="#94a3b8">cuốn</Typography>
@@ -478,9 +522,13 @@ const CreateAdjDialog: React.FC<{
                                                     </Box>
                                                 </TableCell>
                                                 <TableCell align="center" sx={{ py: 0.75 }}>
-                                                    <TextField size="small" type="number" value={item.actualQty}
-                                                        onChange={e => updateItem(item.productId, 'actualQty', parseInt(e.target.value) || 0)}
-                                                        inputProps={{ min: 0, style: { textAlign: 'center', width: 60, padding: '4px 6px' } }}
+                                                    <TextField size="small" value={item.actualQty}
+                                                        onChange={e => {
+                                                            const v = parseInt(e.target.value);
+                                                            updateItem(item.productId, 'actualQty', isNaN(v) ? 0 : Math.max(0, v));
+                                                        }}
+                                                        onFocus={e => e.target.select()}
+                                                        inputProps={{ inputMode: 'numeric', pattern: '[0-9]*', style: { textAlign: 'center', width: 60, padding: '4px 6px' } }}
                                                         sx={{ '& .MuiOutlinedInput-root': {
                                                             bgcolor: hasDiff ? (diff > 0 ? '#dcfce7' : '#fee2e2') : '#fff',
                                                             borderRadius: 1.5,
@@ -536,8 +584,13 @@ const CreateAdjDialog: React.FC<{
                                                         {p?.isbnBarcode || '—'}
                                                     </Typography>
                                                 </TableCell>
-                                                <TableCell sx={{ py: 0.75 }}>
-                                                    <Typography fontSize={12.5} color="#94a3b8">{p?.name || item.productId.slice(0, 14)}</Typography>
+                                                <TableCell sx={{ py: 0.75, maxWidth: 200 }}>
+                                                    <Tooltip title={p?.name || ''} placement="top" arrow enterDelay={400}>
+                                                        <Typography fontSize={12.5} color="#94a3b8"
+                                                            sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                            {p?.name || item.productId.slice(0, 14)}
+                                                        </Typography>
+                                                    </Tooltip>
                                                 </TableCell>
                                                 <TableCell align="center"><Typography variant="caption" color="#c8d3e0">cuốn</Typography></TableCell>
                                                 <TableCell align="center">
@@ -636,13 +689,46 @@ const CreateAdjDialog: React.FC<{
                         ))}
                     </Box>
 
-                    {/* Load all button */}
+                    {/* Progress bar */}
+                    {cart.length > 0 && (
+                        <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid #e2e8f0' }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
+                                <Typography variant="caption" color="#64748b" fontSize={11}>Tiến trình kiểm</Typography>
+                                <Typography variant="caption" fontWeight={700} color="#1e293b" fontSize={11}>
+                                    {checkedCount}/{cart.length} SP
+                                </Typography>
+                            </Box>
+                            <LinearProgress variant="determinate" value={progressPct}
+                                sx={{ height: 6, borderRadius: 3,
+                                    bgcolor: '#e2e8f0',
+                                    '& .MuiLinearProgress-bar': {
+                                        borderRadius: 3,
+                                        bgcolor: progressPct === 100 ? '#16a34a' : '#2563eb',
+                                    }
+                                }} />
+                            <Typography variant="caption" color={progressPct === 100 ? '#16a34a' : '#94a3b8'} fontSize={10} mt={0.5} display="block">
+                                {progressPct === 100 ? '✓ Đã điền đầy đủ' : `${progressPct}% đã xử lý`}
+                            </Typography>
+                        </Box>
+                    )}
+
+                    {/* Load all + Export buttons */}
                     {warehouseId && (
-                        <Box sx={{ px: 2, py: 1.25, borderBottom: '1px solid #e2e8f0' }}>
+                        <Box sx={{ px: 2, py: 1.25, borderBottom: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 0.75 }}>
                             <Button fullWidth variant="outlined" size="small" onClick={loadAllInventory}
                                 sx={{ textTransform: 'none', borderRadius: 1.5, fontSize: 12 }}>
                                 Tải toàn bộ hàng hóa ({invMap.size} SP)
                             </Button>
+                            {cart.length > 0 && (
+                                <Button fullWidth variant="outlined" size="small"
+                                    startIcon={<FileDownloadOutlined sx={{ fontSize: 15 }} />}
+                                    onClick={handleExport}
+                                    sx={{ textTransform: 'none', borderRadius: 1.5, fontSize: 12,
+                                        borderColor: '#16a34a', color: '#16a34a',
+                                        '&:hover': { bgcolor: '#f0fdf4', borderColor: '#15803d' } }}>
+                                    Xuất Excel
+                                </Button>
+                            )}
                         </Box>
                     )}
 
@@ -712,6 +798,13 @@ const InventoryAdjustmentPage: React.FC = () => {
     const isAdmin = currentUser?.role === 'ROLE_ADMIN';
     const qc = useQueryClient();
 
+    // Manager chỉ được xem kho của mình
+    useEffect(() => {
+        if (!isAdmin && currentUser?.warehouseId) {
+            setWarehouseFilter(String(currentUser.warehouseId));
+        }
+    }, [isAdmin, currentUser?.warehouseId]);
+
     const { data: adjData, isLoading, refetch } = useQuery({
         queryKey: ['stock-adjustments', page, statusFilter, keyword, warehouseFilter],
         queryFn: () => adjustmentService.getAll({
@@ -720,9 +813,12 @@ const InventoryAdjustmentPage: React.FC = () => {
             keyword: keyword || undefined,
             warehouseId: warehouseFilter || undefined,
         }),
+        refetchInterval: 15_000,
+        refetchOnWindowFocus: true,
     });
 
     const { data: warehouses = [] } = useQuery({ queryKey: ['warehouses'], queryFn: warehouseService.getAll });
+    const { data: allUsers = [] } = useQuery({ queryKey: ['users-all'], queryFn: () => userService.getAll() });
 
     useEffect(() => {
         productService.search({ size: 1000, isActive: true }).then(res => {
@@ -731,6 +827,12 @@ const InventoryAdjustmentPage: React.FC = () => {
             setProducts(map);
         }).catch(() => {});
     }, []);
+
+    const userMap = React.useMemo(() => {
+        const m = new Map<string, string>();
+        allUsers.forEach(u => m.set(u.id, u.fullName));
+        return m;
+    }, [allUsers]);
 
     const warehouseMap = React.useMemo(() => {
         const m = new Map<string, Warehouse>();
@@ -792,6 +894,40 @@ const InventoryAdjustmentPage: React.FC = () => {
     const adjs = adjData?.content || [];
     const totalPages = adjData?.totalPages || 0;
 
+    // ── Phát hiện thay đổi trạng thái phiếu → toast real-time ─
+    const prevStatusRef = useRef<Map<string, string>>(new Map());
+    const isFirstLoadRef = useRef(true);
+
+    useEffect(() => {
+        if (!adjs.length) return;
+        if (isFirstLoadRef.current) {
+            // Lần đầu load: chỉ ghi nhớ trạng thái, không toast
+            const m = new Map<string, string>();
+            adjs.forEach(a => m.set(a.id, a.status));
+            prevStatusRef.current = m;
+            isFirstLoadRef.current = false;
+            return;
+        }
+        const prev = prevStatusRef.current;
+        adjs.forEach(adj => {
+            const oldStatus = prev.get(adj.id);
+            if (!oldStatus || oldStatus === adj.status) return;
+            if (!isAdmin && adj.status === 'APPROVED') {
+                toast.success(`Phiếu ${adj.code} đã được duyệt!`, { duration: 6000, icon: '✅' });
+                qc.invalidateQueries({ queryKey: ['inventory-all'] });
+                qc.invalidateQueries({ queryKey: ['inventory-stats'] });
+            } else if (!isAdmin && adj.status === 'REJECTED') {
+                toast.error(`Phiếu ${adj.code} bị từ chối`, { duration: 6000, icon: '❌' });
+            } else if (isAdmin && adj.status === 'PENDING_APPROVAL') {
+                toast(`Phiếu ${adj.code} đang chờ duyệt`, { duration: 5000, icon: '📋' });
+            }
+        });
+        const m = new Map<string, string>();
+        adjs.forEach(a => m.set(a.id, a.status));
+        prevStatusRef.current = m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [adjs]);
+
     return (
         <Box sx={{ p: 3, bgcolor: '#f8f9fb', minHeight: '100vh' }}>
             <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 3 }}>
@@ -813,12 +949,22 @@ const InventoryAdjustmentPage: React.FC = () => {
                     <TextField size="small" placeholder="Tìm theo mã phiếu..."
                         value={keyword} onChange={e => setKeyword(e.target.value)} sx={{ minWidth: 200 }}
                         InputProps={{ startAdornment: <InputAdornment position="start"><Search /></InputAdornment> }} />
-                    <FormControl size="small" sx={{ minWidth: 150 }}>
-                        <Select value={warehouseFilter} onChange={e => setWarehouseFilter(e.target.value)} displayEmpty>
-                            <MenuItem value="">Tất cả kho</MenuItem>
-                            {warehouses.map(w => <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>)}
-                        </Select>
-                    </FormControl>
+                    {isAdmin ? (
+                        <FormControl size="small" sx={{ minWidth: 150 }}>
+                            <Select value={warehouseFilter} onChange={e => setWarehouseFilter(e.target.value)} displayEmpty>
+                                <MenuItem value="">Tất cả kho</MenuItem>
+                                {warehouses.map(w => <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>)}
+                            </Select>
+                        </FormControl>
+                    ) : (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 1.5, py: 0.85,
+                            bgcolor: '#e8f5e9', borderRadius: 1.5, border: '1px solid #a5d6a7' }}>
+                            <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: '#4caf50' }} />
+                            <Typography fontSize={13} fontWeight={600} color="#1b5e20">
+                                {warehouseMap.get(warehouseFilter)?.name || 'Kho của bạn'}
+                            </Typography>
+                        </Box>
+                    )}
                     <FormControl size="small" sx={{ minWidth: 170 }}>
                         <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} displayEmpty>
                             <MenuItem value="">Tất cả trạng thái</MenuItem>
@@ -934,6 +1080,7 @@ const InventoryAdjustmentPage: React.FC = () => {
             {/* Detail Dialog */}
             <AdjDetailDialog
                 open={detailOpen} adj={selected} warehouses={warehouses} products={products}
+                userMap={userMap}
                 onClose={() => setDetailOpen(false)}
                 onSubmit={handleSubmit} onApprove={handleApprove}
                 onReject={() => setRejectOpen(true)} onCancel={() => setCancelOpen(true)}

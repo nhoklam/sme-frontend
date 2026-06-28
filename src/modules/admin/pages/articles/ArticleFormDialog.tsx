@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Box, FormControl, InputLabel, Select, MenuItem, FormControlLabel, Switch, Typography, IconButton, CircularProgress, LinearProgress } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Box, FormControl, InputLabel, Select, MenuItem, FormControlLabel, Switch, Typography, IconButton, CircularProgress, LinearProgress, Alert } from '@mui/material';
 import { AddPhotoAlternate, DeleteOutline } from '@mui/icons-material';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import axiosInstance from '../../../../services/axiosConfig';
 import articleService, { CreateArticleRequest, UpdateArticleRequest } from '../../../../services/articleService';
+import authService from '../../../../services/authService';
 import toast from 'react-hot-toast';
 
 const SingleImageUploader = ({ imageUrl, onChange }: { imageUrl: string; onChange: (url: string) => void }) => {
@@ -73,6 +74,9 @@ interface ArticleFormDialogProps {
 
 const ArticleFormDialog: React.FC<ArticleFormDialogProps> = ({ open, onClose, articleId }) => {
     const queryClient = useQueryClient();
+    const currentUser = authService.getCurrentUser()?.user;
+    const isAdmin = currentUser?.role === 'ROLE_ADMIN';
+
     const [formData, setFormData] = useState<CreateArticleRequest>({
         title: '',
         slug: '',
@@ -80,8 +84,10 @@ const ArticleFormDialog: React.FC<ArticleFormDialogProps> = ({ open, onClose, ar
         coverImage: '',
         authorName: '',
         type: 'TIN_TUC',
-        isActive: true
+        isActive: isAdmin ? true : false
     });
+    const [articleStatus, setArticleStatus] = useState<string | null>(null);
+    const [rejectionReason, setRejectionReason] = useState<string | null>(null);
 
     useEffect(() => {
         if (open && articleId) {
@@ -96,6 +102,8 @@ const ArticleFormDialog: React.FC<ArticleFormDialogProps> = ({ open, onClose, ar
                     type: data.type,
                     isActive: data.isActive
                 });
+                setArticleStatus(data.status ?? null);
+                setRejectionReason(data.rejectionReason ?? null);
             });
         } else if (open && !articleId) {
             // Reset form
@@ -106,10 +114,12 @@ const ArticleFormDialog: React.FC<ArticleFormDialogProps> = ({ open, onClose, ar
                 coverImage: '',
                 authorName: '',
                 type: 'TIN_TUC',
-                isActive: true
+                isActive: isAdmin ? true : false
             });
+            setArticleStatus(null);
+            setRejectionReason(null);
         }
-    }, [open, articleId]);
+    }, [open, articleId, isAdmin]);
 
     const mutation = useMutation({
         mutationFn: (data: any) => articleId ? articleService.update(articleId, data) : articleService.create(data),
@@ -133,12 +143,18 @@ const ArticleFormDialog: React.FC<ArticleFormDialogProps> = ({ open, onClose, ar
             <form onSubmit={handleSubmit}>
                 <DialogContent dividers>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-                        <TextField 
-                            label="Tiêu đề" 
-                            fullWidth 
-                            required 
-                            value={formData.title} 
-                            onChange={e => setFormData({...formData, title: e.target.value})} 
+                        {articleStatus === 'REJECTED' && rejectionReason && (
+                            <Alert severity="warning" sx={{ borderRadius: 2 }}>
+                                <strong>Bị từ chối:</strong> {rejectionReason}
+                            </Alert>
+                        )}
+
+                        <TextField
+                            label="Tiêu đề"
+                            fullWidth
+                            required
+                            value={formData.title}
+                            onChange={e => setFormData({...formData, title: e.target.value})}
                         />
                         
                         <Box sx={{ display: 'flex', gap: 2 }}>
@@ -189,15 +205,17 @@ const ArticleFormDialog: React.FC<ArticleFormDialogProps> = ({ open, onClose, ar
                             onChange={e => setFormData({...formData, content: e.target.value})} 
                         />
 
-                        <FormControlLabel
-                            control={
-                                <Switch 
-                                    checked={formData.isActive} 
-                                    onChange={e => setFormData({...formData, isActive: e.target.checked})} 
-                                />
-                            }
-                            label="Hiển thị bài viết"
-                        />
+                        {isAdmin && (
+                            <FormControlLabel
+                                control={
+                                    <Switch
+                                        checked={formData.isActive}
+                                        onChange={e => setFormData({...formData, isActive: e.target.checked})}
+                                    />
+                                }
+                                label="Hiển thị bài viết"
+                            />
+                        )}
                     </Box>
                 </DialogContent>
                 <DialogActions>

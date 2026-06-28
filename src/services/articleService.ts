@@ -14,6 +14,9 @@ export interface ArticleResponse {
     updatedAt: string;
     createdBy: string;
     updatedBy: string;
+    status: 'DRAFT' | 'PENDING_APPROVAL' | 'PUBLISHED' | 'REJECTED';
+    rejectionReason?: string;
+    createdByUserId?: string;
 }
 
 export interface CreateArticleRequest {
@@ -38,11 +41,12 @@ export interface UpdateArticleRequest {
 
 const articleService = {
     // PUBLIC
-    search: async (params: { keyword?: string; type?: string; isActive?: boolean; page?: number; size?: number }): Promise<PageResponse<ArticleResponse>> => {
+    search: async (params: { keyword?: string; type?: string; isActive?: boolean; status?: string; page?: number; size?: number }): Promise<PageResponse<ArticleResponse>> => {
         const query = new URLSearchParams();
         if (params.keyword?.trim()) query.set('keyword', params.keyword.trim());
         if (params.type) query.set('type', params.type);
         if (params.isActive !== undefined) query.set('isActive', String(params.isActive));
+        if (params.status) query.set('status', params.status);
         query.set('page', String(params.page ?? 0));
         query.set('size', String(params.size ?? 20));
 
@@ -73,7 +77,22 @@ const articleService = {
 
     delete: async (id: string): Promise<void> => {
         await axiosInstance.delete(`/articles/${id}`);
-    }
+    },
+
+    submit: async (id: string): Promise<ArticleResponse> => {
+        const res = await axiosInstance.post<ApiResponse<ArticleResponse>>(`/articles/${id}/submit`);
+        return res.data.data;
+    },
+
+    approve: async (id: string): Promise<ArticleResponse> => {
+        const res = await axiosInstance.post<ApiResponse<ArticleResponse>>(`/articles/${id}/approve`);
+        return res.data.data;
+    },
+
+    reject: async (id: string, reason: string): Promise<ArticleResponse> => {
+        const res = await axiosInstance.post<ApiResponse<ArticleResponse>>(`/articles/${id}/reject`, { reason });
+        return res.data.data;
+    },
 };
 
 export default articleService;

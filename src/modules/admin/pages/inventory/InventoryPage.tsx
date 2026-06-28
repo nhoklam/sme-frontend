@@ -4,13 +4,12 @@ import {
     Box, Typography,
 } from '@mui/material';
 import {
-    Inventory2, Warning as WarningIcon, History,
+    Inventory2, Warning as WarningIcon,
 } from '@mui/icons-material';
 import warehouseService from '../../../../services/warehouseService';
 import { Warehouse as WarehouseType } from '../../../../types';
 import InventoryListTab from './tabs/InventoryListTab';
 import LowStockTab from './tabs/LowStockTab';
-import StockCountHistoryTab from './tabs/StockCountHistoryTab';
 
 const InventoryPage: React.FC = () => {
     const location = useLocation();
@@ -33,13 +32,11 @@ const InventoryPage: React.FC = () => {
     const TAB_CONFIG = [
         { label: 'Danh sách tồn kho', icon: <Inventory2 sx={{ fontSize: 16 }} />, desc: 'Xem & điều chỉnh tồn kho' },
         { label: 'Sắp hết hàng', icon: <WarningIcon sx={{ fontSize: 16 }} />, desc: 'Cảnh báo tồn kho thấp & hết hàng' },
-        { label: 'Lịch sử kiểm kho', icon: <History sx={{ fontSize: 16 }} />, desc: 'Xem lại các phiếu kiểm kho' },
     ];
 
     const tabComponents = [
         <InventoryListTab warehouses={warehouses} />,
         <LowStockTab warehouses={warehouses} />,
-        <StockCountHistoryTab warehouses={warehouses} />,
     ];
 
     return (

@@ -1,5 +1,6 @@
 // src/modules/admin/pages/suppliers/SupplierPage.tsx
 import React, { useState, useEffect, useCallback } from 'react';
+import authService from '../../../../services/authService';
 import {
     Box, Typography, Button, TextField, InputAdornment,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -308,7 +309,7 @@ const SupplierDetailDialog: React.FC<{
                                                     <Chip
                                                         label={
                                                             order.status === 'COMPLETED' ? 'Đã nhập kho' :
-                                                                order.status === 'PENDING' ? 'Chờ duyệt' :
+                                                                order.status === 'PENDING_APPROVAL' ? 'Chờ duyệt' :
                                                                     order.status === 'CANCELLED' ? 'Đã hủy' : 'Nháp'
                                                         }
                                                         size="small"
@@ -316,11 +317,11 @@ const SupplierDetailDialog: React.FC<{
                                                             height: 20, fontSize: 11, fontWeight: 700,
                                                             bgcolor:
                                                                 order.status === 'COMPLETED' ? '#e8f5e9' :
-                                                                    order.status === 'PENDING' ? '#fff3e0' :
+                                                                    order.status === 'PENDING_APPROVAL' ? '#fff3e0' :
                                                                         order.status === 'CANCELLED' ? '#ffe5e5' : '#f5f5f5',
                                                             color:
                                                                 order.status === 'COMPLETED' ? '#2e7d32' :
-                                                                    order.status === 'PENDING' ? '#ef6c00' :
+                                                                    order.status === 'PENDING_APPROVAL' ? '#ef6c00' :
                                                                         order.status === 'CANCELLED' ? '#c62828' : '#666',
                                                         }}
                                                     />
@@ -347,11 +348,17 @@ const SupplierDetailDialog: React.FC<{
                     sx={{ textTransform: 'none', borderColor: '#e0e0e0', color: '#555' }}>
                     Đóng
                 </Button>
-                <Button onClick={() => { onEdit(supplier); onClose(); }} variant="contained"
-                    startIcon={<Edit sx={{ fontSize: 15 }} />}
-                    sx={{ textTransform: 'none', fontWeight: 700, bgcolor: '#2563eb', '&:hover': { bgcolor: '#1d4ed8' } }}>
-                    Chỉnh sửa
-                </Button>
+                {(() => {
+                    const cu = authService.getCurrentUser()?.user;
+                    const adminFlag = cu?.role === 'ROLE_ADMIN';
+                    return adminFlag ? (
+                        <Button onClick={() => { onEdit(supplier); onClose(); }} variant="contained"
+                            startIcon={<Edit sx={{ fontSize: 15 }} />}
+                            sx={{ textTransform: 'none', fontWeight: 700, bgcolor: '#2563eb', '&:hover': { bgcolor: '#1d4ed8' } }}>
+                            Chỉnh sửa
+                        </Button>
+                    ) : null;
+                })()}
             </DialogActions>
         </Dialog>
     );
@@ -640,6 +647,9 @@ const SupplierFormDialog: React.FC<{
 
 // ─── Main Component ────────────────────────────────────────────
 const SupplierPage: React.FC = () => {
+    const currentUser = authService.getCurrentUser()?.user;
+    const isAdmin = currentUser?.role === 'ROLE_ADMIN';
+
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [allDebts, setAllDebts] = useState<SupplierDebt[]>([]);
     const [loading, setLoading] = useState(false);
@@ -811,19 +821,23 @@ const SupplierPage: React.FC = () => {
                         sx={{ textTransform: 'none', borderColor: '#e0e0e0', color: '#555', fontSize: 13, borderRadius: 2 }}>
                         Xuất Excel
                     </Button>
-                    <Button
-                        variant="outlined"
-                        component="label"
-                        startIcon={<UploadFile sx={{ fontSize: 15 }} />}
-                        sx={{ textTransform: 'none', borderColor: '#e0e0e0', color: '#1976d2', fontSize: 13, borderRadius: 2 }}
-                    >
-                        Nhập Excel
-                        <input type="file" hidden accept=".xlsx, .xls" onChange={handleImportExcel} />
-                    </Button>
-                    <Button variant="contained" startIcon={<Add />} onClick={openCreate}
-                        sx={{ bgcolor: '#2563eb', textTransform: 'none', fontWeight: 700, borderRadius: 2, '&:hover': { bgcolor: '#1d4ed8' }, boxShadow: '0 4px 12px rgba(25,118,210,0.2)' }}>
-                        Thêm nhà cung cấp
-                    </Button>
+                    {isAdmin && (
+                        <Button
+                            variant="outlined"
+                            component="label"
+                            startIcon={<UploadFile sx={{ fontSize: 15 }} />}
+                            sx={{ textTransform: 'none', borderColor: '#e0e0e0', color: '#1976d2', fontSize: 13, borderRadius: 2 }}
+                        >
+                            Nhập Excel
+                            <input type="file" hidden accept=".xlsx, .xls" onChange={handleImportExcel} />
+                        </Button>
+                    )}
+                    {isAdmin && (
+                        <Button variant="contained" startIcon={<Add />} onClick={openCreate}
+                            sx={{ bgcolor: '#2563eb', textTransform: 'none', fontWeight: 700, borderRadius: 2, '&:hover': { bgcolor: '#1d4ed8' }, boxShadow: '0 4px 12px rgba(25,118,210,0.2)' }}>
+                            Thêm nhà cung cấp
+                        </Button>
+                    )}
                 </Box>
             </Box>
 
@@ -1025,20 +1039,24 @@ const SupplierPage: React.FC = () => {
                                                         <Info sx={{ fontSize: 16 }} />
                                                     </IconButton>
                                                 </Tooltip>
-                                                <Tooltip title="Chỉnh sửa">
-                                                    <IconButton size="small" onClick={() => openEdit(s)}
-                                                        sx={{ color: '#f59e0b', '&:hover': { bgcolor: '#fef3c7' } }}>
-                                                        <Edit sx={{ fontSize: 16 }} />
-                                                    </IconButton>
-                                                </Tooltip>
-                                                <Tooltip title={s.isActive ? 'Vô hiệu hóa' : 'Kích hoạt'}>
-                                                    <IconButton size="small" onClick={() => handleToggle(s)}
-                                                        sx={{ '&:hover': { color: s.isActive ? '#d32f2f' : '#2e7d32' } }}>
-                                                        {s.isActive
-                                                            ? <ToggleOn fontSize="small" sx={{ color: '#16a34a' }} />
-                                                            : <ToggleOff fontSize="small" sx={{ color: '#bbb' }} />}
-                                                    </IconButton>
-                                                </Tooltip>
+                                                {isAdmin && (
+                                                    <Tooltip title="Chỉnh sửa">
+                                                        <IconButton size="small" onClick={() => openEdit(s)}
+                                                            sx={{ color: '#f59e0b', '&:hover': { bgcolor: '#fef3c7' } }}>
+                                                            <Edit sx={{ fontSize: 16 }} />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                )}
+                                                {isAdmin && (
+                                                    <Tooltip title={s.isActive ? 'Vô hiệu hóa' : 'Kích hoạt'}>
+                                                        <IconButton size="small" onClick={() => handleToggle(s)}
+                                                            sx={{ '&:hover': { color: s.isActive ? '#d32f2f' : '#2e7d32' } }}>
+                                                            {s.isActive
+                                                                ? <ToggleOn fontSize="small" sx={{ color: '#16a34a' }} />
+                                                                : <ToggleOff fontSize="small" sx={{ color: '#bbb' }} />}
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                )}
                                             </Box>
                                         </TableCell>
                                     </TableRow>

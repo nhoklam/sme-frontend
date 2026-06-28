@@ -9,7 +9,16 @@ export type WsEventType =
     | 'TRANSFER_ARRIVED'
     | 'IMPORT_SUCCESS'
     | 'ORDER_STATUS_UPDATED'
-    | 'OUT_OF_STOCK';
+    | 'OUT_OF_STOCK'
+    | 'ADJUSTMENT_APPROVED'
+    | 'ADJUSTMENT_REJECTED'
+    | 'ADJUSTMENT_PENDING'
+    | 'TRANSFER_APPROVED'
+    | 'TRANSFER_RECEIVED_PARTIAL'
+    | 'TRANSFER_RECEIVED_FULL'
+    | 'TRANSFER_REJECTED_BY_RECEIVER'
+    | 'TRANSFER_PENDING_APPROVAL'
+    | 'TRANSFER_REJECTED';
 
 export interface WsPayload {
     type: WsEventType;
@@ -23,6 +32,8 @@ export interface WsPayload {
     amount?: number;
     shiftId?: string;
     transferId?: string;
+    code?: string;
+    adjustmentId?: string;
     [key: string]: unknown;
 }
 

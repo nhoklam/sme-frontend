@@ -19,6 +19,7 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
 
+import authService from '../../../../services/authService';
 import financeService from '../../../../services/financeService';
 import supplierService from '../../../../services/supplierService';
 import warehouseService from '../../../../services/warehouseService';
@@ -172,15 +173,19 @@ const handlePrintReceipt = (txn: any) => {
 const CreateEntryDialog: React.FC<{
     open: boolean; onClose: () => void; onSaved: () => void; warehouses: Warehouse[];
 }> = ({ open, onClose, onSaved, warehouses }) => {
+    const currentUser = authService.getCurrentUser()?.user;
+    const isAdmin = currentUser?.role === 'ROLE_ADMIN';
+    const myWarehouseId = !isAdmin ? (currentUser?.warehouseId ?? '') : '';
+
     const [form, setForm] = useState({
-        warehouseId: '', fundType: 'CASH_111' as FundType,
+        warehouseId: myWarehouseId, fundType: 'CASH_111' as FundType,
         transactionType: 'IN' as TransactionType, referenceType: 'MANUAL_IN', amount: '', description: '',
     });
     const [saving, setSaving] = useState(false);
     const [err, setErr] = useState('');
 
     useEffect(() => {
-        if (open) { setForm({ warehouseId: '', fundType: 'CASH_111', transactionType: 'IN', referenceType: 'MANUAL_IN', amount: '', description: '' }); setErr(''); }
+        if (open) { setForm({ warehouseId: myWarehouseId, fundType: 'CASH_111', transactionType: 'IN', referenceType: 'MANUAL_IN', amount: '', description: '' }); setErr(''); }
     }, [open]);
 
     const set = (k: string) => (e: any) => {
@@ -228,7 +233,7 @@ const CreateEntryDialog: React.FC<{
                     <Grid size={{ xs: 12, sm: 6 }}>
                         <Typography variant="caption" fontWeight={700} color="#555" display="block" mb={0.75}>Chi nhánh *</Typography>
                         <FormControl fullWidth size="small">
-                            <Select value={form.warehouseId} onChange={set('warehouseId')} displayEmpty>
+                            <Select value={form.warehouseId} onChange={set('warehouseId')} displayEmpty disabled={!isAdmin}>
                                 <MenuItem value="">Chọn chi nhánh</MenuItem>
                                 {warehouses.filter(w => w.isActive).map(w => <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>)}
                             </Select>
@@ -833,9 +838,12 @@ const SupplierTotalDebtLabel: React.FC<{ supplierId: string }> = ({ supplierId }
 };
 
 const SupplierDebtTab: React.FC<{ warehouses: Warehouse[] }> = ({ warehouses }) => {
+    const currentUser = authService.getCurrentUser()?.user;
+    const isAdmin = currentUser?.role === 'ROLE_ADMIN';
+
     const [payTarget, setPayTarget] = useState<SupplierDebt | null>(null);
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-    const [warehouseId, setWarehouseId] = useState('');
+    const [warehouseId, setWarehouseId] = useState(() => isAdmin ? '' : (currentUser?.warehouseId ?? ''));
     const [search, setSearch] = useState('');
     const [snack, setSnack] = useState('');
     const [page, setPage] = useState(0);
@@ -914,7 +922,7 @@ const SupplierDebtTab: React.FC<{ warehouses: Warehouse[] }> = ({ warehouses }) 
                     InputProps={{ startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 16, color: '#9ca3af' }} /></InputAdornment> }}
                     sx={{ flex: 1, minWidth: 200 }} />
                 <FormControl size="small" sx={{ minWidth: 200 }}>
-                    <Select value={warehouseId} onChange={e => { setWarehouseId(e.target.value); setPage(0); }} displayEmpty>
+                    <Select value={warehouseId} onChange={e => { setWarehouseId(e.target.value); setPage(0); }} displayEmpty disabled={!isAdmin}>
                         <MenuItem value="">Tất cả chi nhánh</MenuItem>
                         {warehouses.filter(w => w.isActive).map(w => <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>)}
                     </Select>

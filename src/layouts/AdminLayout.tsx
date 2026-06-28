@@ -1,5 +1,5 @@
 // src/layouts/AdminLayout.jsx
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -116,6 +116,9 @@ const AdminLayout = () => {
     const [notifAnchorEl, setNotifAnchorEl] = useState<null | HTMLElement>(null);
     const [warehouseMap, setWarehouseMap] = useState<Map<string, string>>(new Map());
 
+    // Theo dõi ID thông báo mới nhất để phát hiện thông báo chưa từng thấy
+    const lastNotifIdRef = useRef<string | null>(null);
+
     // Fetch danh sách kho một lần — để resolve warehouseId cũ thành tên kho
     React.useEffect(() => {
         warehouseService.getAll()
@@ -127,23 +130,76 @@ const AdminLayout = () => {
             .catch(() => { /* Fallback an toàn */ });
     }, []);
 
-    const loadNotifications = async () => {
-        try {
-            // Lấy 10 thông báo mới nhất (cả đã đọc và chưa đọc)
-            const res = await notificationService.getAll({ page: 0, size: 10 });
-            setNotifications(res.data?.data?.content || []);
-
-            // Vẫn đếm số lượng chưa đọc để hiện ở Badge chuông
-            const countRes = await notificationService.countUnread();
-            setUnreadCount(countRes.data?.data || 0);
-        } catch { }
+    const NOTIF_TOAST_MAP: Record<string, () => void> = {
+        ADJUSTMENT_PENDING:  () => toast(`📋 Phiếu kiểm kê mới chờ duyệt`, { duration: 5000 }),
+        ADJUSTMENT_APPROVED: () => toast.success(`✅ Phiếu kiểm kê đã được duyệt!`, { duration: 5000 }),
+        ADJUSTMENT_REJECTED: () => toast.error(`❌ Phiếu kiểm kê bị từ chối`, { duration: 5000 }),
+        LOW_STOCK:           () => toast.error(`⚠️ Cảnh báo tồn kho thấp`, { duration: 4000 }),
+        IMPORT_SUCCESS:      () => toast.success(`📦 Nhập kho thành công`, { duration: 4000 }),
+        TRANSFER_ARRIVED:    () => toast(`📦 Có phiếu chuyển kho cập nhật`, { duration: 4000 }),
+        TRANSFER_APPROVED:           () => toast.success(`✅ Phiếu chuyển kho đã được duyệt!`, { duration: 5000 }),
+        TRANSFER_RECEIVED_FULL:      () => toast.success(`✅ Kho nhập đã xác nhận đủ hàng!`, { duration: 5000 }),
+        TRANSFER_RECEIVED_PARTIAL:   () => toast.error(`⚠️ Kho nhập nhận thiếu hàng — kiểm tra chi tiết!`, { duration: 7000 }),
+        TRANSFER_REJECTED_BY_RECEIVER: () => toast.error(`❌ Kho nhập từ chối nhận hàng!`, { duration: 6000 }),
+        TRANSFER_PENDING_APPROVAL:   () => toast(`📦 Phiếu chuyển kho chờ duyệt`, { duration: 5000 }),
+        TRANSFER_REJECTED:           () => toast.error(`❌ Phiếu chuyển kho bị từ chối`, { duration: 5000 }),
+        SHIFT_PENDING_APPROVAL: () => toast(`🔒 Có ca làm việc cần duyệt`, { duration: 4000 }),
     };
 
+    const loadNotifications = useCallback(async (detectNew = false) => {
+        try {
+            const [res, countRes] = await Promise.all([
+                notificationService.getAll({ page: 0, size: 10 }),
+                notificationService.countUnread(),
+            ]);
+            const items: Notification[] = res.data?.data?.content || [];
+            const newCount: number = countRes.data?.data || 0;
+
+            setNotifications(items);
+            setUnreadCount(newCount);
+
+            const latestId = items[0]?.id;
+            if (detectNew && latestId && latestId !== lastNotifIdRef.current && lastNotifIdRef.current !== null) {
+                // Tìm tất cả thông báo mới kể từ lần check trước
+                const lastSeenIdx = items.findIndex(n => n.id === lastNotifIdRef.current);
+                const newItems = lastSeenIdx >= 0 ? items.slice(0, lastSeenIdx) : items.slice(0, 3);
+                const unreadNew = newItems.filter(n => !n.isRead).reverse(); // cũ → mới
+
+                if (unreadNew.length > 0) {
+                    playNotificationSound();
+                    queryClient.invalidateQueries({ queryKey: ['stock-adjustments'] });
+                    queryClient.invalidateQueries({ queryKey: ['inventory-all'] });
+                    queryClient.invalidateQueries({ queryKey: ['inventory-stats'] });
+                    queryClient.invalidateQueries({ queryKey: ['transfers'] });
+
+                    // Ưu tiên hiện thông báo quan trọng trước, LOW_STOCK sau
+                    const priority = unreadNew.filter(n => n.type !== 'LOW_STOCK');
+                    const lowStock = unreadNew.filter(n => n.type === 'LOW_STOCK');
+                    [...priority, ...lowStock].forEach((notif, idx) => {
+                        setTimeout(() => {
+                            NOTIF_TOAST_MAP[notif.type]?.();
+                        }, idx * 600);
+                    });
+                }
+            }
+            if (latestId) lastNotifIdRef.current = latestId;
+        } catch { }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [queryClient]);
+
+    // Load lần đầu khi đăng nhập
     React.useEffect(() => {
         if (currentUser) {
-            loadNotifications();
+            loadNotifications(false);
         }
-    }, [currentUser]);
+    }, [currentUser, loadNotifications]);
+
+    // Polling mỗi 20 giây — phát hiện thông báo mới dù WebSocket không gửi
+    React.useEffect(() => {
+        if (!currentUser) return;
+        const timer = setInterval(() => loadNotifications(true), 20_000);
+        return () => clearInterval(timer);
+    }, [currentUser, loadNotifications]);
 
     // Đăng ký setter để NotificationListPage có thể cập nhật badge trực tiếp
     React.useEffect(() => {
@@ -154,15 +210,16 @@ const AdminLayout = () => {
     useWebSocket({
         warehouseId: currentUser?.warehouseId,
         onMessage: (payload: WsPayload) => {
-            const isNotification = ['NEW_ORDER', 'IMPORT_SUCCESS', 'LOW_STOCK', 'OUT_OF_STOCK', 'TRANSFER_ARRIVED', 'SHIFT_PENDING_APPROVAL'].includes(payload.type);
+            const isNotification = ['NEW_ORDER', 'IMPORT_SUCCESS', 'LOW_STOCK', 'OUT_OF_STOCK',
+                'TRANSFER_ARRIVED', 'TRANSFER_APPROVED', 'TRANSFER_RECEIVED_PARTIAL', 'TRANSFER_RECEIVED_FULL',
+                'TRANSFER_REJECTED_BY_RECEIVER', 'TRANSFER_PENDING_APPROVAL', 'TRANSFER_REJECTED',
+                'SHIFT_PENDING_APPROVAL', 'ADJUSTMENT_APPROVED', 'ADJUSTMENT_REJECTED', 'ADJUSTMENT_PENDING',
+            ].includes(payload.type);
 
             if (isNotification) {
                 setUnreadCount(prev => prev + 1);
-                // Thêm delay 500ms để đảm bảo Backend đã lưu xong notification vào DB
-                setTimeout(() => {
-                    loadNotifications();
-                }, 500);
-                // Phát âm thanh thông báo "ding"
+                // Delay 500ms để backend lưu xong DB rồi mới load
+                setTimeout(() => loadNotifications(false), 500);
                 playNotificationSound();
             }
 
@@ -192,11 +249,52 @@ const AdminLayout = () => {
                 case 'TRANSFER_ARRIVED':
                     toast(`Có phiếu chuyển kho mới / cập nhật`, { icon: '📦' });
                     queryClient.invalidateQueries({ queryKey: ['transfers'] });
-                    // Nếu phiếu chuyển ảnh hưởng tồn kho, cập nhật luôn tồn kho
                     queryClient.invalidateQueries({ queryKey: ['inventory-all'] });
+                    break;
+                case 'TRANSFER_APPROVED':
+                    toast.success(`Phiếu chuyển kho ${payload.code || ''} đã được duyệt!`, { duration: 6000, icon: '✅' });
+                    queryClient.invalidateQueries({ queryKey: ['transfers'] });
+                    queryClient.invalidateQueries({ queryKey: ['inventory-all'] });
+                    break;
+                case 'TRANSFER_RECEIVED_FULL':
+                    toast.success(`Kho nhập xác nhận đủ hàng phiếu ${(payload as any).transferCode || ''}!`, { duration: 6000, icon: '✅' });
+                    queryClient.invalidateQueries({ queryKey: ['transfers'] });
+                    break;
+                case 'TRANSFER_RECEIVED_PARTIAL':
+                    toast.error(`⚠️ Phiếu ${(payload as any).transferCode || ''} nhận thiếu hàng — cần kiểm tra!`, { duration: 8000 });
+                    queryClient.invalidateQueries({ queryKey: ['transfers'] });
+                    queryClient.invalidateQueries({ queryKey: ['inventory-all'] });
+                    break;
+                case 'TRANSFER_PENDING_APPROVAL':
+                    toast(`Phiếu chuyển kho ${(payload as any).transferCode || ''} chờ duyệt`, { icon: '📦', duration: 5000 });
+                    queryClient.invalidateQueries({ queryKey: ['transfers'] });
+                    break;
+                case 'TRANSFER_REJECTED':
+                    toast.error(`Phiếu chuyển kho ${(payload as any).transferCode || ''} bị từ chối`, { duration: 6000 });
+                    queryClient.invalidateQueries({ queryKey: ['transfers'] });
                     break;
                 case 'SHIFT_PENDING_APPROVAL':
                     toast(`Có ca làm việc cần duyệt`, { icon: '🔒' });
+                    break;
+                case 'ADJUSTMENT_APPROVED':
+                    toast.success(
+                        `Phiếu kiểm kê ${payload.code || ''} đã được duyệt!`,
+                        { duration: 6000 }
+                    );
+                    queryClient.invalidateQueries({ queryKey: ['stock-adjustments'] });
+                    queryClient.invalidateQueries({ queryKey: ['inventory-all'] });
+                    queryClient.invalidateQueries({ queryKey: ['inventory-stats'] });
+                    break;
+                case 'ADJUSTMENT_REJECTED':
+                    toast.error(
+                        `Phiếu kiểm kê ${payload.code || ''} bị từ chối`,
+                        { duration: 6000 }
+                    );
+                    queryClient.invalidateQueries({ queryKey: ['stock-adjustments'] });
+                    break;
+                case 'ADJUSTMENT_PENDING':
+                    toast(`Có phiếu kiểm kê mới chờ duyệt`, { icon: '📋' });
+                    queryClient.invalidateQueries({ queryKey: ['stock-adjustments'] });
                     break;
             }
         },
@@ -309,7 +407,17 @@ const AdminLayout = () => {
                                         <Typography variant="body2" color="#64748b">Bạn không có thông báo mới</Typography>
                                     </Box>
                                 ) : (
-                                    notifications.map(notif => (
+                                    // Loại trùng lặp: cùng type + message trong vòng 30 giây
+                                    (() => {
+                                        const seen = new Set<string>();
+                                        return notifications.filter(n => {
+                                            const bucket = Math.floor(new Date(n.createdAt).getTime() / 30000);
+                                            const key = `${n.type}:${n.message.slice(0, 80)}:${bucket}`;
+                                            if (seen.has(key)) return false;
+                                            seen.add(key);
+                                            return true;
+                                        });
+                                    })().map(notif => (
                                         <Box
                                             key={notif.id}
                                             onClick={() => handleMarkAsRead(notif)}

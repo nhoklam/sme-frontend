@@ -11,7 +11,6 @@ import {
     Search, Edit, History, Refresh, FilterList,
     Category as CategoryIcon, Warehouse as WarehouseIcon,
     FileDownloadOutlined, ImageNotSupported, CheckCircle, Cancel, Warning,
-    Assignment, Visibility, ContentCopy, Close
 } from '@mui/icons-material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import inventoryService from '../../../../../services/inventoryService';
@@ -22,7 +21,6 @@ import AdjustInventoryModal from '../components/AdjustInventoryModal';
 import { buildCategoryTreeFlat } from '../../../../../utils/categoryUtils';
 import TransactionHistoryModal from '../components/TransactionHistoryModal';
 import { purchaseService } from '../../../../../services/purchaseService';
-import { StockCountTab, SavedReceipt } from './StockCountTab';
 import useAuth from '../../../../../store/hooks/useAuth';
 import {
     Warehouse, ProductResponse, InventoryWithMeta, StockStatusFilter,
@@ -177,16 +175,32 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
     const totalPages = inventoryPageData?.totalPages ?? 0;
     const totalElements = inventoryPageData?.totalElements ?? 0;
 
-    // ── Stats ─────────────────────────────────────────────────
-    // Stats is now limited since we don't have all data client-side. We show what we can or wait for backend global stats API.
-    // For now, we calculate stats based on current page just to have something, or hide it if it's misleading.
-    // Since backend does not return stats, we'll just show total elements.
-    const stats = {
-        total: totalElements,
-        totalQty: 0, // Backend needs to provide this
-        lowStock: 0, // Backend needs to provide this
-        value: 0, // Backend needs to provide this
-    };
+    // ── Stats query — fetch toàn bộ inventory (không lọc) để tính thống kê ──
+    const { data: allInventoryData, isLoading: loadingStats } = useQuery({
+        queryKey: ['inventory-stats', effectiveWarehouseId],
+        queryFn: () => inventoryService.getByWarehousePaged(effectiveWarehouseId || null, { size: 10000 }),
+        enabled: accessibleWarehouses.length > 0,
+        staleTime: 60_000,
+    });
+
+    const stats = React.useMemo(() => {
+        const items: any[] = allInventoryData?.content ?? [];
+        const totalQty = items.reduce((s, i) => s + (i.quantity || 0), 0);
+        const lowStock = items.filter(i => {
+            const min = i.minQuantity || 0;
+            return i.quantity > 0 && min > 0 && i.quantity <= min;
+        }).length;
+        const value = items.reduce((s, i) => {
+            const price = productMap.get(i.productId)?.retailPrice || i.retailPrice || 0;
+            return s + (i.quantity || 0) * price;
+        }, 0);
+        return {
+            total: allInventoryData?.totalElements ?? totalElements,
+            totalQty,
+            lowStock,
+            value,
+        };
+    }, [allInventoryData, totalElements, productMap]);
 
     // ── Excel export — xuất tất cả (vượt qua phân trang) ─
     const handleExport = async () => {
@@ -309,9 +323,6 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
 
     const activeCount = [debouncedSearch, selectedCategory, stockStatus !== 'all', selectedWarehouse].filter(Boolean).length;
 
-    // ── Kiểm kho dialog state ──
-    const [stockCountOpen, setStockCountOpen] = useState(false);
-
     // ── Render ────────────────────────────────────────────────
     return (
         <Box>
@@ -327,7 +338,7 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
                         <Card elevation={0} sx={{ borderRadius: 2, border: '1px solid #f0f0f0' }}>
                             <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
                                 <Typography variant="caption" color="text.secondary">{s.label}</Typography>
-                                {isLoading || loadingProducts ? (
+                                {isLoading || loadingProducts || loadingStats ? (
                                     <Skeleton height={30} />
                                 ) : (
                                     <Typography variant="h5" fontWeight={800} color={s.color}>{s.value}</Typography>
@@ -400,11 +411,6 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
                         onClick={handleExport}
                         sx={{ textTransform: 'none', borderColor: '#16a34a', color: '#16a34a', borderRadius: 1.5, height: 36, '&:hover': { bgcolor: '#f0fdf4', borderColor: '#15803d' } }}>
                         Excel
-                    </Button>
-                    <Button size="small" variant="contained" startIcon={<Assignment sx={{ fontSize: 15 }} />}
-                        onClick={() => setStockCountOpen(true)}
-                        sx={{ textTransform: 'none', bgcolor: '#2563eb', borderRadius: 1.5, height: 36, fontWeight: 700, '&:hover': { bgcolor: '#1d4ed8' } }}>
-                        Kiểm kho
                     </Button>
                     {activeCount > 0 && (
                         <Button size="small" onClick={clearFilters}
@@ -488,13 +494,15 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
                                             </TableCell>
                                             <TableCell>
                                                 <Box sx={{ display: 'flex', gap: 0.5 }}>
-                                                    <Tooltip title="Điều chỉnh tồn kho">
-                                                        <IconButton size="small"
-                                                            onClick={() => { setAdjustTarget(inv); setAdjustOpen(true); }}
-                                                            sx={{ color: '#f59e0b', '&:hover': { bgcolor: '#fef3c7' } }}>
-                                                            <Edit sx={{ fontSize: 16 }} />
-                                                        </IconButton>
-                                                    </Tooltip>
+                                                    {!isAdmin && (
+                                                        <Tooltip title="Điều chỉnh tồn kho">
+                                                            <IconButton size="small"
+                                                                onClick={() => { setAdjustTarget(inv); setAdjustOpen(true); }}
+                                                                sx={{ color: '#f59e0b', '&:hover': { bgcolor: '#fef3c7' } }}>
+                                                                <Edit sx={{ fontSize: 16 }} />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    )}
                                                     <Tooltip title="Lịch sử giao dịch">
                                                         <IconButton size="small"
                                                             onClick={() => { setHistoryTarget({ id: inv.id, name: inv.productName ?? inv.productId, image: inv.imageUrl }); setHistoryOpen(true); }}
@@ -596,12 +604,6 @@ const InventoryListTab: React.FC<Props> = ({ warehouses }) => {
                     </Button>
                 </Box>
             </Popover>
-
-            {/* Kiểm kho Dialog */}
-            {stockCountOpen && (
-                <StockCountTab warehouses={warehouses} onClose={() => { setStockCountOpen(false); refetch(); }} />
-            )}
-
 
         </Box>
     );
