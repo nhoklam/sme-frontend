@@ -1,6 +1,6 @@
 // src/routes/index.tsx
-import React, { Suspense, lazy } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import React, { Suspense, lazy, useEffect } from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Box, Typography, CircularProgress } from '@mui/material';
 
 import AdminLayout from '../layouts/AdminLayout';
@@ -153,6 +153,85 @@ const POSGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
 
 // ─────────────────────────────────────────────────────────────
+// PAGE TITLE UPDATER
+// ─────────────────────────────────────────────────────────────
+const ROUTE_TITLES: Record<string, string> = {
+    '/admin/pos': 'CRM Bán hàng',
+    '/admin/pos/revenue': 'Doanh thu ca',
+    '/admin/dashboard': 'Dashboard',
+    '/admin/products': 'Sản phẩm',
+    '/admin/categories': 'Danh mục',
+    '/admin/products/categories': 'Danh mục',
+    '/admin/promotions': 'Khuyến mãi',
+    '/admin/orders': 'Đơn hàng',
+    '/admin/inventory': 'Tồn kho',
+    '/admin/inventory/import': 'Nhập hàng',
+    '/admin/inventory/transfer': 'Chuyển kho',
+    '/admin/inventory/adjustment': 'Điều chỉnh tồn kho',
+    '/admin/inventory/history': 'Lịch sử tồn kho',
+    '/admin/inventory/alerts': 'Cảnh báo tồn kho',
+    '/admin/customers': 'Khách hàng',
+    '/admin/suppliers': 'Nhà cung cấp',
+    '/admin/finance': 'Tài chính',
+    '/admin/finance/cashbook': 'Sổ quỹ',
+    '/admin/finance/supplier-debts': 'Công nợ NCC',
+    '/admin/finance/cod': 'Đối soát COD',
+    '/admin/reports/revenue': 'Báo cáo doanh thu',
+    '/admin/reports/business': 'Báo cáo kinh doanh',
+    '/admin/reports/end-of-day': 'Báo cáo cuối ngày',
+    '/admin/reports/inventory': 'Báo cáo tồn kho',
+    '/admin/reports/products': 'Báo cáo sản phẩm',
+    '/admin/reports/employees': 'Báo cáo nhân viên',
+    '/admin/reports/customers': 'Phân tích khách hàng',
+    '/admin/profile': 'Trang cá nhân',
+    '/admin/users': 'Người dùng',
+    '/admin/users/create': 'Tạo người dùng',
+    '/admin/warehouses': 'Chi nhánh',
+    '/admin/settings': 'Cài đặt hệ thống',
+    '/admin/settings/notifications': 'Cài đặt thông báo',
+    '/admin/settings/payments': 'Cài đặt thanh toán',
+    '/admin/settings/ai-knowledge': 'Kiến thức AI',
+    '/admin/shifts': 'Ca làm việc',
+    '/admin/shift-assignments': 'Phân công ca',
+    '/admin/notifications': 'Thông báo',
+    '/admin/banners': 'Banner',
+    '/admin/authors': 'Tác giả',
+    '/admin/articles': 'Bài viết',
+    '/admin/reviews': 'Duyệt đánh giá',
+    '/': 'Trang chủ',
+    '/shop': 'Cửa hàng sách',
+    '/cart': 'Giỏ hàng',
+    '/checkout': 'Thanh toán',
+    '/account': 'Tài khoản của tôi',
+    '/login': 'Đăng nhập',
+    '/forgot-password': 'Quên mật khẩu',
+    '/order-success': 'Đặt hàng thành công',
+    '/order-tracking': 'Theo dõi đơn hàng',
+    '/admin/login': 'Đăng nhập',
+};
+
+const SITE_NAME = 'Nhà sách';
+
+const TitleUpdater: React.FC = () => {
+    const { pathname } = useLocation();
+    useEffect(() => {
+        const exactTitle = ROUTE_TITLES[pathname];
+        if (exactTitle) {
+            document.title = `${exactTitle} | ${SITE_NAME}`;
+            return;
+        }
+        // Prefix match — find longest matching prefix
+        const prefixMatch = Object.entries(ROUTE_TITLES)
+            .filter(([path]) => pathname.startsWith(path + '/'))
+            .sort((a, b) => b[0].length - a[0].length)[0];
+        document.title = prefixMatch
+            ? `${prefixMatch[1]} | ${SITE_NAME}`
+            : SITE_NAME;
+    }, [pathname]);
+    return null;
+};
+
+// ─────────────────────────────────────────────────────────────
 // INDEX REDIRECT
 // ─────────────────────────────────────────────────────────────
 const IndexRedirect: React.FC = () => {
@@ -165,6 +244,8 @@ const IndexRedirect: React.FC = () => {
 // APP ROUTES
 // ─────────────────────────────────────────────────────────────
 const AppRoutes: React.FC = () => (
+    <>
+    <TitleUpdater />
     <Routes>
         <Route path="/admin/login" element={<AuthLayout />}>
             <Route index element={<LoginPage />} />
@@ -280,6 +361,7 @@ const AppRoutes: React.FC = () => (
 
         <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </>
 );
 
 export default AppRoutes;

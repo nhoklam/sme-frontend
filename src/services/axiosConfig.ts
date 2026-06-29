@@ -94,6 +94,17 @@ axiosInstance.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
+    // Log chi tiết lỗi backend để dễ debug
+    if (error.response && error.response.status !== 401) {
+      const errData = error.response.data as any;
+      console.error(
+        `[API ERROR] ${error.config?.method?.toUpperCase()} ${error.config?.url} → ${error.response.status}`,
+        '\nMessage:', errData?.message || '(no message)',
+        '\nCode:', errData?.code,
+        '\nFull response:', errData
+      );
+    }
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       const requestUrl = originalRequest.url ?? '';
       if (isPublicRoute(requestUrl)) {

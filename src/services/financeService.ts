@@ -31,14 +31,8 @@ const financeService = {
     },
 
     searchCashbook: async (params: {
-        from: string;
-        to: string;
-        warehouseId?: string;
-        fundType?: string;
-        transactionType?: string;
-        keyword?: string;
-        page?: number;
-        size?: number;
+        from: string; to: string; warehouseId?: string; fundType?: string;
+        transactionType?: string; keyword?: string; page?: number; size?: number;
     }): Promise<PageResponse<CashbookTransaction>> => {
         const query = new URLSearchParams();
         query.set('from', params.from);
@@ -50,6 +44,51 @@ const financeService = {
         query.set('page', String(params.page ?? 0));
         query.set('size', String(params.size ?? 10));
         const res = await axiosInstance.get<ApiResponse<PageResponse<CashbookTransaction>>>(`/finance/cashbook/search?${query}`);
+        return res.data.data;
+    },
+
+    getCashbookSummary: async (params: {
+        from: string; to: string; warehouseId?: string;
+        fundType?: string; transactionType?: string; keyword?: string;
+    }): Promise<{ totalIn: number; totalOut: number }> => {
+        const query = new URLSearchParams();
+        query.set('from', params.from);
+        query.set('to', params.to);
+        if (params.warehouseId) query.set('warehouseId', params.warehouseId);
+        if (params.fundType) query.set('fundType', params.fundType);
+        if (params.transactionType) query.set('transactionType', params.transactionType);
+        if (params.keyword) query.set('keyword', params.keyword);
+        const res = await axiosInstance.get<ApiResponse<{ totalIn: number; totalOut: number }>>(`/finance/cashbook/search/summary?${query}`);
+        return res.data.data;
+    },
+
+    // ── Approval Workflow (Phiếu chờ duyệt) ──────────────────
+    // Backend cần: POST /finance/cashbook/pending
+    //              GET  /finance/cashbook/pending
+    //              PUT  /finance/cashbook/{id}/approve
+    //              PUT  /finance/cashbook/{id}/reject
+    createPendingEntry: async (data: {
+        warehouseId: string; fundType: string; transactionType: string;
+        referenceType: string; amount: number; description: string; personName?: string;
+    }): Promise<any> => {
+        const res = await axiosInstance.post<ApiResponse<any>>('/finance/cashbook/pending', data);
+        return res.data.data;
+    },
+
+    getPendingEntries: async (warehouseId?: string): Promise<any[]> => {
+        const query = new URLSearchParams();
+        if (warehouseId) query.set('warehouseId', warehouseId);
+        const res = await axiosInstance.get<ApiResponse<any[]>>(`/finance/cashbook/pending?${query}`);
+        return res.data.data ?? [];
+    },
+
+    approveEntry: async (id: string): Promise<any> => {
+        const res = await axiosInstance.put<ApiResponse<any>>(`/finance/cashbook/${id}/approve`);
+        return res.data.data;
+    },
+
+    rejectEntry: async (id: string, reason: string): Promise<any> => {
+        const res = await axiosInstance.put<ApiResponse<any>>(`/finance/cashbook/${id}/reject`, { reason });
         return res.data.data;
     },
 
@@ -70,6 +109,36 @@ const financeService = {
         return res.data.data;
     },
 
+    getSupplierDebtsPaged: async (params: {
+        warehouseId?: string; search?: string; status?: string; page?: number; size?: number;
+    }): Promise<PageResponse<SupplierDebt>> => {
+        const query = new URLSearchParams();
+        if (params.warehouseId) query.set('warehouseId', params.warehouseId);
+        if (params.search) query.set('search', params.search);
+        if (params.status) query.set('status', params.status);
+        query.set('page', String(params.page ?? 0));
+        query.set('size', String(params.size ?? 20));
+        const res = await axiosInstance.get<ApiResponse<PageResponse<SupplierDebt>>>(`/finance/supplier-debts/search?${query}`);
+        return res.data.data;
+    },
+
+    getSupplierDebtSummary: async (params: {
+        warehouseId?: string; search?: string; status?: string;
+    }): Promise<{ totalDebt: number; totalPaid: number; totalRemaining: number; suppliersWithDebtCount: number }> => {
+        const query = new URLSearchParams();
+        if (params.warehouseId) query.set('warehouseId', params.warehouseId);
+        if (params.search) query.set('search', params.search);
+        if (params.status) query.set('status', params.status);
+        const res = await axiosInstance.get<ApiResponse<{ totalDebt: number; totalPaid: number; totalRemaining: number; suppliersWithDebtCount: number }>>(`/finance/supplier-debts/search/summary?${query}`);
+        return res.data.data;
+    },
+
+    // ── Debt Payment History ──────────────────────────────────
+    getDebtPaymentHistory: async (debtId: string): Promise<any[]> => {
+        const res = await axiosInstance.get<ApiResponse<any[]>>(`/finance/supplier-debts/${debtId}/payments`);
+        return res.data.data ?? [];
+    },
+
     // ── COD Reconciliation ────────────────────────────────────
     reconcileCOD: async (
         items: Array<{ orderCode: string; amountReceived: number; shippingFee: number; shippingProvider: string }>,
@@ -79,56 +148,6 @@ const financeService = {
             `/finance/cod-reconciliation?warehouseId=${warehouseId}`,
             items
         );
-        return res.data.data;
-    },
-
-    // ── Cashbook Summary — SUM tại DB level, thay thế .reduce() sai ở frontend ──
-    // (Lý do xóa .reduce(): chỉ tính trên 1 trang data, không phải toàn bộ kỳ)
-    getCashbookSummary: async (params: {
-        from: string;
-        to: string;
-        warehouseId?: string;
-        fundType?: string;
-        transactionType?: string;
-        keyword?: string;
-    }): Promise<{ totalIn: number; totalOut: number }> => {
-        const query = new URLSearchParams();
-        query.set('from', params.from);
-        query.set('to', params.to);
-        if (params.warehouseId) query.set('warehouseId', params.warehouseId);
-        if (params.fundType) query.set('fundType', params.fundType);
-        if (params.transactionType) query.set('transactionType', params.transactionType);
-        if (params.keyword) query.set('keyword', params.keyword);
-        const res = await axiosInstance.get<ApiResponse<{ totalIn: number; totalOut: number }>>(`/finance/cashbook/search/summary?${query}`);
-        return res.data.data;
-    },
-
-    // ── Supplier Debts Paged — thay thế fetch-all gây memory issue ──
-    getSupplierDebtsPaged: async (params: {
-        warehouseId?: string;
-        search?: string;
-        page?: number;
-        size?: number;
-    }): Promise<PageResponse<SupplierDebt>> => {
-        const query = new URLSearchParams();
-        if (params.warehouseId) query.set('warehouseId', params.warehouseId);
-        if (params.search) query.set('search', params.search);
-        query.set('page', String(params.page ?? 0));
-        query.set('size', String(params.size ?? 20));
-        const res = await axiosInstance.get<ApiResponse<PageResponse<SupplierDebt>>>(`/finance/supplier-debts/search?${query}`);
-        return res.data.data;
-    },
-
-    // ── Supplier Debts Summary — SUM tại DB level, thay thế .reduce() sai ──
-    // (Lý do xóa .reduce(): frontend cũ fetch toàn bộ list rồi tính, gây memory issue)
-    getSupplierDebtSummary: async (params: {
-        warehouseId?: string;
-        search?: string;
-    }): Promise<{ totalDebt: number; totalPaid: number; totalRemaining: number; suppliersWithDebtCount: number }> => {
-        const query = new URLSearchParams();
-        if (params.warehouseId) query.set('warehouseId', params.warehouseId);
-        if (params.search) query.set('search', params.search);
-        const res = await axiosInstance.get<ApiResponse<{ totalDebt: number; totalPaid: number; totalRemaining: number; suppliersWithDebtCount: number }>>(`/finance/supplier-debts/search/summary?${query}`);
         return res.data.data;
     },
 };

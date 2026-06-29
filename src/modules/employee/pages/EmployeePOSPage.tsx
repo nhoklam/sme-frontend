@@ -175,23 +175,15 @@ const EmployeePOSPage: React.FC = () => {
 
     const [qrDialogOpen, setQrDialogOpen] = useState(false);
     const [qrPaymentData, setQrPaymentData] = useState<{ checkoutUrl: string; qrCode?: string; orderCode: string; amount: number; gateway: string } | null>(null);
+    const [qrSlipOpen, setQrSlipOpen] = useState(false);
+    const [qrSlipInvoice, setQrSlipInvoice] = useState<any | null>(null);
 
     const [closeShiftOpen, setCloseShiftOpen] = useState(false);
     const [closeShiftLoading, setCloseShiftLoading] = useState(false);
 
     const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
 
-    usePosPaymentWebSocket(qrPaymentData?.orderCode || '', (invoice) => {
-        setSnack({ msg: '✅ Khách hàng đã thanh toán thành công!', sev: 'success' });
-        setQrDialogOpen(false);
-        setQrPaymentData(null);
-        updateOrder(o => ({ ...o, items: [], customer: null, pointsToUse: 0, couponCode: '', couponDiscount: 0, orderDiscount: 0, orderDiscountAmt: 0, volumeDiscountAmt: 0 }));
-        setCheckoutOpen(false);
-        setCustomerGivenAmount('');
-        if (autoPrint) {
-            setReceiptData(invoice);
-        }
-    });
+    const paymentHandledRef = useRef(false);
 
     const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
     const [editingPriceVal, setEditingPriceVal] = useState('');
@@ -338,6 +330,50 @@ const EmployeePOSPage: React.FC = () => {
         setOrders(prev => prev.map((o, i) => i === activeIdx ? updater(o) : o));
     }, [activeIdx]);
 
+    const handlePaymentSuccess = useCallback((invoice: any) => {
+        if (paymentHandledRef.current) return;
+        paymentHandledRef.current = true;
+        setSnack({ msg: '✅ Khách hàng đã thanh toán thành công!', sev: 'success' });
+        setQrDialogOpen(false);
+        setQrPaymentData(null);
+        setQrSlipOpen(false);
+        setQrSlipInvoice(null);
+        updateOrder(o => ({ ...o, items: [], customer: null, pointsToUse: 0, couponCode: '', couponDiscount: 0, orderDiscount: 0, orderDiscountAmt: 0, volumeDiscountAmt: 0 }));
+        setCheckoutOpen(false);
+        setCustomerGivenAmount('');
+        setReceiptData(invoice);
+    }, [updateOrder]);
+
+    usePosPaymentWebSocket(qrPaymentData?.orderCode || '', handlePaymentSuccess);
+
+    // Polling: tự động verify PayOS status mỗi 3 giây để phát hiện thanh toán
+    useEffect(() => {
+        if (!qrPaymentData?.orderCode) return;
+        paymentHandledRef.current = false;
+
+        const doVerify = async () => {
+            if (paymentHandledRef.current) return;
+            try {
+                const res = await axiosInstance.get(`/payments/payos/verify/${qrPaymentData.orderCode}`);
+                if (res.data?.data === true && !paymentHandledRef.current) {
+                    setTimeout(async () => {
+                        if (!paymentHandledRef.current) {
+                            try {
+                                const invRes = await axiosInstance.get('/pos/invoices', {
+                                    params: { shiftId: shift?.id, page: 0, size: 1 }
+                                });
+                                handlePaymentSuccess(invRes.data?.data?.content?.[0] ?? null);
+                            } catch { handlePaymentSuccess(null); }
+                        }
+                    }, 1500);
+                }
+            } catch { /* bỏ qua lỗi poll */ }
+        };
+
+        const interval = setInterval(doVerify, 3000);
+        return () => clearInterval(interval);
+    }, [qrPaymentData?.orderCode, handlePaymentSuccess, shift?.id]);
+
     const holdCurrentCart = useCallback(() => {
         if (activeOrder.items.length === 0) return;
         const held: HeldOrder = {
@@ -398,7 +434,34 @@ const EmployeePOSPage: React.FC = () => {
             if (paymentMethod === 'VNPAY' || paymentMethod === 'PAYOS') {
                 const data = await posService.initQrCheckout(paymentMethod, reqPayload);
                 setQrPaymentData(data);
-                setQrDialogOpen(true);
+                if (paymentMethod === 'PAYOS') {
+                    // In phiếu QR để khách quét, không hiện dialog trên màn hình
+                    const slipInvoice = {
+                        id: data.orderCode,
+                        code: data.orderCode,
+                        totalAmount: totalAmount,
+                        finalAmount: data.amount,
+                        discountAmount: totalDiscount > 0 ? totalDiscount : undefined,
+                        volumeDiscountAmt: volumeDiscountAmt > 0 ? volumeDiscountAmt : undefined,
+                        orderDiscountAmt: orderDiscountAmt > 0 ? orderDiscountAmt : undefined,
+                        couponDiscountAmt: couponDiscountAmt > 0 ? couponDiscountAmt : undefined,
+                        cashierName: currentUser?.fullName,
+                        customerName: activeOrder.customer?.fullName,
+                        createdAt: new Date().toISOString(),
+                        items: activeOrder.items.map(i => ({
+                            productId: i.productId,
+                            productName: i.productName,
+                            quantity: i.quantity,
+                            unitPrice: i.unitPrice,
+                            subtotal: i.subtotal,
+                        })),
+                        payments: [{ method: 'PAYOS', amount: data.amount }],
+                    };
+                    setQrSlipInvoice(slipInvoice);
+                    setQrSlipOpen(true);
+                } else {
+                    setQrDialogOpen(true);
+                }
                 setCheckoutLoading(false);
                 return;
             }
@@ -1345,9 +1408,34 @@ const EmployeePOSPage: React.FC = () => {
                 }}
             />
 
-            {qrPaymentData && (
-                <QrPaymentDialog 
-                    open={qrDialogOpen} 
+            <PrintInvoiceDialog
+                open={qrSlipOpen}
+                onClose={() => { setQrSlipOpen(false); setQrSlipInvoice(null); setQrPaymentData(null); paymentHandledRef.current = false; }}
+                invoice={qrSlipInvoice}
+                cashierDisplayName={currentUser?.fullName}
+                mode="qr-slip"
+                qrValue={qrPaymentData?.qrCode || qrPaymentData?.checkoutUrl}
+                autoTriggerPrint={true}
+                onConfirmPayment={async () => {
+                    if (!qrPaymentData?.orderCode || paymentHandledRef.current) return;
+                    try {
+                        // Gọi endpoint xác nhận thủ công — backend checkout từ Redis draft
+                        const res = await axiosInstance.post(`/payments/payos/pos-confirm/${qrPaymentData.orderCode}`);
+                        if (res.data?.data) {
+                            handlePaymentSuccess(res.data.data);
+                        } else {
+                            setSnack({ msg: '⏳ Chưa nhận được thanh toán. Vui lòng thử lại sau.', sev: 'warning' });
+                        }
+                    } catch (e: any) {
+                        const msg = e.response?.data?.message || 'Lỗi xác nhận thanh toán';
+                        setSnack({ msg, sev: 'error' });
+                    }
+                }}
+            />
+
+            {qrPaymentData && !qrSlipOpen && (
+                <QrPaymentDialog
+                    open={qrDialogOpen}
                     onClose={() => { setQrDialogOpen(false); setQrPaymentData(null); }} 
                     checkoutUrl={qrPaymentData.checkoutUrl} 
                     qrCode={qrPaymentData.qrCode}

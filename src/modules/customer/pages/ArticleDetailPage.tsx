@@ -15,6 +15,12 @@ const ArticleDetailPage = () => {
         window.scrollTo(0, 0);
     }, [slug]);
 
+    useEffect(() => {
+        if (article?.title) {
+            document.title = `${article.title} | Nhà sách`;
+        }
+    }, [article?.title]);
+
     if (isLoading) {
         return (
             <Container maxWidth="lg" sx={{ py: 4, minHeight: '80vh' }}>

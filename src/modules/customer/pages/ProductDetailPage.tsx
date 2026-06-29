@@ -1,5 +1,5 @@
 // src/modules/customer/pages/ProductDetailPage.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     Box, Container, Grid, Typography, Button, IconButton,
@@ -121,6 +121,12 @@ const ProductDetailPage = () => {
     const [fav, setFav] = useState(false);
     const [tab, setTab] = useState(0);
     const [showFullDesc, setShowFullDesc] = useState(false);
+
+    useEffect(() => {
+        if (product?.title) {
+            document.title = `${product.title} | Nhà sách`;
+        }
+    }, [product?.title]);
 
     // Sách liên quan — lấy theo cùng categoryId
     const { products: relatedProducts } = useProducts({
