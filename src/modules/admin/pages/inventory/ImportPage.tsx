@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
     Box, Typography, Button, Paper, Table, TableBody,
@@ -533,17 +534,22 @@ const CreatePurchaseDialog: React.FC<{
 
             for (const row of rows) {
                 const vals = Object.values(row);
+
+                // Cột A: ISBN / Mã vạch
                 const barcode = String(
-                    row['Mã vạch'] ?? row['ISBN'] ?? row['Barcode'] ?? row['barcode'] ??
-                    row['isbn'] ?? row['SKU'] ?? row['sku'] ?? vals[0] ?? ''
+                    row['ISBN / Mã vạch'] ?? row['ISBN'] ?? row['Mã vạch'] ?? row['Barcode'] ??
+                    row['barcode'] ?? row['isbn'] ?? row['SKU'] ?? vals[0] ?? ''
                 ).trim();
                 if (!barcode) continue;
 
-                const qty = Math.max(1, parseInt(String(
-                    row['Số lượng'] ?? row['SL'] ?? row['Quantity'] ?? vals[1] ?? '1'
-                )) || 1);
+                // Cột C: Số lượng nhập (index 2 vì cột B là Tên sách)
+                const qtyRaw = row['Số lượng nhập'] ?? row['Số lượng'] ?? row['SL'] ?? vals[2] ?? '';
+                const qty = parseInt(String(qtyRaw));
+                if (!qty || qty <= 0) continue; // bỏ qua dòng không có SL (người dùng không muốn nhập)
+
+                // Cột D: Giá nhập (index 3)
                 const price = parseFloat(String(
-                    row['Giá nhập'] ?? row['Giá'] ?? row['Price'] ?? vals[2] ?? '0'
+                    row['Giá nhập (VNĐ)'] ?? row['Giá nhập'] ?? row['Giá'] ?? vals[3] ?? '0'
                 ).replace(/[^0-9.]/g, '')) || 0;
 
                 const product = allProductsByBarcode.get(barcode.toLowerCase());
@@ -556,28 +562,52 @@ const CreatePurchaseDialog: React.FC<{
             }
 
             if (matched === 0 && unmatched.length === 0) {
-                setSnack({ message: 'File Excel trống hoặc không đọc được dữ liệu.', severity: 'warning' });
+                setSnack({ message: 'Không có dòng nào có số lượng nhập. Hãy điền số lượng vào cột C rồi upload lại.', severity: 'warning' });
             } else if (unmatched.length > 0) {
-                setSnack({ message: `Đã thêm ${matched} SP. Không tìm thấy ${unmatched.length} mã: ${unmatched.slice(0, 3).join(', ')}${unmatched.length > 3 ? '...' : ''}`, severity: 'warning' });
+                setSnack({ message: `Đã thêm ${matched} sách. Không tìm thấy ISBN: ${unmatched.slice(0, 5).join(', ')}${unmatched.length > 5 ? ` (+${unmatched.length - 5})` : ''}`, severity: 'warning' });
             } else {
-                setSnack({ message: `Đã nhập ${matched} sản phẩm từ Excel thành công!`, severity: 'success' });
+                setSnack({ message: `✅ Đã thêm ${matched} đầu sách từ Excel!`, severity: 'success' });
             }
-        } catch {
-            setSnack({ message: 'Không thể đọc file Excel. Vui lòng kiểm tra định dạng.', severity: 'error' });
+        } catch (err) {
+            console.error(err);
+            setSnack({ message: 'Không thể đọc file Excel. Vui lòng dùng định dạng .xlsx.', severity: 'error' });
         }
     };
 
     const downloadTemplate = async () => {
+        if (!supplierId) {
+            setSnack({ message: 'Vui lòng chọn nhà cung cấp trước để tải mẫu có sẵn danh sách sách.', severity: 'warning' });
+            return;
+        }
+        if (!supplierProducts.length) {
+            setSnack({ message: 'Nhà cung cấp này chưa có sản phẩm nào trong hệ thống.', severity: 'warning' });
+            return;
+        }
         const XLSX = await import('xlsx');
-        const ws = XLSX.utils.aoa_to_sheet([
-            ['Mã vạch (ISBN/Barcode/SKU)', 'Số lượng', 'Giá nhập (VNĐ)'],
-            ['978-1234567890', 10, 50000],
-            ['978-9876543210', 5, 120000],
+        const supplierName = suppliers.find(s => s.id === supplierId)?.name || 'NCC';
+
+        const headers = ['ISBN / Mã vạch', 'Tên sách (tham khảo)', 'Số lượng nhập', 'Giá nhập (VNĐ)'];
+        // Pre-fill ISBN + tên, để trống SL và Giá để người dùng tự điền
+        const productRows = supplierProducts.map(p => [
+            p.isbnBarcode || p.sku || '',
+            p.name,
+            '',
+            '',
         ]);
-        ws['!cols'] = [{ wch: 32 }, { wch: 14 }, { wch: 20 }];
+
+        const ws = XLSX.utils.aoa_to_sheet([headers, ...productRows]);
+
+        const headerStyle = { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '1565C0' } }, alignment: { horizontal: 'center' } };
+        headers.forEach((_, c) => {
+            const cellRef = XLSX.utils.encode_cell({ r: 0, c });
+            if (!ws[cellRef]) ws[cellRef] = {};
+            ws[cellRef].s = headerStyle;
+        });
+        ws['!cols'] = [{ wch: 26 }, { wch: 42 }, { wch: 16 }, { wch: 20 }];
+
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Nhập kho');
-        XLSX.writeFile(wb, 'template_nhap_kho.xlsx');
+        XLSX.writeFile(wb, `nhap_kho_${supplierName.replace(/[^a-zA-Z0-9À-ỹ]/g, '_')}.xlsx`);
     };
 
     const updateField = (productId: string, field: keyof CartItem, value: any) => {
@@ -689,7 +719,7 @@ const CreatePurchaseDialog: React.FC<{
                                 <Box sx={{ width: 9, height: 9, borderRadius: '50%', bgcolor: '#4caf50', flexShrink: 0 }} />
                                 <Box>
                                     <Typography variant="body2" fontWeight={700} color="#1b5e20" fontSize={13}>{warehouseName || '—'}</Typography>
-                                    <Typography variant="caption" color="#388e3c" fontSize={10}>Kho của bạn · không thể thay đổi</Typography>
+                                    
                                 </Box>
                             </Box>
                         )}
@@ -698,55 +728,56 @@ const CreatePurchaseDialog: React.FC<{
 
                 {/* Search + Excel buttons — chỉ hiện khi đã chọn NCC */}
                 {supplierId && (
-                    <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                        <Box sx={{ flex: 1, minWidth: 280, position: 'relative' }}>
-                            <Typography variant="caption" fontWeight={700} color="#64748b" display="block" mb={0.75}
-                                fontSize={10} textTransform="uppercase" letterSpacing={0.5}>Tìm & thêm sản phẩm</Typography>
-                            <TextField fullWidth size="small" placeholder="Tìm theo tên, ISBN, SKU..."
-                                value={searchKeyword} onChange={e => setSearchKeyword(e.target.value)}
-                                sx={{ bgcolor: '#fff' }}
-                                InputProps={{
-                                    startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 17, color: '#bbb' }} /></InputAdornment>,
-                                    endAdornment: searching && <CircularProgress size={16} />,
-                                    sx: { borderRadius: 1.5 }
-                                }} />
-                            {searchResults.length > 0 && (
-                                <Paper elevation={8} sx={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 1000,
-                                    maxHeight: 220, overflowY: 'auto', borderRadius: 1.5, mt: 0.5 }}>
-                                    {searchResults.map(product => (
-                                        <Box key={product.id} onClick={() => addToCart(product)} sx={{
-                                            px: 2, py: 1.25, cursor: 'pointer', borderBottom: '1px solid #f0f0f0',
-                                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                            '&:hover': { bgcolor: '#f0f7ff' },
-                                        }}>
-                                            <Box>
-                                                <Typography variant="body2" fontWeight={600} fontSize={13}>{product.name}</Typography>
-                                                <Typography variant="caption" color="#888" fontFamily="monospace">{product.isbnBarcode}</Typography>
+                    <Box>
+                        <Typography variant="caption" fontWeight={700} color="#64748b" display="block" mb={0.75}
+                            fontSize={10} textTransform="uppercase" letterSpacing={0.5}>Tìm & thêm sản phẩm</Typography>
+                        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                            <Box sx={{ flex: 1, position: 'relative' }}>
+                                <TextField fullWidth size="small" placeholder="Tìm theo tên, ISBN, SKU..."
+                                    value={searchKeyword} onChange={e => setSearchKeyword(e.target.value)}
+                                    sx={{ bgcolor: '#fff' }}
+                                    InputProps={{
+                                        startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 17, color: '#bbb' }} /></InputAdornment>,
+                                        endAdornment: searching && <CircularProgress size={16} />,
+                                        sx: { borderRadius: 1.5 }
+                                    }} />
+                                {searchResults.length > 0 && (
+                                    <Paper elevation={8} sx={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 1000,
+                                        maxHeight: 220, overflowY: 'auto', borderRadius: 1.5, mt: 0.5 }}>
+                                        {searchResults.map(product => (
+                                            <Box key={product.id} onClick={() => addToCart(product)} sx={{
+                                                px: 2, py: 1.25, cursor: 'pointer', borderBottom: '1px solid #f0f0f0',
+                                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                                '&:hover': { bgcolor: '#f0f7ff' },
+                                            }}>
+                                                <Box>
+                                                    <Typography variant="body2" fontWeight={600} fontSize={13}>{product.name}</Typography>
+                                                    <Typography variant="caption" color="#888" fontFamily="monospace">{product.isbnBarcode}</Typography>
+                                                </Box>
+                                                <Typography variant="body2" fontWeight={700} color="#1976d2">{fmtCurrency(product.retailPrice)}</Typography>
                                             </Box>
-                                            <Typography variant="body2" fontWeight={700} color="#1976d2">{fmtCurrency(product.retailPrice)}</Typography>
-                                        </Box>
-                                    ))}
-                                </Paper>
-                            )}
-                        </Box>
+                                        ))}
+                                    </Paper>
+                                )}
+                            </Box>
 
-                        {/* Excel buttons */}
-                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end', pb: 0 }}>
+                            {/* Excel buttons */}
                             <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept=".xlsx,.xls,.csv"
                                 onChange={handleExcelUpload} />
-                            <Tooltip title="Nhập danh sách sản phẩm từ file Excel (.xlsx) — cột: Mã vạch, Số lượng, Giá nhập">
+                            <Tooltip title="Tải file Excel có sẵn toàn bộ sách của NCC đã chọn. Chỉ cần điền cột Số lượng và Giá nhập rồi upload lại.">
+                                <Button variant="outlined" size="small" onClick={downloadTemplate}
+                                    startIcon={<FileDownloadOutlined sx={{ fontSize: 16 }} />}
+                                    sx={{ textTransform: 'none', borderRadius: 1.5, whiteSpace: 'nowrap', borderColor: '#1565c0', color: '#1565c0',
+                                        '&:hover': { bgcolor: '#e3f2fd', borderColor: '#0d47a1' } }}>
+                                    Tải danh sách sách
+                                </Button>
+                            </Tooltip>
+                            <Tooltip title="Upload file Excel đã điền số lượng. Hãy tải mẫu trước để có danh sách sách của NCC đã chọn.">
                                 <Button variant="contained" size="small" onClick={() => fileInputRef.current?.click()}
                                     startIcon={<FileUploadOutlined sx={{ fontSize: 16 }} />}
                                     sx={{ textTransform: 'none', borderRadius: 1.5, bgcolor: '#16a34a',
-                                        '&:hover': { bgcolor: '#15803d' }, whiteSpace: 'nowrap', height: 36 }}>
+                                        '&:hover': { bgcolor: '#15803d' }, whiteSpace: 'nowrap' }}>
                                     Nhập Excel
-                                </Button>
-                            </Tooltip>
-                            <Tooltip title="Tải file mẫu Excel (Mã vạch, Số lượng, Giá nhập)">
-                                <Button variant="outlined" size="small" onClick={downloadTemplate}
-                                    startIcon={<FileDownloadOutlined sx={{ fontSize: 16 }} />}
-                                    sx={{ textTransform: 'none', borderRadius: 1.5, whiteSpace: 'nowrap', height: 36 }}>
-                                    Tải mẫu
                                 </Button>
                             </Tooltip>
                         </Box>
@@ -859,9 +890,10 @@ const CreatePurchaseDialog: React.FC<{
                                                                     sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1.5 } }} />
                                                             </TableCell>
                                                             <TableCell sx={{ minWidth: 140 }} align="right">
-                                                                <TextField size="small" type="number" value={item.importPrice}
-                                                                    onChange={e => updateField(item.productId, 'importPrice', parseInt(e.target.value) || 0)}
-                                                                    inputProps={{ min: 0, style: { width: 100, textAlign: 'right' } }}
+                                                                <TextField size="small"
+                                                                    value={item.importPrice ? item.importPrice.toLocaleString('vi-VN') : '0'}
+                                                                    onChange={e => updateField(item.productId, 'importPrice', parseInt(e.target.value.replace(/\D/g, '')) || 0)}
+                                                                    inputProps={{ inputMode: 'numeric', style: { width: 110, textAlign: 'right' } }}
                                                                     InputProps={{ endAdornment: <InputAdornment position="end">₫</InputAdornment>, sx: { borderRadius: 1.5 } }} />
                                                             </TableCell>
                                                             <TableCell align="right">
@@ -965,6 +997,257 @@ const CreatePurchaseDialog: React.FC<{
 };
 
 // ══════════════════════════════════════════════════════════════
+// EXCEL WIZARD DIALOG (standalone, outside create form)
+// ══════════════════════════════════════════════════════════════
+interface ExcelRow { barcode: string; qty: number; price: number; product?: ProductResponse; }
+
+const ExcelWizardDialog: React.FC<{
+    open: boolean; onClose: () => void;
+    suppliers: Supplier[]; warehouses: Warehouse[];
+    onSuccess: () => void;
+}> = ({ open, onClose, suppliers, warehouses, onSuccess }) => {
+    const [supplierId, setSupplierId] = useState('');
+    const [warehouseId, setWarehouseId] = useState('');
+    const [rows, setRows] = useState<ExcelRow[]>([]);
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState('');
+    const [snack, setSnack] = useState<{ message: string; severity: 'success' | 'error' | 'warning' } | null>(null);
+    const fileRef = React.useRef<HTMLInputElement>(null);
+    const [productMap, setProductMap] = useState<Map<string, ProductResponse>>(new Map());
+
+    const currentUser = authService.getCurrentUser()?.user;
+    const isAdmin = currentUser?.role === 'ROLE_ADMIN';
+
+    useEffect(() => {
+        if (!open) { setSupplierId(''); setWarehouseId(''); setRows([]); setError(''); return; }
+        if (!isAdmin && currentUser?.warehouseId) setWarehouseId(String(currentUser.warehouseId));
+        productService.search({ size: 5000, isActive: true }).then(res => {
+            const map = new Map<string, ProductResponse>();
+            res.content.forEach(p => {
+                if (p.isbnBarcode) map.set(p.isbnBarcode.trim().toLowerCase(), p);
+                if (p.sku) map.set(p.sku.trim().toLowerCase(), p);
+            });
+            setProductMap(map);
+        }).catch(() => {});
+    }, [open]);
+
+    const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        e.target.value = '';
+        try {
+            const XLSX = await import('xlsx');
+            const buffer = await file.arrayBuffer();
+            const wb = XLSX.read(buffer);
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const rawRows = XLSX.utils.sheet_to_json<Record<string, any>>(ws);
+            const parsed: ExcelRow[] = [];
+            for (const row of rawRows) {
+                const vals = Object.values(row);
+
+                // Cột A: ISBN
+                const barcode = String(
+                    row['ISBN / Mã vạch'] ?? row['ISBN'] ?? row['Mã vạch'] ?? row['Barcode'] ??
+                    row['isbn'] ?? row['SKU'] ?? vals[0] ?? ''
+                ).trim();
+                if (!barcode) continue;
+
+                // Cột C: Số lượng (index 2 vì cột B là Tên sách)
+                const qtyRaw = row['Số lượng nhập'] ?? row['Số lượng'] ?? row['SL'] ?? vals[2] ?? '';
+                const qty = parseInt(String(qtyRaw));
+                if (!qty || qty <= 0) continue; // bỏ qua dòng người dùng không điền SL
+
+                // Cột D: Giá nhập (index 3)
+                const price = parseFloat(String(
+                    row['Giá nhập (VNĐ)'] ?? row['Giá nhập'] ?? row['Giá'] ?? vals[3] ?? '0'
+                ).replace(/[^0-9.]/g, '')) || 0;
+
+                const product = productMap.get(barcode.toLowerCase());
+                parsed.push({ barcode, qty, price, product });
+            }
+            if (parsed.length === 0) { setError('Không có dòng nào có số lượng nhập. Hãy điền số lượng vào cột C rồi upload lại.'); return; }
+            setRows(parsed); setError('');
+        } catch { setError('Không đọc được file Excel. Vui lòng dùng .xlsx.'); }
+    };
+
+    const handleCreate = async () => {
+        if (!supplierId) { setError('Vui lòng chọn nhà cung cấp.'); return; }
+        if (!warehouseId) { setError('Vui lòng chọn kho nhập.'); return; }
+        const validRows = rows.filter(r => r.product);
+        if (!validRows.length) { setError('Không có sản phẩm nào tìm thấy trong hệ thống.'); return; }
+        setSubmitting(true);
+        try {
+            await purchaseService.create({
+                supplierId,
+                warehouseId,
+                note: `Nhập từ Excel — ${new Date().toLocaleDateString('vi-VN')}`,
+                items: validRows.map(r => ({
+                    productId: r.product!.id,
+                    quantity: r.qty,
+                    importPrice: r.price || Math.round((r.product!.retailPrice ?? 0) * 0.7) || 0,
+                })),
+            });
+            setSnack({ message: `✅ Tạo phiếu nháp thành công (${validRows.length} đầu sách)!`, severity: 'success' });
+            setTimeout(() => { onSuccess(); onClose(); }, 1500);
+        } catch (e: any) {
+            setSnack({ message: e.response?.data?.message || 'Tạo phiếu thất bại', severity: 'error' });
+        } finally { setSubmitting(false); }
+    };
+
+    const [templateLoading, setTemplateLoading] = useState(false);
+
+    const downloadTemplate = async () => {
+        if (!supplierId) { setError('Vui lòng chọn nhà cung cấp trước để tải mẫu có danh sách sách.'); return; }
+        setTemplateLoading(true);
+        try {
+            const res = await productService.search({ size: 1000, isActive: true });
+            const products = res.content.filter(p => p.supplierId === supplierId);
+            if (!products.length) { setError('Nhà cung cấp này chưa có sản phẩm nào trong hệ thống.'); return; }
+
+            const XLSX = await import('xlsx');
+            const supplierName = suppliers.find(s => s.id === supplierId)?.name || 'NCC';
+
+            const headers = ['ISBN / Mã vạch', 'Tên sách (tham khảo)', 'Số lượng nhập', 'Giá nhập (VNĐ)'];
+            const productRows = products.map(p => [p.isbnBarcode || p.sku || '', p.name, '', '']);
+
+            const ws = XLSX.utils.aoa_to_sheet([headers, ...productRows]);
+            const headerStyle = { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '1565C0' } }, alignment: { horizontal: 'center' } };
+            headers.forEach((_, c) => {
+                const cellRef = XLSX.utils.encode_cell({ r: 0, c });
+                if (!ws[cellRef]) ws[cellRef] = {};
+                ws[cellRef].s = headerStyle;
+            });
+            ws['!cols'] = [{ wch: 26 }, { wch: 42 }, { wch: 16 }, { wch: 20 }];
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Nhập kho');
+            XLSX.writeFile(wb, `nhap_kho_${supplierName.replace(/[^a-zA-Z0-9À-ỹ]/g, '_')}.xlsx`);
+        } catch { setError('Không thể tải danh sách sản phẩm. Vui lòng thử lại.'); }
+        finally { setTemplateLoading(false); }
+    };
+
+    const found = rows.filter(r => r.product).length;
+    const notFound = rows.filter(r => !r.product).length;
+
+    return (
+        <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 3, maxHeight: '90vh' } }}>
+            <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <FileUploadOutlined sx={{ color: '#16a34a' }} />
+                    <Typography fontWeight={700} fontSize={17}>Nhập kho từ Excel</Typography>
+                </Box>
+                <IconButton size="small" onClick={onClose}><Close fontSize="small" /></IconButton>
+            </DialogTitle>
+            <Divider />
+
+            <DialogContent sx={{ p: 2.5 }}>
+                {/* Step 1: NCC + Kho */}
+                <Box sx={{ display: 'flex', gap: 2, mb: 2.5 }}>
+                    <FormControl size="small" fullWidth>
+                        <Typography variant="caption" fontWeight={600} color="#555" mb={0.5}>Nhà cung cấp *</Typography>
+                        <Select value={supplierId} onChange={e => setSupplierId(e.target.value)} displayEmpty>
+                            <MenuItem value=""><em>— Chọn nhà cung cấp —</em></MenuItem>
+                            {suppliers.map(s => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
+                        </Select>
+                    </FormControl>
+                    {isAdmin && (
+                        <FormControl size="small" fullWidth>
+                            <Typography variant="caption" fontWeight={600} color="#555" mb={0.5}>Kho nhập *</Typography>
+                            <Select value={warehouseId} onChange={e => setWarehouseId(e.target.value)} displayEmpty>
+                                <MenuItem value=""><em>— Chọn kho —</em></MenuItem>
+                                {warehouses.map(w => <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>)}
+                            </Select>
+                        </FormControl>
+                    )}
+                </Box>
+
+                {/* Step 2: Upload */}
+                <Box sx={{ display: 'flex', gap: 1.5, mb: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleFile} />
+                    <Tooltip title="Tải file Excel có sẵn toàn bộ sách của NCC đã chọn. Chỉ cần điền cột Số lượng và Giá nhập rồi upload lại.">
+                        <span>
+                            <Button variant="outlined" startIcon={templateLoading ? <CircularProgress size={14} /> : <FileDownloadOutlined />}
+                                onClick={downloadTemplate} disabled={templateLoading}
+                                sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 1.5, borderColor: '#1565c0', color: '#1565c0',
+                                    '&:hover': { bgcolor: '#e3f2fd', borderColor: '#0d47a1' } }}>
+                                {templateLoading ? 'Đang tải...' : 'Tải danh sách sách'}
+                            </Button>
+                        </span>
+                    </Tooltip>
+                    <Button variant="contained" startIcon={<FileUploadOutlined />} onClick={() => fileRef.current?.click()}
+                        sx={{ textTransform: 'none', fontWeight: 600, bgcolor: '#16a34a', '&:hover': { bgcolor: '#15803d' }, borderRadius: 1.5 }}>
+                        Upload file đã điền
+                    </Button>
+                    <Typography variant="caption" color="#888" sx={{ alignSelf: 'center' }}>
+                        Bước 1: Tải danh sách · Bước 2: Điền SL + Giá · Bước 3: Upload
+                    </Typography>
+                </Box>
+
+                {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 1.5 }}>{error}</Alert>}
+
+                {/* Preview */}
+                {rows.length > 0 && (
+                    <>
+                        <Box sx={{ display: 'flex', gap: 2, mb: 1.5, alignItems: 'center' }}>
+                            <Typography variant="body2" fontWeight={700} color="#333">
+                                Xem trước: {rows.length} dòng
+                            </Typography>
+                            <Chip label={`✓ ${found} tìm thấy`} size="small" sx={{ bgcolor: '#dcfce7', color: '#166534', fontWeight: 600 }} />
+                            {notFound > 0 && <Chip label={`✗ ${notFound} không tìm thấy`} size="small" sx={{ bgcolor: '#fee2e2', color: '#991b1b', fontWeight: 600 }} />}
+                        </Box>
+                        <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #f0f0f0', borderRadius: 1.5, maxHeight: 340 }}>
+                            <Table size="small" stickyHeader>
+                                <TableHead>
+                                    <TableRow sx={{ bgcolor: '#fafafa' }}>
+                                        {['ISBN / Mã vạch', 'Tên sách', 'Số lượng', 'Giá nhập', 'Trạng thái'].map(col => (
+                                            <TableCell key={col} sx={{ fontWeight: 700, fontSize: 11, color: '#888', bgcolor: '#fafafa' }}>{col}</TableCell>
+                                        ))}
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {rows.map((r, i) => (
+                                        <TableRow key={i} sx={{ bgcolor: r.product ? 'inherit' : '#fff5f5' }}>
+                                            <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{r.barcode}</TableCell>
+                                            <TableCell sx={{ fontSize: 12, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {r.product ? r.product.name : <Typography color="error" fontSize={12}>Không tìm thấy</Typography>}
+                                            </TableCell>
+                                            <TableCell sx={{ fontSize: 12 }}>{r.qty}</TableCell>
+                                            <TableCell sx={{ fontSize: 12 }}>{r.price ? fmtCurrency(r.price) : <Typography color="#aaa" fontSize={12}>Dùng giá sỉ</Typography>}</TableCell>
+                                            <TableCell>
+                                                {r.product
+                                                    ? <Chip label="OK" size="small" sx={{ bgcolor: '#dcfce7', color: '#166534', fontSize: 10, height: 18 }} />
+                                                    : <Chip label="Bỏ qua" size="small" sx={{ bgcolor: '#fee2e2', color: '#991b1b', fontSize: 10, height: 18 }} />
+                                                }
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    </>
+                )}
+            </DialogContent>
+
+            <Divider />
+            <DialogActions sx={{ px: 2.5, py: 1.5, gap: 1 }}>
+                <Button onClick={onClose} sx={{ textTransform: 'none', color: '#555' }}>Hủy</Button>
+                <Button variant="contained" disabled={!rows.length || !supplierId || !warehouseId || submitting || found === 0}
+                    onClick={handleCreate}
+                    sx={{ textTransform: 'none', fontWeight: 700, bgcolor: '#1565c0', '&:hover': { bgcolor: '#0d47a1' }, borderRadius: 1.5, minWidth: 180 }}>
+                    {submitting
+                        ? <><CircularProgress size={14} sx={{ color: '#fff', mr: 1 }} />Đang tạo...</>
+                        : `Tạo phiếu nháp (${found} sách)`}
+                </Button>
+            </DialogActions>
+
+            <Snackbar open={!!snack} autoHideDuration={3000} onClose={() => setSnack(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+                {snack ? <Alert severity={snack.severity} onClose={() => setSnack(null)}>{snack.message}</Alert> : <div />}
+            </Snackbar>
+        </Dialog>
+    );
+};
+
+// ══════════════════════════════════════════════════════════════
 // MAIN PAGE
 // ══════════════════════════════════════════════════════════════
 const ImportPage: React.FC = () => {
@@ -973,6 +1256,7 @@ const ImportPage: React.FC = () => {
     const [detailOpen, setDetailOpen] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null);
     const [createOpen, setCreateOpen] = useState(false);
+    const [excelWizardOpen, setExcelWizardOpen] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
     const [snack, setSnack] = useState<{ message: string; severity: 'success' | 'error' } | null>(null);
     const [rejectOpen, setRejectOpen] = useState(false);
@@ -980,6 +1264,18 @@ const ImportPage: React.FC = () => {
     const [cancelOpen, setCancelOpen] = useState(false);
     const [cancelReason, setCancelReason] = useState('');
     const [receiveOpen, setReceiveOpen] = useState(false);
+
+    const [searchParams, setSearchParams] = useSearchParams();
+
+    // Deep-link: ?open={id} từ trang Lịch sử kho
+    useEffect(() => {
+        const openId = searchParams.get('open');
+        if (!openId) return;
+        purchaseService.getById(openId)
+            .then(order => { setSelectedOrder(order); setDetailOpen(true); })
+            .catch(() => {})
+            .finally(() => setSearchParams(p => { p.delete('open'); return p; }, { replace: true }));
+    }, []);
     const [products, setProducts] = useState<Map<string, ProductResponse>>(new Map());
     const PAGE_SIZE = 15;
 
@@ -1095,10 +1391,17 @@ const ImportPage: React.FC = () => {
                     <Typography variant="h5" fontWeight={800} color="#1a1a2e" mt={0.5}>Phiếu nhập kho</Typography>
                     <Typography variant="body2" color="text.secondary" fontSize={12}>Quản lý nhập hàng từ Nhà cung cấp · Quy trình duyệt 2 bước</Typography>
                 </Box>
-                <Button variant="contained" startIcon={<Add />} onClick={() => setCreateOpen(true)}
-                    sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 2, bgcolor: '#2563eb', '&:hover': { bgcolor: '#1d4ed8' } }}>
-                    Tạo phiếu nhập
-                </Button>
+                <Box sx={{ display: 'flex', gap: 1.5 }}>
+                    <Button variant="outlined" startIcon={<FileUploadOutlined />} onClick={() => setExcelWizardOpen(true)}
+                        sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2, borderColor: '#16a34a', color: '#16a34a',
+                            '&:hover': { bgcolor: '#f0fdf4', borderColor: '#15803d' } }}>
+                        Nhập Excel
+                    </Button>
+                    <Button variant="contained" startIcon={<Add />} onClick={() => setCreateOpen(true)}
+                        sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 2, bgcolor: '#2563eb', '&:hover': { bgcolor: '#1d4ed8' } }}>
+                        Tạo phiếu nhập
+                    </Button>
+                </Box>
             </Box>
 
             <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid #f0f0f0', mb: 2 }}>
@@ -1254,6 +1557,10 @@ const ImportPage: React.FC = () => {
             <CreatePurchaseDialog open={createOpen} onClose={() => setCreateOpen(false)}
                 onCreated={() => refetchOrders()} warehouses={warehouses} suppliers={suppliers}
                 currentUser={currentUser} isAdmin={isAdmin} />
+
+            <ExcelWizardDialog open={excelWizardOpen} onClose={() => setExcelWizardOpen(false)}
+                suppliers={suppliers} warehouses={warehouses}
+                onSuccess={() => refetchOrders()} />
 
             <Snackbar open={!!snack} autoHideDuration={3000} onClose={() => setSnack(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
                 {snack && <Alert severity={snack.severity} onClose={() => setSnack(null)}>{snack.message}</Alert>}

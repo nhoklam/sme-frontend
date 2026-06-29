@@ -413,24 +413,31 @@ const PromotionDialog = ({ open, editing, onClose, onSuccess }: { open: boolean;
                             {form.discountType === 'PERCENTAGE' ? 'Phần trăm giảm' : 'Số tiền giảm'} *
                         </Typography>
                         <TextField
-                            fullWidth size="small" type="number" sx={{ mt: 0.5 }}
-                            value={form.discountValue} onChange={e => setForm({ ...form, discountValue: Number(e.target.value) })}
+                            fullWidth size="small" sx={{ mt: 0.5 }}
+                            inputProps={{ inputMode: 'numeric' }}
+                            value={form.discountValue ? form.discountValue.toLocaleString('vi-VN') : ''}
+                            onChange={e => { const raw = e.target.value.replace(/\D/g, ''); setForm({ ...form, discountValue: raw ? Number(raw) : 0 }); }}
+                            InputProps={form.discountType === 'FIXED_AMOUNT' ? { endAdornment: <Typography variant="caption">₫</Typography> } : undefined}
                         />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
                         <Typography variant="caption" fontWeight={800} color="text.secondary">Đơn hàng tối thiểu</Typography>
                         <TextField
-                            fullWidth size="small" type="number" placeholder="0" sx={{ mt: 0.5 }}
-                            value={form.minOrderValue || ''} onChange={e => setForm({ ...form, minOrderValue: Number(e.target.value) })}
-                            InputProps={{ endAdornment: <Typography variant="caption">VND</Typography> }}
+                            fullWidth size="small" placeholder="0" sx={{ mt: 0.5 }}
+                            inputProps={{ inputMode: 'numeric' }}
+                            value={form.minOrderValue ? form.minOrderValue.toLocaleString('vi-VN') : ''}
+                            onChange={e => { const raw = e.target.value.replace(/\D/g, ''); setForm({ ...form, minOrderValue: raw ? Number(raw) : 0 }); }}
+                            InputProps={{ endAdornment: <Typography variant="caption">₫</Typography> }}
                         />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
                         <Typography variant="caption" fontWeight={800} color="text.secondary">Giảm tối đa</Typography>
                         <TextField
-                            fullWidth size="small" type="number" placeholder="Không giới hạn" sx={{ mt: 0.5 }}
-                            value={form.maxDiscountAmount || ''} onChange={e => setForm({ ...form, maxDiscountAmount: e.target.value ? Number(e.target.value) : undefined })}
-                            InputProps={{ endAdornment: <Typography variant="caption">VND</Typography> }}
+                            fullWidth size="small" placeholder="Không giới hạn" sx={{ mt: 0.5 }}
+                            inputProps={{ inputMode: 'numeric' }}
+                            value={form.maxDiscountAmount ? form.maxDiscountAmount.toLocaleString('vi-VN') : ''}
+                            onChange={e => { const raw = e.target.value.replace(/\D/g, ''); setForm({ ...form, maxDiscountAmount: raw ? Number(raw) : undefined }); }}
+                            InputProps={{ endAdornment: <Typography variant="caption">₫</Typography> }}
                             disabled={form.discountType !== 'PERCENTAGE'}
                         />
                     </Grid>
@@ -442,49 +449,21 @@ const PromotionDialog = ({ open, editing, onClose, onSuccess }: { open: boolean;
                         />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
-                        <Typography variant="caption" fontWeight={800} color="text.secondary">Ngày bắt đầu (DD/MM/YYYY)</Typography>
+                        <Typography variant="caption" fontWeight={800} color="text.secondary">Ngày bắt đầu</Typography>
                         <TextField
-                            fullWidth size="small" sx={{ mt: 0.5 }}
-                            placeholder="DD/MM/YYYY"
-                            value={form.startDate ? (() => { const parts = form.startDate.split('-'); return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : form.startDate; })() : ''}
-                            onChange={e => {
-                                const v = e.target.value.replace(/[^\d/]/g, '');
-                                // Auto-format: thêm / sau ngày và tháng
-                                let formatted = v;
-                                const digits = v.replace(/\//g, '');
-                                if (digits.length >= 2 && !v.includes('/')) formatted = digits.slice(0, 2) + '/' + digits.slice(2);
-                                if (digits.length >= 4 && v.split('/').length < 3) { formatted = digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4, 8); }
-                                // Parse DD/MM/YYYY -> YYYY-MM-DD
-                                const match = formatted.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-                                if (match) {
-                                    setForm({ ...form, startDate: `${match[3]}-${match[2]}-${match[1]}` });
-                                } else {
-                                    setForm({ ...form, startDate: formatted });
-                                }
-                            }}
-                            inputProps={{ maxLength: 10 }}
+                            fullWidth size="small" type="date" sx={{ mt: 0.5 }}
+                            value={form.startDate || ''}
+                            onChange={e => setForm({ ...form, startDate: e.target.value })}
+                            inputProps={{ max: form.endDate || undefined }}
                         />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
-                        <Typography variant="caption" fontWeight={800} color="text.secondary">Ngày kết thúc (DD/MM/YYYY)</Typography>
+                        <Typography variant="caption" fontWeight={800} color="text.secondary">Ngày kết thúc</Typography>
                         <TextField
-                            fullWidth size="small" sx={{ mt: 0.5 }}
-                            placeholder="DD/MM/YYYY"
-                            value={form.endDate ? (() => { const parts = form.endDate.split('-'); return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : form.endDate; })() : ''}
-                            onChange={e => {
-                                const v = e.target.value.replace(/[^\d/]/g, '');
-                                let formatted = v;
-                                const digits = v.replace(/\//g, '');
-                                if (digits.length >= 2 && !v.includes('/')) formatted = digits.slice(0, 2) + '/' + digits.slice(2);
-                                if (digits.length >= 4 && v.split('/').length < 3) { formatted = digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4, 8); }
-                                const match = formatted.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-                                if (match) {
-                                    setForm({ ...form, endDate: `${match[3]}-${match[2]}-${match[1]}` });
-                                } else {
-                                    setForm({ ...form, endDate: formatted });
-                                }
-                            }}
-                            inputProps={{ maxLength: 10 }}
+                            fullWidth size="small" type="date" sx={{ mt: 0.5 }}
+                            value={form.endDate || ''}
+                            onChange={e => setForm({ ...form, endDate: e.target.value })}
+                            inputProps={{ min: form.startDate || undefined }}
                         />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>

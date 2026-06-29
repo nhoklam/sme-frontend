@@ -131,7 +131,8 @@ const TransactionDetailDialog: React.FC<{
     };
 
     const canNavigate = transaction.referenceId &&
-        ['SALE', 'SALE_POS', 'SALE_ONLINE', 'IMPORT', 'TRANSFER_IN', 'TRANSFER_OUT'].includes(transaction.transactionType);
+        ['SALE', 'SALE_POS', 'SALE_ONLINE', 'IMPORT', 'TRANSFER_IN', 'TRANSFER_OUT',
+         'RETURN', 'RETURN_TO_STOCK', 'ADJUSTMENT', 'ADJUSTMENT_UP', 'ADJUSTMENT_DOWN'].includes(transaction.transactionType);
 
     return (
         <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 2.5 } }}>
@@ -427,12 +428,14 @@ const InventoryHistoryPage: React.FC = () => {
     };
 
     const handleNavigate = (referenceId: string, type: string) => {
-        if (['SALE', 'SALE_POS', 'SALE_ONLINE'].includes(type)) {
-            navigate('/admin/orders');
+        if (['SALE', 'SALE_POS', 'SALE_ONLINE', 'RETURN', 'RETURN_TO_STOCK'].includes(type)) {
+            navigate(`/admin/orders/${referenceId}`);
         } else if (type === 'IMPORT') {
-            navigate('/admin/inventory/import');
+            navigate(`/admin/inventory/import?open=${referenceId}`);
         } else if (['TRANSFER_IN', 'TRANSFER_OUT'].includes(type)) {
-            navigate('/admin/inventory/transfers');
+            navigate(`/admin/inventory/transfer?open=${referenceId}`);
+        } else if (['ADJUSTMENT', 'ADJUSTMENT_UP', 'ADJUSTMENT_DOWN'].includes(type)) {
+            navigate(`/admin/inventory/adjustment?open=${referenceId}`);
         }
     };
 

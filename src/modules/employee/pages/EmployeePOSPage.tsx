@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     Box, Typography, Chip, IconButton, Button, Alert,
     Snackbar, CircularProgress, Tooltip, TextField,
-    Select, MenuItem, FormControl, Menu,
+    Select, MenuItem, FormControl, Menu, Popover,
     Divider, Badge, Checkbox, FormControlLabel, Switch,
     Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle as MuiDialogTitle
 } from '@mui/material';
@@ -10,7 +10,8 @@ import {
     Storefront, Dashboard as DashboardIcon,
     Logout as LogoutIcon, Logout,
     Add, Close, LocalOffer, Delete, Print, ReceiptLong,
-    Pause, ShoppingBasket, PersonAdd, Undo, ArrowBack, Person, MonetizationOn, Percent, Lock, Star
+    Pause, ShoppingBasket, PersonAdd, Undo, ArrowBack, Person, MonetizationOn, Percent, Lock, Star,
+    ExpandMore, ExpandLess, Discount, CardGiftcard, History, Assessment, KeyboardReturn, ClearAll, Keyboard
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 
@@ -102,6 +103,7 @@ interface OrderTab {
     couponDiscount: number;
     orderDiscount: number;
     orderDiscountAmt: number;
+    volumeDiscountAmt: number;
     isDelivery: boolean;
     isWholesale: boolean;
 }
@@ -116,6 +118,7 @@ interface Shift {
 const newOrder = (id: string, label: string): OrderTab => ({
     id, label, items: [], customer: null, pointsToUse: 0,
     couponCode: '', couponDiscount: 0, orderDiscount: 0, orderDiscountAmt: 0,
+    volumeDiscountAmt: 0,
     isDelivery: false, isWholesale: false,
 });
 
@@ -157,6 +160,14 @@ const EmployeePOSPage: React.FC = () => {
     const [refundOpen, setRefundOpen] = useState(false);
     const [refundInitialCode, setRefundInitialCode] = useState<string | undefined>(undefined);
     const [revenueOpen, setRevenueOpen] = useState(false);
+    const [quickActionsOpen, setQuickActionsOpen] = useState(true);
+    const [discountAnchorEl, setDiscountAnchorEl] = useState<HTMLElement | null>(null);
+    const [shortcutsAnchorEl, setShortcutsAnchorEl] = useState<HTMLElement | null>(null);
+
+    const [discountHint, setDiscountHint] = useState<{
+        discountPct: number; discountAmount: number; tierLabel?: string;
+        ruleName?: string; nextTierMinAmount?: number; nextTierPct?: number; nextTierLabel?: string;
+    } | null>(null);
 
     const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'BANK_TRANSFER' | 'CARD' | 'VNPAY' | 'PAYOS'>('CASH');
     const [customerGivenAmount, setCustomerGivenAmount] = useState<number | ''>('');
@@ -174,7 +185,7 @@ const EmployeePOSPage: React.FC = () => {
         setSnack({ msg: '✅ Khách hàng đã thanh toán thành công!', sev: 'success' });
         setQrDialogOpen(false);
         setQrPaymentData(null);
-        updateOrder(o => ({ ...o, items: [], customer: null, pointsToUse: 0, couponCode: '', couponDiscount: 0, orderDiscount: 0, orderDiscountAmt: 0 }));
+        updateOrder(o => ({ ...o, items: [], customer: null, pointsToUse: 0, couponCode: '', couponDiscount: 0, orderDiscount: 0, orderDiscountAmt: 0, volumeDiscountAmt: 0 }));
         setCheckoutOpen(false);
         setCustomerGivenAmount('');
         if (autoPrint) {
@@ -300,6 +311,29 @@ const EmployeePOSPage: React.FC = () => {
 
     useEffect(() => { loadShift(); }, [loadShift]);
 
+    const totalAmountForEffect = activeOrder.items.reduce((s, i) => s + i.subtotal, 0);
+    useEffect(() => {
+        if (totalAmountForEffect <= 0 || !currentUser?.warehouseId) {
+            setDiscountHint(null);
+            setOrders(prev => prev.map((o, i) => i === activeIdx ? { ...o, volumeDiscountAmt: 0 } : o));
+            return;
+        }
+        const timer = setTimeout(async () => {
+            try {
+                const res = await axiosInstance.get('/discount-rules/calculate', {
+                    params: { totalAmount: totalAmountForEffect, warehouseId: currentUser.warehouseId }
+                });
+                const data = res.data?.data;
+                if (data) {
+                    setDiscountHint(data);
+                    setOrders(prev => prev.map((o, i) => i === activeIdx ? { ...o, volumeDiscountAmt: data.discountAmount ?? 0 } : o));
+                }
+            } catch { /* không có quy tắc = không có chiết khấu */ }
+        }, 400);
+        return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [totalAmountForEffect, currentUser?.warehouseId, activeIdx]);
+
     const updateOrder = useCallback((updater: (o: OrderTab) => OrderTab) => {
         setOrders(prev => prev.map((o, i) => i === activeIdx ? updater(o) : o));
     }, [activeIdx]);
@@ -317,7 +351,7 @@ const EmployeePOSPage: React.FC = () => {
             fullTab: { ...activeOrder },
         };
         setHeldOrders(prev => [...prev, held]);
-        updateOrder(o => ({ ...o, items: [], customer: null, pointsToUse: 0, couponCode: '', couponDiscount: 0, orderDiscount: 0, orderDiscountAmt: 0 }));
+        updateOrder(o => ({ ...o, items: [], customer: null, pointsToUse: 0, couponCode: '', couponDiscount: 0, orderDiscount: 0, orderDiscountAmt: 0, volumeDiscountAmt: 0 }));
         setSnack({ msg: `⏸ Đã giữ tạm "${activeOrder.label}" · F5 để gọi lại`, sev: 'info' });
     }, [activeOrder, updateOrder]);
 
@@ -355,6 +389,7 @@ const EmployeePOSPage: React.FC = () => {
                 items: activeOrder.items.map(i => ({ productId: i.productId, quantity: i.quantity, unitPrice: i.unitPrice })),
                 payments: payments.map(p => ({ method: p.method, amount: p.amount })),
                 pointsToUse: activeOrder.pointsToUse > 0 ? activeOrder.pointsToUse : undefined,
+                volumeDiscountAmt: volumeDiscountAmt > 0 ? volumeDiscountAmt : undefined,
                 orderDiscountAmt: orderDiscountAmt > 0 ? orderDiscountAmt : undefined,
                 couponDiscountAmt: couponDiscountAmt > 0 ? couponDiscountAmt : undefined,
                 couponCodes: activeOrder.couponCode ? [activeOrder.couponCode] : undefined,
@@ -386,7 +421,7 @@ const EmployeePOSPage: React.FC = () => {
                 invoiceData.payments = [{ method: paymentMethod, amount: customerGivenAmount !== '' ? Number(customerGivenAmount) : finalAmount }];
             }
             setSnack({ msg: '✅ Thanh toán thành công!', sev: 'success' });
-            updateOrder(o => ({ ...o, items: [], customer: null, pointsToUse: 0, couponCode: '', couponDiscount: 0, orderDiscount: 0, orderDiscountAmt: 0 }));
+            updateOrder(o => ({ ...o, items: [], customer: null, pointsToUse: 0, couponCode: '', couponDiscount: 0, orderDiscount: 0, orderDiscountAmt: 0, volumeDiscountAmt: 0 }));
             setCheckoutOpen(false);
             setCustomerGivenAmount('');
 
@@ -534,13 +569,14 @@ const EmployeePOSPage: React.FC = () => {
     const removeItem = (id: string) => { updateOrder(o => ({ ...o, items: o.items.filter(i => i.productId !== id) })); };
 
     const totalAmount = activeOrder.items.reduce((s, i) => s + i.subtotal, 0);
+    const volumeDiscountAmt = activeOrder.volumeDiscountAmt ?? 0;
     const orderDiscountAmt = activeOrder.orderDiscount > 0
         ? Math.round(totalAmount * activeOrder.orderDiscount / 100)
         : activeOrder.orderDiscountAmt;
     const couponDiscountAmt = activeOrder.couponDiscount ?? 0;
-    const pointsDiscount = activeOrder.pointsToUse > 0 ? activeOrder.pointsToUse * 100 : 0;
-    const finalAmount = Math.max(0, totalAmount - orderDiscountAmt - couponDiscountAmt - pointsDiscount);
-    const totalDiscount = orderDiscountAmt + couponDiscountAmt + pointsDiscount;
+    const pointsDiscount = activeOrder.pointsToUse > 0 ? activeOrder.pointsToUse * 1000 : 0;
+    const finalAmount = Math.max(0, totalAmount - volumeDiscountAmt - orderDiscountAmt - couponDiscountAmt - pointsDiscount);
+    const totalDiscount = volumeDiscountAmt + orderDiscountAmt + couponDiscountAmt + pointsDiscount;
 
     const handleOpenShift = async (startingCash: number) => {
         setOpenShiftLoading(true);
@@ -649,22 +685,80 @@ const EmployeePOSPage: React.FC = () => {
                         <Typography fontWeight={700} fontSize={15} color="#262626">CRM Bán hàng</Typography>
                     </Box>
                 </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    {shift && (
-                        <Box sx={{ display: 'flex', gap: 1 }}>
-                            <Button size="small" variant="outlined" startIcon={<ReceiptLong sx={{ fontSize: 16 }} />} onClick={() => setInvoiceHistoryOpen(true)} sx={{ textTransform: 'none', borderColor: '#d9d9d9', color: '#595959', height: 36 }}>Hóa đơn</Button>
-                            <Button size="small" variant="outlined" startIcon={<Undo sx={{ fontSize: 16 }} />} onClick={() => setRefundOpen(true)} sx={{ textTransform: 'none', borderColor: '#d9d9d9', color: '#ff4d4f', height: 36 }}>Trả hàng</Button>
-                            <Button size="small" variant="outlined" startIcon={<DashboardIcon sx={{ fontSize: 16 }} />} onClick={() => setRevenueOpen(true)} sx={{ textTransform: 'none', borderColor: '#d9d9d9', color: '#52c41a', height: 36 }}>Doanh thu</Button>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    {/* Store + employee info */}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', mr: 0.5 }}>
+                        <Box display="flex" alignItems="center" gap={0.5}>
+                            <Storefront sx={{ fontSize: 13, color: '#1890ff' }} />
+                            <Typography fontSize={13} fontWeight={700} color="#262626" noWrap maxWidth={160}>
+                                {currentUser?.warehouseName || 'Cửa hàng'}
+                            </Typography>
                         </Box>
-                    )}
+                        <Box display="flex" alignItems="center" gap={0.5}>
+                            <Person sx={{ fontSize: 12, color: '#8c8c8c' }} />
+                            <Typography fontSize={11.5} color="#8c8c8c" noWrap maxWidth={160}>
+                                {currentUser?.fullName || 'Nhân viên'}
+                            </Typography>
+                        </Box>
+                    </Box>
+
+                    {/* Phím tắt button */}
+                    <Button
+                        size="small" variant="outlined"
+                        startIcon={<Keyboard sx={{ fontSize: 15 }} />}
+                        onClick={e => setShortcutsAnchorEl(e.currentTarget)}
+                        sx={{ textTransform: 'none', fontSize: 12, fontWeight: 600, color: '#595959', borderColor: '#d9d9d9', borderRadius: 1.5, height: 34, px: 1.5, bgcolor: '#fafafa', '&:hover': { borderColor: '#1890ff', color: '#1890ff', bgcolor: '#e6f7ff' } }}
+                    >
+                        Phím tắt
+                    </Button>
+
+                    {/* Shortcuts popover */}
+                    <Popover
+                        open={Boolean(shortcutsAnchorEl)}
+                        anchorEl={shortcutsAnchorEl}
+                        onClose={() => setShortcutsAnchorEl(null)}
+                        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                        PaperProps={{ sx: { borderRadius: 2, p: 2, width: 340, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' } }}
+                    >
+                        <Typography fontSize={13} fontWeight={700} color="#262626" mb={1.5} display="flex" alignItems="center" gap={0.75}>
+                            <Keyboard sx={{ fontSize: 16, color: '#1890ff' }} /> Danh sách phím tắt
+                        </Typography>
+                        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px' }}>
+                            {[
+                                ['F1', 'Tìm kiếm sản phẩm'],
+                                ['F2', 'Giữ đơn hàng'],
+                                ['F3', 'Thêm đơn mới'],
+                                ['F4', 'Tìm khách hàng'],
+                                ['F5', 'Đơn đã giữ'],
+                                ['F6', 'Chiết khấu đơn'],
+                                ['F8', 'Khuyến mãi / CK%'],
+                                ['F9', 'Lịch sử hóa đơn'],
+                                ['F10', 'Báo cáo doanh thu'],
+                                ['Enter', 'Thanh toán nhanh'],
+                            ].map(([key, desc]) => (
+                                <Box key={key} display="flex" alignItems="center" gap={1} sx={{ py: '2px' }}>
+                                    <Box component="span" sx={{
+                                        bgcolor: '#f5f5f5', border: '1px solid #d9d9d9', borderBottom: '2px solid #bfbfbf',
+                                        borderRadius: 1, px: 0.75, py: '1px', fontSize: 11, fontWeight: 700, color: '#434343',
+                                        minWidth: 32, textAlign: 'center', flexShrink: 0,
+                                    }}>
+                                        {key}
+                                    </Box>
+                                    <Typography fontSize={12} color="#595959">{desc}</Typography>
+                                </Box>
+                            ))}
+                        </Box>
+                    </Popover>
+
+                    {/* User menu */}
                     <Box
                         onClick={(e) => setUserMenuAnchor(e.currentTarget)}
-                        sx={{ display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer', '&:hover': { opacity: 0.8 }, px: 1, py: 0.5, borderRadius: 1 }}
+                        sx={{ display: 'flex', alignItems: 'center', gap: 0.75, cursor: 'pointer', '&:hover': { opacity: 0.8 }, px: 1, py: 0.5, borderRadius: 1 }}
                     >
                         <Box sx={{ width: 32, height: 32, borderRadius: '50%', bgcolor: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <Person sx={{ color: '#1890ff', fontSize: 18 }} />
                         </Box>
-                        <Typography variant="body2" sx={{ maxWidth: 180 }} noWrap color="#595959">{currentUser?.fullName || 'Quản trị viên'}</Typography>
                     </Box>
                     <Menu
                         anchorEl={userMenuAnchor}
@@ -834,16 +928,83 @@ const EmployeePOSPage: React.FC = () => {
                             </Box>
                         </Box>
                     </Box>
+
+                    {/* THAO TÁC NHANH */}
+                    <Box sx={{ bgcolor: '#fff', borderRadius: 2, flexShrink: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', overflow: 'hidden' }}>
+                        {/* Header toggle */}
+                        <Box
+                            onClick={() => setQuickActionsOpen(o => !o)}
+                            sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', userSelect: 'none', '&:hover': { bgcolor: '#fafafa' } }}
+                        >
+                            <Typography fontSize={12} fontWeight={600} color="#8c8c8c" letterSpacing={0.3}>THAO TÁC NHANH</Typography>
+                            {quickActionsOpen
+                                ? <ExpandLess sx={{ fontSize: 18, color: '#bfbfbf' }} />
+                                : <ExpandMore sx={{ fontSize: 18, color: '#bfbfbf' }} />}
+                        </Box>
+                        {/* Buttons */}
+                        {quickActionsOpen && (
+                            <>
+                            <Box sx={{ px: 1.5, pb: 1, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1 }}>
+                                {[
+                                    { label: 'Chiết khấu', shortcut: 'F6', icon: <Discount sx={{ fontSize: 16 }} />, color: '#1890ff', onClick: () => setDiscountOpen(true) },
+                                    { label: 'Khuyến mãi', shortcut: 'F8', icon: <CardGiftcard sx={{ fontSize: 16 }} />, color: '#52c41a', onClick: () => setPromotionOpen(true) },
+                                    { label: 'Giữ đơn', shortcut: 'F2', icon: <Pause sx={{ fontSize: 16 }} />, color: '#faad14', onClick: () => holdCurrentCart() },
+                                    { label: 'Đơn đã giữ', shortcut: 'F5', icon: <ShoppingBasket sx={{ fontSize: 16 }} />, color: '#722ed1', onClick: () => setHeldOpen(true) },
+                                    { label: 'Hóa đơn', shortcut: 'F9', icon: <History sx={{ fontSize: 16 }} />, color: '#13c2c2', onClick: () => setInvoiceHistoryOpen(true) },
+                                    { label: 'Doanh thu', shortcut: 'F10', icon: <Assessment sx={{ fontSize: 16 }} />, color: '#eb2f96', onClick: () => setRevenueOpen(true) },
+                                    { label: 'Trả hàng', shortcut: '', icon: <KeyboardReturn sx={{ fontSize: 16 }} />, color: '#ff4d4f', onClick: () => setRefundOpen(true) },
+                                    { label: 'Xóa đơn', shortcut: '', icon: <ClearAll sx={{ fontSize: 16 }} />, color: '#ff7875', onClick: () => updateOrder(o => ({ ...o, items: [] })) },
+                                ].map(action => (
+                                    <Button
+                                        key={action.label}
+                                        onClick={action.onClick}
+                                        variant="outlined"
+                                        sx={{
+                                            textTransform: 'none',
+                                            fontSize: 13,
+                                            fontWeight: 600,
+                                            color: '#262626',
+                                            borderColor: '#e0e0e0',
+                                            bgcolor: '#fafafa',
+                                            borderRadius: 2,
+                                            py: 1.25,
+                                            flexDirection: 'column',
+                                            gap: 0.5,
+                                            minHeight: 68,
+                                            '&:hover': { bgcolor: '#f0f0f0', borderColor: '#bdbdbd' },
+                                        }}
+                                    >
+                                        {React.cloneElement(action.icon, { sx: { fontSize: 18, color: action.color } })}
+                                        <Box component="span" sx={{ fontSize: 11.5, fontWeight: 600, lineHeight: 1.2, textAlign: 'center', color: '#262626' }}>
+                                            {action.label}
+                                        </Box>
+                                        {action.shortcut && (
+                                            <Box component="span" sx={{
+                                                bgcolor: '#eeeeee', color: '#595959',
+                                                borderRadius: 0.5, px: 0.5, fontSize: 9.5, fontWeight: 700,
+                                                lineHeight: 1.5,
+                                            }}>
+                                                {action.shortcut}
+                                            </Box>
+                                        )}
+                                    </Button>
+                                ))}
+                            </Box>
+
+                            </>
+                        )}
+                    </Box>
                 </Box>
 
                 {/* RIGHT COLUMN (PAYMENT) */}
                 <Box sx={{ width: 360, bgcolor: '#fff', borderRadius: 2, p: 2, display: 'flex', flexDirection: 'column', overflowY: 'auto', flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-                    <Typography component="div" fontWeight={700} mb={2} display="flex" alignItems="center" gap={1} color="#262626" fontSize={16}>
+                    <Typography component="div" fontWeight={700} mb={1} display="flex" alignItems="center" gap={1} color="#262626" fontSize={16}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: '50%', bgcolor: '#e6f7ff', color: '#1890ff' }}>
                             <MonetizationOn sx={{ fontSize: 16 }} />
                         </Box>
                         Thanh toán
                     </Typography>
+
 
                     {/* Khách hàng */}
                     <Box mb={2}>
@@ -863,7 +1024,7 @@ const EmployeePOSPage: React.FC = () => {
                         {activeOrder.customer && (activeOrder.customer.loyaltyPoints ?? 0) > 0 && (
                             <Box sx={{ mt: 1 }}>
                                 <Box display="flex" justifyContent="space-between" mb={0.5}>
-                                    <Typography variant="caption" color="#8c8c8c">Quy đổi điểm (1đ = 100₫)</Typography>
+                                    <Typography variant="caption" color="#8c8c8c">Quy đổi điểm (1đ = 1.000₫)</Typography>
                                     <Typography variant="caption" color="#1890ff" fontWeight={600}>Khả dụng: {activeOrder.customer.loyaltyPoints}</Typography>
                                 </Box>
                                 <TextField
@@ -873,7 +1034,7 @@ const EmployeePOSPage: React.FC = () => {
                                     onChange={e => {
                                         let val = parseInt(e.target.value);
                                         if (isNaN(val) || val < 0) val = 0;
-                                        const maxAllowed = Math.min(activeOrder.customer!.loyaltyPoints, Math.ceil(Math.max(0, totalAmount - orderDiscountAmt - couponDiscountAmt) / 100));
+                                        const maxAllowed = Math.min(activeOrder.customer!.loyaltyPoints, Math.ceil(Math.max(0, totalAmount - orderDiscountAmt - couponDiscountAmt) / 1000));
                                         if (val > maxAllowed) val = maxAllowed;
                                         updateOrder(o => ({ ...o, pointsToUse: val }));
                                     }}
@@ -883,7 +1044,7 @@ const EmployeePOSPage: React.FC = () => {
                                                 variant="caption" color="#1890ff" fontWeight={600} 
                                                 sx={{ cursor: 'pointer', whiteSpace: 'nowrap', ml: 1 }} 
                                                 onClick={() => {
-                                                    const maxAllowed = Math.min(activeOrder.customer!.loyaltyPoints, Math.ceil(Math.max(0, totalAmount - orderDiscountAmt - couponDiscountAmt) / 100));
+                                                    const maxAllowed = Math.min(activeOrder.customer!.loyaltyPoints, Math.ceil(Math.max(0, totalAmount - orderDiscountAmt - couponDiscountAmt) / 1000));
                                                     updateOrder(o => ({ ...o, pointsToUse: maxAllowed }));
                                                 }}
                                             >
@@ -904,6 +1065,35 @@ const EmployeePOSPage: React.FC = () => {
                         <Typography variant="body2" color="#8c8c8c">Tạm tính</Typography>
                         <Typography variant="body2" color="#262626">{fmt(totalAmount)}</Typography>
                     </Box>
+
+                    {/* Banner chiết khấu sản lượng */}
+                    {discountHint && discountHint.discountPct > 0 && (
+                        <Box sx={{ bgcolor: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 1.5, p: 1, mb: 1.5 }}>
+                            <Box display="flex" justifyContent="space-between" alignItems="center">
+                                <Box display="flex" alignItems="center" gap={0.5}>
+                                    <LocalOffer sx={{ fontSize: 13, color: '#52c41a' }} />
+                                    <Typography variant="caption" fontWeight={700} color="#52c41a">
+                                        Chiết khấu {discountHint.discountPct}%{discountHint.tierLabel ? ` (${discountHint.tierLabel})` : ''}
+                                    </Typography>
+                                </Box>
+                                <Typography variant="caption" fontWeight={700} color="#52c41a">
+                                    -{fmt(discountHint.discountAmount)}
+                                </Typography>
+                            </Box>
+                            {discountHint.nextTierMinAmount && discountHint.nextTierMinAmount > totalAmount && (
+                                <Typography variant="caption" color="#8c8c8c" sx={{ mt: 0.25, display: 'block', fontSize: 11 }}>
+                                    💡 Mua thêm {fmt(discountHint.nextTierMinAmount - totalAmount)} → được {discountHint.nextTierPct}%
+                                </Typography>
+                            )}
+                        </Box>
+                    )}
+                    {discountHint && discountHint.discountPct === 0 && discountHint.nextTierMinAmount && (
+                        <Box sx={{ bgcolor: '#fffbe6', border: '1px solid #ffe58f', borderRadius: 1.5, p: 1, mb: 1.5 }}>
+                            <Typography variant="caption" color="#d48806" sx={{ fontSize: 11 }}>
+                                💡 Mua thêm {fmt(discountHint.nextTierMinAmount - totalAmount)} → được chiết khấu {discountHint.nextTierPct}%
+                            </Typography>
+                        </Box>
+                    )}
 
                     {/* Mã khuyến mãi */}
                     <Box mb={1.5}>
@@ -944,56 +1134,107 @@ const EmployeePOSPage: React.FC = () => {
                         )}
                     </Box>
 
-                    {/* Giảm giá đơn - inline */}
-                    <Box mb={1.5}>
-                        <Box display="flex" alignItems="center" justifyContent="space-between" mb={0.5}>
+                    {/* Chiết khấu đơn — button mở Popover */}
+                    <Box mb={1.5} display="flex" alignItems="center" justifyContent="space-between">
+                        <Button
+                            size="small"
+                            variant={(activeOrder.orderDiscount > 0 || activeOrder.orderDiscountAmt > 0) ? 'contained' : 'outlined'}
+                            startIcon={<Percent sx={{ fontSize: 14 }} />}
+                            onClick={e => setDiscountAnchorEl(e.currentTarget)}
+                            sx={{
+                                textTransform: 'none', fontSize: 13, fontWeight: 600,
+                                ...(activeOrder.orderDiscount > 0 || activeOrder.orderDiscountAmt > 0) ? {
+                                    color: '#fff', bgcolor: '#1890ff', borderColor: '#1890ff', boxShadow: 'none',
+                                    '&:hover': { bgcolor: '#40a9ff', boxShadow: 'none' },
+                                } : {
+                                    color: '#595959', borderColor: '#d9d9d9', bgcolor: '#fafafa',
+                                    '&:hover': { borderColor: '#1890ff', color: '#1890ff', bgcolor: '#e6f7ff' },
+                                },
+                                borderRadius: 1.5, height: 34, px: 1.5,
+                            }}
+                        >
+                            Chiết khấu đơn
+                            <Box component="span" sx={{ ml: 0.75, fontSize: 10, fontWeight: 700, bgcolor: 'rgba(0,0,0,0.1)', borderRadius: 0.5, px: 0.5, lineHeight: 1.6 }}>F6</Box>
+                        </Button>
+                        {(activeOrder.orderDiscount > 0 || activeOrder.orderDiscountAmt > 0) ? (
                             <Box display="flex" alignItems="center" gap={0.5}>
-                                <Percent sx={{ fontSize: 14, color: '#1890ff' }} />
-                                <Typography variant="caption" color="#595959" fontWeight={600}> Giảm giá đơn</Typography>
-                            </Box>
-                            {(activeOrder.orderDiscount > 0 || activeOrder.orderDiscountAmt > 0) && (
-                                <Typography
-                                    variant="caption"
-                                    color="#ff4d4f"
-                                    sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
-                                    onClick={() => updateOrder(o => ({ ...o, orderDiscount: 0, orderDiscountAmt: 0 }))}
-                                >
-                                    Xóa
+                                <Typography variant="body2" color="#ff4d4f" fontWeight={700}>
+                                    -{fmt(orderDiscountAmt)}
                                 </Typography>
-                            )}
-                        </Box>
-                        <Box display="flex" gap={1} alignItems="center">
+                                <IconButton size="small" onClick={() => updateOrder(o => ({ ...o, orderDiscount: 0, orderDiscountAmt: 0 }))} sx={{ p: 0.25, color: '#bfbfbf', '&:hover': { color: '#ff4d4f' } }}>
+                                    <Close sx={{ fontSize: 14 }} />
+                                </IconButton>
+                            </Box>
+                        ) : (
+                            <Typography variant="caption" color="#bfbfbf">Chưa áp dụng</Typography>
+                        )}
+                    </Box>
+
+                    {/* Popover nhập chiết khấu */}
+                    <Popover
+                        open={Boolean(discountAnchorEl)}
+                        anchorEl={discountAnchorEl}
+                        onClose={() => setDiscountAnchorEl(null)}
+                        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+                        PaperProps={{ sx: { borderRadius: 2, p: 2, width: 260, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' } }}
+                    >
+                        <Typography fontSize={13} fontWeight={700} color="#262626" mb={1.5}>
+                            Chiết khấu đơn hàng
+                        </Typography>
+                        <Box display="flex" flexDirection="column" gap={1.25}>
                             <TextField
                                 size="small"
+                                label="Theo phần trăm (%)"
                                 type="number"
                                 value={activeOrder.orderDiscount || ''}
                                 onChange={e => {
                                     const pct = Number(e.target.value) || 0;
                                     updateOrder(o => ({ ...o, orderDiscount: pct, orderDiscountAmt: 0 }));
                                 }}
-                                placeholder="0"
-                                InputProps={{
-                                    endAdornment: <Typography color="#8c8c8c" fontWeight={700}>%</Typography>,
-                                    sx: { fontWeight: 700, fontSize: 15 }
-                                }}
-                                sx={{ flex: 1, '& input': { textAlign: 'left', py: 1 } }}
+                                placeholder="Ví dụ: 5"
+                                InputProps={{ endAdornment: <Typography color="#8c8c8c" fontWeight={700} fontSize={13}>%</Typography> }}
+                                inputProps={{ min: 0, max: 100 }}
+                                fullWidth
+                                autoFocus
                             />
                             <TextField
                                 size="small"
+                                label="Theo số tiền cố định (đ)"
                                 type="number"
                                 value={activeOrder.orderDiscountAmt || ''}
                                 onChange={e => {
                                     const amt = Number(e.target.value) || 0;
                                     updateOrder(o => ({ ...o, orderDiscount: 0, orderDiscountAmt: amt }));
                                 }}
-                                placeholder="0"
-                                InputProps={{
-                                    sx: { fontWeight: 700, fontSize: 15 }
-                                }}
-                                sx={{ flex: 1, '& input': { textAlign: 'left', py: 1 } }}
+                                placeholder="Ví dụ: 50000"
+                                InputProps={{ endAdornment: <Typography color="#8c8c8c" fontWeight={700} fontSize={13}>đ</Typography> }}
+                                fullWidth
                             />
+                            {(activeOrder.orderDiscount > 0 || activeOrder.orderDiscountAmt > 0) && (
+                                <Box sx={{ bgcolor: '#fff1f0', border: '1px solid #ffa39e', borderRadius: 1.5, px: 1.5, py: 0.75, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <Typography fontSize={12} color="#cf1322">Giảm</Typography>
+                                    <Typography fontSize={14} fontWeight={700} color="#cf1322">-{fmt(orderDiscountAmt)}</Typography>
+                                </Box>
+                            )}
+                            <Box display="flex" gap={1} mt={0.5}>
+                                <Button
+                                    fullWidth size="small" variant="outlined" color="error"
+                                    onClick={() => { updateOrder(o => ({ ...o, orderDiscount: 0, orderDiscountAmt: 0 })); setDiscountAnchorEl(null); }}
+                                    sx={{ textTransform: 'none', borderRadius: 1.5, whiteSpace: 'nowrap', fontWeight: 600 }}
+                                >
+                                    Xóa giảm giá
+                                </Button>
+                                <Button
+                                    fullWidth size="small" variant="contained"
+                                    onClick={() => setDiscountAnchorEl(null)}
+                                    sx={{ textTransform: 'none', borderRadius: 1.5, bgcolor: '#1890ff', '&:hover': { bgcolor: '#40a9ff' }, whiteSpace: 'nowrap', fontWeight: 600 }}
+                                >
+                                    Xác nhận
+                                </Button>
+                            </Box>
                         </Box>
-                    </Box>
+                    </Popover>
 
                     <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5}>
                         <Typography variant="body2" color="#8c8c8c">Thu khác</Typography>
@@ -1014,7 +1255,7 @@ const EmployeePOSPage: React.FC = () => {
                     )}
 
                     <Box display="flex" gap={1} mb={1.5} bgcolor="#f5f5f5" p={0.5} borderRadius={1.5}>
-                        <Button variant="contained" fullWidth sx={{ bgcolor: '#1890ff', color: '#fff', boxShadow: 'none', textTransform: 'none', borderRadius: 1 }}>Thanh toán</Button>
+                        <Button variant="contained" fullWidth onClick={() => setCheckoutOpen(true)} sx={{ bgcolor: '#1890ff', color: '#fff', boxShadow: 'none', textTransform: 'none', borderRadius: 1, '&:hover': { bgcolor: '#40a9ff', boxShadow: 'none' } }}>Thanh toán</Button>
                         <Button variant="text" fullWidth sx={{ color: '#8c8c8c', textTransform: 'none' }} onClick={() => holdCurrentCart()}>Giữ đơn (F2)</Button>
                     </Box>
 

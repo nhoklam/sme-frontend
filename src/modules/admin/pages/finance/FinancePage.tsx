@@ -250,7 +250,10 @@ const CreateEntryDialog: React.FC<{
                     </Grid>
                     <Grid size={{ xs: 12 }}>
                         <Typography variant="caption" fontWeight={700} color="#555" display="block" mb={0.75}>Số tiền *</Typography>
-                        <TextField fullWidth size="small" type="number" placeholder="0" value={form.amount} onChange={set('amount')} InputProps={{ endAdornment: <InputAdornment position="end">₫</InputAdornment> }} />
+                        <TextField fullWidth size="small" placeholder="0" inputProps={{ inputMode: 'numeric' }}
+                            value={form.amount ? Number(form.amount).toLocaleString('vi-VN') : ''}
+                            onChange={e => { const raw = e.target.value.replace(/\D/g, ''); setForm(f => ({ ...f, amount: raw })); }}
+                            InputProps={{ endAdornment: <InputAdornment position="end">₫</InputAdornment> }} />
                     </Grid>
                     <Grid size={{ xs: 12 }}>
                         <Typography variant="caption" fontWeight={700} color="#555" display="block" mb={0.75}>Mô tả *</Typography>
@@ -334,7 +337,10 @@ const PayDebtDialog: React.FC<{
                     </Box>
                 </Box>
                 <Typography variant="caption" fontWeight={700} color="#555" display="block" mb={0.75}>Số tiền thanh toán *</Typography>
-                <TextField fullWidth size="small" type="number" value={amount} onChange={e => setAmount(e.target.value)} InputProps={{ endAdornment: <InputAdornment position="end">₫</InputAdornment> }} sx={{ mb: 2 }} />
+                <TextField fullWidth size="small" placeholder="0" inputProps={{ inputMode: 'numeric' }} sx={{ mb: 2 }}
+                    value={amount ? Number(amount).toLocaleString('vi-VN') : ''}
+                    onChange={e => setAmount(e.target.value.replace(/\D/g, ''))}
+                    InputProps={{ endAdornment: <InputAdornment position="end">₫</InputAdornment> }} />
                 <Box sx={{ display: 'flex', gap: 0.75, mb: 2 }}>
                     {[25, 50, 100].map(p => {
                         const v = Math.round(debt.remainingAmount * p / 100);

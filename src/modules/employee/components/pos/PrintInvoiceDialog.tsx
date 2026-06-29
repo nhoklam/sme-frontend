@@ -27,6 +27,9 @@ interface InvoiceData {
     type?: string;
     totalAmount: number;
     discountAmount?: number;
+    volumeDiscountAmt?: number;
+    orderDiscountAmt?: number;
+    couponDiscountAmt?: number;
     finalAmount: number;
     pointsUsed?: number;
     pointsEarned?: number;
@@ -223,18 +226,38 @@ const PrintInvoiceDialog: React.FC<PrintInvoiceDialogProps> = ({
                         {/* Totals */}
                         <div style={{ marginBottom: '8px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                                <span style={{ width: '100px', display: 'inline-block' }}>Tổng cộng:</span>
+                                <span style={{ width: '110px', display: 'inline-block' }}>Tổng cộng:</span>
                                 <span>{fmt(invoice.totalAmount)}</span>
                             </div>
-                            {(invoice.discountAmount ?? 0) > 0 && (
+                            {/* Breakdown chiết khấu — hiện từng dòng nếu có */}
+                            {(invoice.volumeDiscountAmt ?? 0) > 0 && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                                    <span style={{ width: '100px', display: 'inline-block' }}>Giảm giá:</span>
+                                    <span style={{ width: '110px', display: 'inline-block' }}>CK sản lượng:</span>
+                                    <span>-{fmt(invoice.volumeDiscountAmt)}</span>
+                                </div>
+                            )}
+                            {(invoice.orderDiscountAmt ?? 0) > 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                                    <span style={{ width: '110px', display: 'inline-block' }}>CK đơn hàng:</span>
+                                    <span>-{fmt(invoice.orderDiscountAmt)}</span>
+                                </div>
+                            )}
+                            {(invoice.couponDiscountAmt ?? 0) > 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                                    <span style={{ width: '110px', display: 'inline-block' }}>Mã KM:</span>
+                                    <span>-{fmt(invoice.couponDiscountAmt)}</span>
+                                </div>
+                            )}
+                            {/* Fallback: nếu không có breakdown thì hiện tổng giảm giá */}
+                            {(invoice.volumeDiscountAmt ?? 0) === 0 && (invoice.orderDiscountAmt ?? 0) === 0 && (invoice.couponDiscountAmt ?? 0) === 0 && (invoice.discountAmount ?? 0) > 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                                    <span style={{ width: '110px', display: 'inline-block' }}>Giảm giá:</span>
                                     <span>-{fmt(invoice.discountAmount)}</span>
                                 </div>
                             )}
                             {(invoice.pointsUsed ?? 0) > 0 && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                                    <span style={{ width: '100px', display: 'inline-block' }}>Dùng điểm:</span>
+                                    <span style={{ width: '110px', display: 'inline-block' }}>Dùng điểm:</span>
                                     <span>-{fmt((invoice.pointsUsed ?? 0) * 100)}</span>
                                 </div>
                             )}

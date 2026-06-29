@@ -850,7 +850,7 @@ const CreateOrderDialog: React.FC<{
                                 </Grid>
                                 
                                 <Grid size={{ xs: 6 }}>
-                                    <TextField fullWidth size="small" label="Phí giao hàng" type="number" value={shippingFee || ''} onChange={e => setShippingFee(Number(e.target.value) || 0)} />
+                                    <TextField fullWidth size="small" label="Phí giao hàng" inputProps={{ inputMode: 'numeric' }} value={shippingFee ? shippingFee.toLocaleString('vi-VN') : ''} onChange={e => setShippingFee(Number(e.target.value.replace(/\D/g, '')) || 0)} InputProps={{ endAdornment: <InputAdornment position="end">₫</InputAdornment> }} />
                                 </Grid>
                                 <Grid size={{ xs: 6 }}>
                                     <TextField fullWidth size="small" label="Tiêu điểm (Bội số 500)" type="number" 

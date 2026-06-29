@@ -14,7 +14,7 @@ import {
     Search, Add, Edit, ToggleOn, ToggleOff,
     Phone, Email, LocationOn, Refresh,
     Close, FileDownloadOutlined,
-    Info, History, UploadFile
+    Info, Visibility, History, UploadFile
 } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
 import supplierService from '../../../../services/supplierService';
@@ -94,6 +94,9 @@ const SupplierDetailDialog: React.FC<{
     const [totalDebt, setTotalDebt] = useState<number>(0);
     const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
     const [loadingOrders, setLoadingOrders] = useState(false);
+    const [orderPage, setOrderPage] = useState(0);
+    const [orderTotalPages, setOrderTotalPages] = useState(0);
+    const ORDER_PAGE_SIZE = 8;
 
     useEffect(() => {
         if (open && supplier && tab === 0) {
@@ -114,20 +117,23 @@ const SupplierDetailDialog: React.FC<{
     useEffect(() => {
         if (open && supplier && tab === 1) {
             setLoadingOrders(true);
-            purchaseService.getBySupplier(supplier.id, { page: 0, size: 50 })
+            purchaseService.getBySupplier(supplier.id, { page: orderPage, size: ORDER_PAGE_SIZE })
                 .then((ordersPage) => {
                     setPurchaseOrders(ordersPage.content ?? []);
+                    setOrderTotalPages(ordersPage.totalPages ?? 0);
                 })
-                .catch(() => { setPurchaseOrders([]); })
+                .catch(() => { setPurchaseOrders([]); setOrderTotalPages(0); })
                 .finally(() => setLoadingOrders(false));
         }
-    }, [open, supplier, tab]);
+    }, [open, supplier, tab, orderPage]);
 
     useEffect(() => {
         if (!open) {
             setTab(0);
             setTotalDebt(0);
             setPurchaseOrders([]);
+            setOrderPage(0);
+            setOrderTotalPages(0);
         }
     }, [open]);
 
@@ -240,34 +246,43 @@ const SupplierDetailDialog: React.FC<{
                                 [1, 2, 3].map(i => <Skeleton key={i} height={40} sx={{ mb: 0.5, borderRadius: 1 }} />)
                             ) : debts.length > 0 ? (
                                 <Paper elevation={0} sx={{ border: '1px solid #f0f0f0', borderRadius: 2, overflow: 'hidden' }}>
-                                    <Table size="small">
-                                        <TableHead>
-                                            <TableRow sx={{ bgcolor: '#fafafa' }}>
-                                                <TableCell sx={{ fontWeight: 700, fontSize: 11, color: '#888' }}>MÃ ĐƠN NHẬP</TableCell>
-                                                <TableCell align="right" sx={{ fontWeight: 700, fontSize: 11, color: '#888' }}>DƯ NỢ</TableCell>
-                                                <TableCell align="right" sx={{ fontWeight: 700, fontSize: 11, color: '#888' }}>HẠN</TableCell>
-                                            </TableRow>
-                                        </TableHead>
-                                        <TableBody>
-                                            {debts.slice(0, 5).map(d => (
-                                                <TableRow key={d.id} hover>
-                                                    <TableCell sx={{ fontSize: 12, fontFamily: 'monospace', color: '#1976d2' }}>
-                                                        {d.purchaseOrderCode || d.purchaseOrderId?.slice(0, 12)}
-                                                    </TableCell>
-                                                    <TableCell align="right">
-                                                        <Typography variant="body2" fontWeight={700} color="#d32f2f" fontSize={12}>
-                                                            {fmtCurrency(d.remainingAmount)}
-                                                        </Typography>
-                                                    </TableCell>
-                                                    <TableCell align="right">
-                                                        <Typography variant="caption" color="text.secondary">
-                                                            {d.dueDate ? new Date(d.dueDate).toLocaleDateString('vi-VN') : '—'}
-                                                        </Typography>
-                                                    </TableCell>
+                                    <TableContainer sx={{ maxHeight: 220, overflowY: 'auto' }}>
+                                        <Table size="small" stickyHeader>
+                                            <TableHead>
+                                                <TableRow>
+                                                    <TableCell sx={{ fontWeight: 700, fontSize: 11, color: '#888', bgcolor: '#fafafa' }}>MÃ ĐƠN NHẬP</TableCell>
+                                                    <TableCell align="right" sx={{ fontWeight: 700, fontSize: 11, color: '#888', bgcolor: '#fafafa' }}>DƯ NỢ</TableCell>
+                                                    <TableCell align="right" sx={{ fontWeight: 700, fontSize: 11, color: '#888', bgcolor: '#fafafa' }}>HẠN</TableCell>
                                                 </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
+                                            </TableHead>
+                                            <TableBody>
+                                                {debts.map(d => (
+                                                    <TableRow key={d.id} hover>
+                                                        <TableCell sx={{ fontSize: 12, fontFamily: 'monospace', color: '#1976d2' }}>
+                                                            {d.purchaseOrderCode || d.purchaseOrderId?.slice(0, 12)}
+                                                        </TableCell>
+                                                        <TableCell align="right">
+                                                            <Typography variant="body2" fontWeight={700} color="#d32f2f" fontSize={12}>
+                                                                {fmtCurrency(d.remainingAmount)}
+                                                            </Typography>
+                                                        </TableCell>
+                                                        <TableCell align="right">
+                                                            <Typography variant="caption" color="text.secondary">
+                                                                {d.dueDate ? new Date(d.dueDate).toLocaleDateString('vi-VN') : '—'}
+                                                            </Typography>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </TableContainer>
+                                    {debts.length > 4 && (
+                                        <Box sx={{ px: 2, py: 0.75, bgcolor: '#fafafa', borderTop: '1px solid #f0f0f0' }}>
+                                            <Typography variant="caption" color="text.secondary">
+                                                {debts.length} đơn còn dư nợ — kéo xuống để xem thêm
+                                            </Typography>
+                                        </Box>
+                                    )}
                                 </Paper>
                             ) : null}
                         </Grid>
@@ -291,7 +306,9 @@ const SupplierDetailDialog: React.FC<{
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
-                                        {purchaseOrders.map(order => (
+                                        {loadingOrders
+                                            ? [1,2,3].map(i => <TableRow key={i}><TableCell colSpan={5}><Skeleton /></TableCell></TableRow>)
+                                            : purchaseOrders.map(order => (
                                             <TableRow key={order.id} hover>
                                                 <TableCell sx={{ fontSize: 12, fontFamily: 'monospace', color: '#1976d2', fontWeight: 600 }}>
                                                     {order.code}
@@ -337,6 +354,17 @@ const SupplierDetailDialog: React.FC<{
                                 <Typography variant="body2" color="text.secondary">
                                     Không tìm thấy lịch sử nhập kho nào từ nhà cung cấp này
                                 </Typography>
+                            </Box>
+                        )}
+                        {orderTotalPages > 1 && (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', pt: 2 }}>
+                                <Pagination
+                                    count={orderTotalPages}
+                                    page={orderPage + 1}
+                                    onChange={(_, v) => setOrderPage(v - 1)}
+                                    size="small"
+                                    color="primary"
+                                />
                             </Box>
                         )}
                     </Box>
@@ -1036,7 +1064,7 @@ const SupplierPage: React.FC = () => {
                                                 <Tooltip title="Xem chi tiết">
                                                     <IconButton size="small" onClick={() => openDetail(s)}
                                                         sx={{ color: '#2563eb', '&:hover': { bgcolor: '#eff6ff' } }}>
-                                                        <Info sx={{ fontSize: 16 }} />
+                                                        <Visibility sx={{ fontSize: 16 }} />
                                                     </IconButton>
                                                 </Tooltip>
                                                 {isAdmin && (

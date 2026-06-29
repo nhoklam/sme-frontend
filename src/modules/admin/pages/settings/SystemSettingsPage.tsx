@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Box, Typography } from '@mui/material';
 import {
-    ManageAccounts, AutoAwesome, Assignment, Lock
+    ManageAccounts, AutoAwesome, Assignment, Lock, Discount
 } from '@mui/icons-material';
 import authService from '../../../../services/authService';
 
@@ -10,9 +10,11 @@ import UsersTab from './tabs/UsersTab';
 import AIDocumentsTab from './tabs/AIDocumentsTab';
 import AuditLogsTab from './tabs/AuditLogsTab';
 import ChangePasswordTab from './tabs/ChangePasswordTab';
+import DiscountRulesTab from './tabs/DiscountRulesTab';
 
 const TAB_CONFIG = [
     { id: 'users', label: 'Tài khoản', icon: <ManageAccounts sx={{ fontSize: 18 }} />, roles: ['ROLE_ADMIN', 'ROLE_MANAGER'] },
+    { id: 'discount', label: 'Chiết khấu', icon: <Discount sx={{ fontSize: 18 }} />, roles: ['ROLE_ADMIN'] },
     { id: 'ai', label: 'Dữ liệu AI', icon: <AutoAwesome sx={{ fontSize: 18 }} />, roles: ['ROLE_ADMIN'] },
     { id: 'audit', label: 'Nhật ký hệ thống', icon: <Assignment sx={{ fontSize: 18 }} />, roles: ['ROLE_ADMIN'] },
     { id: 'password', label: 'Bảo mật', icon: <Lock sx={{ fontSize: 18 }} />, roles: ['ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_CASHIER'] },
@@ -72,6 +74,7 @@ export default function SystemSettingsPage() {
 
             {/* Tab Content */}
             {tab === 'users' && <UsersTab />}
+            {tab === 'discount' && <DiscountRulesTab />}
             {tab === 'ai' && <AIDocumentsTab />}
             {tab === 'audit' && <AuditLogsTab />}
             {tab === 'password' && <ChangePasswordTab />}

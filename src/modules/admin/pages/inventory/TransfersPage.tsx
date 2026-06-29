@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     Box, Typography, Button, Paper, Table, TableBody, TableCell,
@@ -841,6 +842,17 @@ const TransfersPage: React.FC = () => {
     const isAdmin = currentUser?.role === 'ROLE_ADMIN';
 
     const qc = useQueryClient();
+    const [searchParams, setSearchParams] = useSearchParams();
+
+    // Deep-link: ?open={id} từ trang Lịch sử kho
+    useEffect(() => {
+        const openId = searchParams.get('open');
+        if (!openId) return;
+        transferService.getById(openId)
+            .then(t => { setSelected(t); setDetailOpen(true); })
+            .catch(() => {})
+            .finally(() => setSearchParams(p => { p.delete('open'); return p; }, { replace: true }));
+    }, []);
 
     const { data: transfers, isLoading } = useQuery({
         queryKey: ['transfers', page, statusFilter, keyword],

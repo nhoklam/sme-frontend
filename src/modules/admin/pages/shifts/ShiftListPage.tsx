@@ -352,9 +352,11 @@ export default function ShiftListPage() {
                         {actionType === 'OPEN' ? 'SỐ TIỀN MẶT ĐẦU CA (VỐN):' : 'KIỂM KÊ TIỀN MẶT THỰC TẾ TRONG KÉT:'}
                     </Typography>
                     <TextField
-                        fullWidth type="number" size="small"
+                        fullWidth size="small"
                         placeholder="Nhập số tiền..."
-                        value={cashAmount} onChange={e => setCashAmount(e.target.value)}
+                        inputProps={{ inputMode: 'numeric' }}
+                        value={cashAmount ? Number(cashAmount).toLocaleString('vi-VN') : ''}
+                        onChange={e => setCashAmount(e.target.value.replace(/\D/g, ''))}
                         slotProps={{
                             input: {
                                 startAdornment: <InputAdornment position="start">₫</InputAdornment>,

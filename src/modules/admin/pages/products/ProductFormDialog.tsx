@@ -399,12 +399,12 @@ const ProductFormDialog: React.FC<Props> = ({ open, onClose, onSuccess, productI
                                         <Grid container spacing={2}>
                                             <Grid size={{ xs: 12, sm: 4 }}>
                                                 <FieldLabel label="Giá bán" required />
-                                                <TextField fullWidth size="small" type="number" value={form.retailPrice} onChange={set('retailPrice')} error={!!errors.retailPrice} helperText={errors.retailPrice} sx={inputStyles} disabled={disablePrice}
+                                                <TextField fullWidth size="small" value={form.retailPrice ? Number(String(form.retailPrice).replace(/\D/g, '') || 0).toLocaleString('vi-VN') : ''} onChange={e => { const raw = e.target.value.replace(/\D/g, ''); setForm(f => ({ ...f, retailPrice: raw })); if (errors.retailPrice) setErrors(er => { const n = { ...er }; delete n.retailPrice; return n; }); }} inputProps={{ inputMode: 'numeric' }} error={!!errors.retailPrice} helperText={errors.retailPrice} sx={inputStyles} disabled={disablePrice}
                                                     InputProps={{ endAdornment: <InputAdornment position="end"><Typography variant="caption" fontWeight={700} color="#94a3b8">₫</Typography></InputAdornment> }} />
                                             </Grid>
                                             <Grid size={{ xs: 12, sm: 4 }}>
                                                 <FieldLabel label="Giá sỉ" hint="Giá bán cho đại lý, phải ≤ giá bán" />
-                                                <TextField fullWidth size="small" type="number" value={form.wholesalePrice} onChange={set('wholesalePrice')} error={!!errors.wholesalePrice} helperText={errors.wholesalePrice} sx={inputStyles} disabled={disablePrice}
+                                                <TextField fullWidth size="small" value={form.wholesalePrice ? Number(String(form.wholesalePrice).replace(/\D/g, '') || 0).toLocaleString('vi-VN') : ''} onChange={e => { const raw = e.target.value.replace(/\D/g, ''); setForm(f => ({ ...f, wholesalePrice: raw })); if (errors.wholesalePrice) setErrors(er => { const n = { ...er }; delete n.wholesalePrice; return n; }); }} inputProps={{ inputMode: 'numeric' }} error={!!errors.wholesalePrice} helperText={errors.wholesalePrice} sx={inputStyles} disabled={disablePrice}
                                                     InputProps={{ endAdornment: <InputAdornment position="end"><Typography variant="caption" fontWeight={700} color="#94a3b8">₫</Typography></InputAdornment> }} />
                                             </Grid>
                                             <Grid size={{ xs: 12, sm: 4 }}>
