@@ -15,10 +15,9 @@ import {
     Timer, NotificationsPaused,
 } from '@mui/icons-material';
 import {
-    BarChart, Bar, XAxis, YAxis, CartesianGrid,
+    ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid,
     Tooltip as RTooltip, ResponsiveContainer, Cell,
-    Legend,
-    LabelList,
+    Legend, LabelList, BarChart
 } from 'recharts';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -35,9 +34,12 @@ const fmtCurrency = (n: number | null | undefined) =>
     new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(n ?? 0);
 
 const fmtShort = (n: number) => {
-    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} tr`;
-    if (n >= 1_000) return `${(n / 1_000).toFixed(0)}k`;
-    return String(n);
+    if (!n) return '0';
+    const absN = Math.abs(n);
+    const sign = n < 0 ? '-' : '';
+    if (absN >= 1_000_000) return `${sign}${(absN / 1_000_000).toFixed(1)} tr`;
+    if (absN >= 1_000) return `${sign}${(absN / 1_000).toFixed(0)}k`;
+    return `${sign}${absN}`;
 };
 
 // ── Stat Card ────────────────────────────────────────────────
@@ -483,7 +485,6 @@ const DashboardPage: React.FC = () => {
                     {loading ? <Skeleton variant="rectangular" height="100%" sx={{ borderRadius: 2 }} /> :
                         (() => {
                             const data = (() => {
-
                                 if (chartPeriod === 'dayOfWeek') {
                                     const days = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "CN"];
                                     const result = days.map(d => ({ date: d, revenue: 0, orders: 0, grossProfit: 0 }));
@@ -502,10 +503,9 @@ const DashboardPage: React.FC = () => {
                                 return [...revenueTrend].sort((a, b) => a.date.localeCompare(b.date));
                             })();
 
-                            const maxOrders = Math.max(...data.map(d => d.orders), 1);
                             return data.length > 0 ? (
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={data} margin={{ top: 10, right: 50, left: 0, bottom: 0 }}>
+                                    <ComposedChart data={data} margin={{ top: 10, right: 50, left: 0, bottom: 0 }}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                         <XAxis
                                             dataKey="date"
@@ -534,7 +534,7 @@ const DashboardPage: React.FC = () => {
                                             orientation="right"
                                             axisLine={false} tickLine={false}
                                             tick={{ fontSize: 11, fill: '#3b82f6', fontWeight: 600 }}
-                                            domain={[0, Math.ceil(maxOrders * 1.2)]}
+                                            domain={[0, 'auto']}
                                         />
                                         <RTooltip
                                             cursor={{ fill: '#f1f5f9' }}
@@ -555,11 +555,11 @@ const DashboardPage: React.FC = () => {
                                             }}
                                             labelStyle={{ fontWeight: 800, color: '#1e293b', marginBottom: 8 }}
                                         />
-                                        <Legend align="center" verticalAlign="bottom" iconType="rect" wrapperStyle={{ paddingTop: 20, fontSize: 13, fontWeight: 700 }} />
-                                        <Bar yAxisId="left" name="Doanh thu" dataKey="revenue" fill="#16a34a" radius={[4, 4, 0, 0]} maxBarSize={80} />
-                                        <Bar yAxisId="left" name="Lợi nhuận gộp" dataKey="grossProfit" fill="#8b5cf6" radius={[4, 4, 0, 0]} maxBarSize={80} />
-                                        <Bar yAxisId="right" name="Số đơn" dataKey="orders" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={80} />
-                                    </BarChart>
+                                        <Legend align="center" verticalAlign="bottom" wrapperStyle={{ paddingTop: 20, fontSize: 13, fontWeight: 700 }} />
+                                        <Bar yAxisId="left" name="Doanh thu" dataKey="revenue" fill="#16a34a" radius={[4, 4, 0, 0]} maxBarSize={60} />
+                                        <Bar yAxisId="left" name="Lợi nhuận gộp" dataKey="grossProfit" fill="#8b5cf6" radius={[4, 4, 0, 0]} maxBarSize={60} />
+                                        <Line yAxisId="right" type="monotone" name="Số đơn" dataKey="orders" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                                    </ComposedChart>
                                 </ResponsiveContainer>
                             ) : (
                                 <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
